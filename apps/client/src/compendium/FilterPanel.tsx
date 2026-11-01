@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Button, Input, Select, Tick } from "@vtt/ui";
+import { Button, IconButton, IconChevronLeft, Input, Select, Tick } from "@vtt/ui";
 import { ModifiedDropdown, OneChoice } from "../scenes/listTools";
 import { KIND_FILTERS, type Kind } from "./kinds";
 import {
@@ -196,7 +196,8 @@ export function FilterPanel({
   onFilters,
   rows,
   sources,
-  gm
+  gm,
+  onFold
 }: Readonly<{
   kind: Kind | null;
   filters: TableFilters;
@@ -204,6 +205,8 @@ export function FilterPanel({
   rows: readonly CompendiumRow[];
   sources: readonly SourceOption[];
   gm: boolean;
+  /** Folds the pane to its edge, beside an open record. */
+  onFold?: () => void;
 }>) {
   const set = (patch: Partial<TableFilters>) => onFilters({ ...filters, ...patch });
   const counts = (facet: Facet) => facetCounts(rows, filters, kind, facet);
@@ -225,9 +228,16 @@ export function FilterPanel({
     <aside className="cp-filter-panel scroll-y" aria-label="Filters">
       <div className="cp-fp-head">
         <h3 className="cp-fp-title">Filters {on > 0 && <span className="cp-fp-on">{on}</span>}</h3>
-        <Button size="sm" disabled={on === 0} onClick={() => onFilters(NO_FILTERS)}>
-          Clear
-        </Button>
+        <span className="cp-fp-head-end">
+          <Button size="sm" disabled={on === 0} onClick={() => onFilters(NO_FILTERS)}>
+            Clear
+          </Button>
+          {onFold && (
+            <IconButton label="Fold the filters" size="sm" onClick={onFold}>
+              <IconChevronLeft />
+            </IconButton>
+          )}
+        </span>
       </div>
       <div className="cp-fp-group">
         <Input

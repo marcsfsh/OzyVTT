@@ -34,6 +34,8 @@ export type CompendiumContextValue = Readonly<{
   openNew: (options?: NewRecordOptions) => void;
   /** Opens the search (Ctrl K). */
   openSearch: () => void;
+  /** Closes a record's tab: the tab beside it shows, or the table when it was the last (compendium spec 2.3). */
+  closeTab: (kind: Kind, id: string) => void;
 }>;
 
 /**

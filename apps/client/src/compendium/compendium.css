@@ -409,16 +409,8 @@
   min-height: 0;
   height: 100%;
 }
-.cp-recordlayout.is-docked {
-  grid-template-columns: minmax(300px, 1fr) minmax(0, 720px);
-}
 .cp-recordlayout.is-full {
   grid-template-columns: minmax(0, 1fr);
-}
-.cp-dock-table {
-  min-width: 0;
-  min-height: 0;
-  border-right: 1px solid var(--line-raised);
 }
 .nh-flyout.cp-table-flyout {
   width: min(440px, 100%);
@@ -1390,4 +1382,185 @@
   display: inline-flex;
   gap: 6px;
   margin-left: auto;
+}
+
+/* ----- Three panes and the open records (compendium spec 2.3 and 4) ----- */
+.cp-panes {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.cp-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.cp-pane--filters {
+  flex: none;
+  width: 250px;
+}
+.cp-pane--filters .cp-filter-panel {
+  width: auto;
+  flex: 1 1 auto;
+}
+.cp-pane--results {
+  flex: none;
+  width: 300px;
+  border-right: 1px solid var(--line-strong);
+}
+.cp-pane--record {
+  flex: 1 1 auto;
+}
+.cp-pane--record > .cp-record {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cp-fp-head-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* A folded pane: its head as a 44px edge, the icon and the name read across. */
+.cp-fold-edge {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 44px;
+  padding: var(--space-3) 0;
+  border: 0;
+  border-right: 1px solid var(--line-strong);
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.cp-fold-edge:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.cp-fold-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.cp-fold-label {
+  writing-mode: vertical-rl;
+  font: 600 12px / 1 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+/* The results' head: 42px, its count in VT323 17px, Sort and Fold. */
+.cp-pane-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 42px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.cp-pane-title {
+  color: var(--text);
+  font: 600 12px / 1 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.cp-pane-count {
+  font: 400 17px / 1 var(--font-numeric);
+  letter-spacing: 0;
+}
+.cp-pane-note {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+  color: var(--caution-text);
+  font-size: var(--fs-sm);
+}
+.cp-tables.is-pane .cp-row {
+  min-height: 46px;
+}
+/* The open records: 40px over the record only; tabs up to 260px; the shown one on the page's ground with a 2px cyan
+   line on top. A phone draws them as a strip of chips. */
+.cp-opentabs {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  min-height: 40px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line-strong);
+  background: var(--surface-1);
+  scrollbar-width: none;
+}
+.cp-opentab {
+  display: inline-flex;
+  flex: 0 1 260px;
+  align-items: center;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  box-shadow: inset 0 2px 0 transparent;
+}
+.cp-opentab.is-on {
+  background: var(--bg);
+  box-shadow: inset 0 2px 0 var(--cyan);
+}
+.cp-opentab-link {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 4px 12px 10px;
+  color: var(--text-dim);
+  font: 600 13px / 1 var(--font-label);
+  text-decoration: none;
+}
+.cp-opentab.is-on .cp-opentab-link {
+  color: var(--text);
+}
+.cp-opentab-link svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.cp-opentab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-opentabs.is-phone {
+  gap: 6px;
+  min-height: 0;
+  padding: 6px var(--space-2);
+}
+.cp-opentabs.is-phone .cp-opentab {
+  flex: none;
+  max-width: 200px;
+  border: 1px solid var(--line-raised);
+}
+.cp-phone-record {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.cp-phone-record > .cp-record {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* A record's parts: a small switch at the right of its line row. */
+.cp-rec-parts {
+  margin-left: auto;
+}
+.cp-rec-parts .nh-tab {
+  height: 32px;
+  font-size: 13px;
+}
+/* A phone pins the record's main action at its foot (compendium spec 2.3). */
+.cp-record.is-phone .cp-rec-actions {
+  position: sticky;
+  bottom: 0;
+  padding: var(--space-2) 0;
+  background: var(--surface-1);
 }

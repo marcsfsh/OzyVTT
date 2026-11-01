@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Button,
   Eyebrow,
@@ -12,7 +12,10 @@ import {
   FiltersButton,
   AudienceChip,
   Chip,
-  Modal
+  IconButton,
+  IconChevronLeft,
+  Modal,
+  Tag
 } from "@vtt/ui";
 import { FilterPanel } from "./FilterPanel";
 import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "../scenes/listTools";
@@ -86,6 +89,13 @@ export type CompendiumTableProps = Readonly<{
   /** Browse's filter panel at the left (the GM's full table): the toolbar's Source, first filter and Filters give way
    *  to the active filters as chips. On a phone Filters opens the panel as a sheet. */
   panel?: boolean;
+  /** Beside an open record, as the results pane (compendium spec 2.3): a list under a head with its count, Sort and
+   *  Fold, the arrow keys moving through it. */
+  pane?: Readonly<{ onFold: () => void }>;
+  /** The records open as tabs, marked Open in the table. */
+  openKeys?: readonly string[];
+  /** Brings the open records back ("3 records open"). */
+  onOpenRecords?: () => void;
 }>;
 
 /**
@@ -120,7 +130,18 @@ export function CompendiumTable(props: CompendiumTableProps) {
       )
     );
   const columns = kind ? KIND_COLUMNS[kind].slice(0, compact ? 3 : undefined) : [];
-  const asList = phone || inFlyout;
+  const pane = props.pane;
+  // The results pane brings the open record's row into view as it opens.
+  const paneRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!pane || !rows) return;
+    paneRef.current?.querySelector<HTMLElement>('[aria-current="true"]')?.scrollIntoView({ block: "nearest" });
+    // The row to show changes with the record, and with the rows' first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, rows === null]);
+  const asList = phone || inFlyout || pane !== undefined;
+  const openKeys = props.openKeys ?? [];
+  const isOpen = (row: CompendiumRow) => openKeys.includes(`${row.kind}:${row.id}`);
 
   const kindDropdown = (
     <Dropdown
@@ -200,6 +221,11 @@ export function CompendiumTable(props: CompendiumTableProps) {
         firstDirection={firstDirection}
         phone={phone}
       />
+      {panel && openKeys.length > 0 && props.onOpenRecords && (
+        <Button size="sm" onClick={props.onOpenRecords}>
+          {openKeys.length} {openKeys.length === 1 ? "record" : "records"} open
+        </Button>
+      )}
       {panel ? (
         <span className="cp-tool-count" role="status">
           {rows ? `${shown.length.toLocaleString("en")} of ${all.length.toLocaleString("en")}` : "Loading the table."}
@@ -213,6 +239,33 @@ export function CompendiumTable(props: CompendiumTableProps) {
       )}
     </div>
   );
+  // The results pane's head: how many, the sort and Fold (compendium spec 2.3).
+  const paneHead = pane ? (
+    <div className="cp-pane-head">
+      <span className="cp-pane-title">
+        <span className="cp-pane-count">{shown.length}</span> {(kind ? kindPlural(kind) : "records").toLowerCase()}
+      </span>
+      <span className="cp-grow" />
+      <SortButton
+        sort={sort}
+        keys={sortKeys(kind, gm)}
+        labels={labels}
+        onSort={(levels) =>
+          setQuery((params) => params.set("sort", levels.map((level) => `${level.key}:${level.direction}`).join(",")))
+        }
+        directionLabel={(key, direction) => directionLabel(key, direction, kind)}
+        firstDirection={firstDirection}
+        phone={false}
+      />
+      <IconButton label="Fold the results" size="sm" onClick={pane.onFold}>
+        <IconChevronLeft />
+      </IconButton>
+    </div>
+  ) : null;
+  const outOfResults =
+    pane && selectedId && rows && !shown.some((row) => row.id === selectedId)
+      ? (all.find((row) => row.id === selectedId)?.name ?? "The open record")
+      : null;
   // The active filters as chips, each with its remove, and Clear all (compendium spec 2.2).
   const chips = panel ? filterChips(filters, kind, sources, gm) : [];
   const chipRow =
@@ -256,7 +309,21 @@ export function CompendiumTable(props: CompendiumTableProps) {
       );
     if (asList)
       return (
-        <ul className="cp-list">
+        <ul
+          className="cp-list"
+          onKeyDown={(event) => {
+            // The arrow keys move through the list; Enter opens the lit row (each row is a button).
+            if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+            const rowsShown = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("button.cp-row")];
+            const at = rowsShown.indexOf(document.activeElement as HTMLButtonElement);
+            const next =
+              rowsShown[Math.max(0, Math.min(rowsShown.length - 1, at + (event.key === "ArrowDown" ? 1 : -1)))];
+            if (next) {
+              event.preventDefault();
+              next.focus();
+            }
+          }}
+        >
           {shown.map((row) => (
             <li key={row.id}>
               <button
@@ -279,6 +346,7 @@ export function CompendiumTable(props: CompendiumTableProps) {
                   </small>
                 </span>
                 {props.mark(row)}
+                {isOpen(row) && row.id !== selectedId && <Tag tone="status">Open</Tag>}
               </button>
             </li>
           ))}
@@ -328,7 +396,16 @@ export function CompendiumTable(props: CompendiumTableProps) {
                     props.onOpen(row);
                   }}
                 >
-                  <NameCell kind={row.kind} name={row.name} mark={props.mark(row)} />
+                  <NameCell
+                    kind={row.kind}
+                    name={row.name}
+                    mark={
+                      <>
+                        {props.mark(row)}
+                        {isOpen(row) && <Tag tone="status">Open</Tag>}
+                      </>
+                    }
+                  />
                 </button>
               </td>
               {!kind && <td>{kindLabel(row.kind).replace(/^./, (first) => first.toUpperCase())}</td>}
@@ -372,6 +449,14 @@ export function CompendiumTable(props: CompendiumTableProps) {
     );
   })();
 
+  if (pane)
+    return (
+      <section ref={paneRef} className="cp-tables is-pane" aria-label={kind ? kindPlural(kind) : "Every kind"}>
+        {paneHead}
+        {outOfResults && <p className="cp-pane-note">{outOfResults} is open but not in these results</p>}
+        <div className="cp-tables-body scroll-y">{body}</div>
+      </section>
+    );
   if (panel)
     return (
       <section className="cp-tables has-panel" aria-label={kind ? kindPlural(kind) : "Every kind"}>

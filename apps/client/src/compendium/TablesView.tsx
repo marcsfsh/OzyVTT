@@ -6,7 +6,9 @@ import { usePacks, useTable } from "./data";
 import { KINDS, type Kind, type Names } from "./kinds";
 import { SourceMark, sourceWord } from "./pieces";
 import { recordPath, tablePath, withTableQuery } from "./routes";
-import type { CompendiumRow } from "./tableModel";
+import { parseKey, useOpenRecords } from "./openRecords";
+import { FilterPanel } from "./FilterPanel";
+import { readTableFilters, writeTableFilters, type CompendiumRow } from "./tableModel";
 
 /** A GM table row as the shared row shape. */
 export const rowOf = (row: HomebrewTableRow): CompendiumRow => ({
@@ -54,6 +56,7 @@ export function TablesView({
   const packs = usePacks(token).data?.packs ?? [];
   const names = useNames(token);
   const rows = useMemo(() => (table.data ? table.data.map(rowOf) : null), [table.data]);
+  const open = useOpenRecords();
   return (
     <CompendiumTable
       kind={kind}
@@ -77,6 +80,78 @@ export function TablesView({
       mark={(row) => <SourceMark row={row} packs={packs} />}
       sourceWord={(row) => sourceWord(row, packs)}
       panel={!compact && !inFlyout}
+      openKeys={open.keys}
+      onOpenRecords={() => {
+        if (!open.last) return;
+        const { kind: lastKind, id } = parseKey(open.last);
+        go(withTableQuery(recordPath(lastKind as Kind, id), query));
+      }}
+    />
+  );
+}
+
+/** The filters pane beside an open record: the filter panel over the kind's rows, its changes live in the results. */
+export function FilterPane({ kind, onFold }: Readonly<{ kind: Kind; onFold: () => void }>) {
+  const { token, query, setQuery } = useCompendium();
+  const table = useTable(token, kind);
+  const packs = usePacks(token).data?.packs ?? [];
+  const rows = useMemo(() => (table.data ? table.data.map(rowOf) : []), [table.data]);
+  const sources = sourceOptions(packs);
+  return (
+    <FilterPanel
+      kind={kind}
+      filters={readTableFilters(query, kind)}
+      onFilters={(next) =>
+        setQuery((params) =>
+          writeTableFilters(
+            params,
+            next,
+            sources.map((option) => option.value)
+          )
+        )
+      }
+      rows={rows}
+      sources={sources}
+      gm
+      onFold={onFold}
+    />
+  );
+}
+
+/** The results pane beside an open record: the kind's rows as a list under its head, the open one lit. */
+export function ResultsPane({
+  kind,
+  selectedId,
+  openKeys,
+  onFold
+}: Readonly<{ kind: Kind; selectedId: string; openKeys: readonly string[]; onFold: () => void }>) {
+  const { token, party, query, go, setQuery } = useCompendium();
+  const table = useTable(token, kind);
+  const packs = usePacks(token).data?.packs ?? [];
+  const names = useNames(token);
+  const rows = useMemo(() => (table.data ? table.data.map(rowOf) : null), [table.data]);
+  return (
+    <CompendiumTable
+      kind={kind}
+      kinds={KINDS}
+      allowAll={false}
+      rows={rows}
+      error={table.unavailable ? "This server has no homebrew library yet." : table.error}
+      onRetry={() => void table.reload()}
+      names={names}
+      sources={sourceOptions(packs)}
+      gm
+      party={party}
+      phone={false}
+      selectedId={selectedId}
+      query={query}
+      setQuery={setQuery}
+      onKind={(next, kept) => go(withTableQuery(tablePath(next), kept))}
+      onOpen={(row) => go(withTableQuery(recordPath(row.kind, row.id), query))}
+      mark={(row) => <SourceMark row={row} packs={packs} />}
+      sourceWord={(row) => sourceWord(row, packs)}
+      pane={{ onFold }}
+      openKeys={openKeys}
     />
   );
 }

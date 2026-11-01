@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { GmView } from "@vtt/domain";
-import { IconButton, IconPlus, IconSearch, Kbd, cx, type PartyCharacter, FilterFlyout } from "@vtt/ui";
+import {
+  IconButton,
+  IconSort,
+  IconList,
+  IconPlus,
+  IconSearch,
+  IconX,
+  Kbd,
+  cx,
+  type PartyCharacter,
+  FilterFlyout
+} from "@vtt/ui";
 import { CodexIcon } from "../codex/icons";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -18,14 +29,26 @@ import {
   type NewRecordOptions
 } from "./context";
 import { useCompendiumPing } from "./data";
-import { kindPlural, type Kind } from "./kinds";
+import { useCompendium as useCompendiumValue } from "./context";
+import { KindIcon, kindPlural, type Kind } from "./kinds";
+import { closeRecord, openRecord, parseKey, setFold, useOpenRecords } from "./openRecords";
+import { FilterPane, ResultsPane, useNames } from "./TablesView";
 import { NewRecordDialog } from "./NewRecordDialog";
 import { OverviewView } from "./OverviewView";
 import { RecordView } from "./record/RecordView";
-import { COMPENDIUM_PATHS, compendiumViewOf, sectionOf, type CompendiumSection, type CompendiumView } from "./routes";
+import {
+  COMPENDIUM_PATHS,
+  compendiumViewOf,
+  recordPath,
+  sectionOf,
+  tablePath,
+  withTableQuery,
+  type CompendiumSection,
+  type CompendiumView
+} from "./routes";
+import { TablesView } from "./TablesView";
 import { SharingView } from "./SharingView";
 import { SourcesView } from "./SourcesView";
-import { TablesView } from "./TablesView";
 import "../codex/shell/shell.css";
 import "./compendium.css";
 import { BarPrimary } from "../shell/SectionBar";
@@ -40,6 +63,65 @@ const SECTIONS: ReadonlyArray<Readonly<{ id: CompendiumSection; label: string; p
 ];
 
 const TABLE_FLYOUT_ID = "cp-table-flyout";
+/** Where all three panes open at once; narrower laptops fold the filters (compendium spec 2.3). */
+const THREE_PANES_QUERY = "(min-width: 1280px)";
+
+/** A folded pane: its head as a 44px edge with its icon and its name read across; pressing it opens the pane. */
+function FoldEdge({ label, icon, onOpen }: Readonly<{ label: string; icon: ReactNode; onOpen: () => void }>) {
+  return (
+    <button type="button" className="cp-fold-edge" onClick={onOpen} aria-label={`Open ${label}`}>
+      <span className="cp-fold-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="cp-fold-label">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * The open records as tabs over the record pane only (compendium spec 2.3): each its kind's icon, its name and Close,
+ * each a link to its address. A phone draws them as a strip of chips under the header.
+ */
+function OpenRecordTabs({
+  current,
+  keys,
+  phone,
+  onClose
+}: Readonly<{ current: string; keys: readonly string[]; phone: boolean; onClose: (kind: Kind, id: string) => void }>) {
+  const { token, query } = useCompendiumValue();
+  const names = useNames(token);
+  const shown = keys.includes(current) ? keys : [...keys, current];
+  return (
+    <div className={phone ? "cp-opentabs is-phone" : "cp-opentabs"} role="tablist" aria-label="Open records">
+      {shown.map((key) => {
+        const { kind: which, id } = parseKey(key);
+        const kind = which as Kind;
+        const name = names.record(id) ?? id;
+        const on = key === current;
+        return (
+          <span key={key} className={on ? "cp-opentab is-on" : "cp-opentab"}>
+            <a
+              role="tab"
+              aria-selected={on}
+              className="cp-opentab-link"
+              href={withTableQuery(recordPath(kind, id), query)}
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(withTableQuery(recordPath(kind, id), query));
+              }}
+            >
+              <KindIcon kind={kind} />
+              <span className="cp-opentab-name">{name}</span>
+            </a>
+            <IconButton label={`Close ${name}`} size="sm" onClick={() => onClose(kind, id)}>
+              <IconX />
+            </IconButton>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 /**
  * The GM's Compendium: SRD 5.2.1 and the table's homebrew in one set of tables, with Home, Browse, Sources and
@@ -77,12 +159,28 @@ export function CompendiumShell({
   // A row picked in the folded table opens its record and puts the table away.
   const recordKey = view.view === "record" ? `${view.kind}:${view.id}` : null;
   useEffect(() => setTableOpen(false), [recordKey]);
+  // A record shown from anywhere joins the open records (compendium spec 2.3).
+  useEffect(() => {
+    if (recordKey) openRecord(recordKey);
+  }, [recordKey]);
+  const open = useOpenRecords();
+  const threePanes = useMediaQuery(THREE_PANES_QUERY);
+  const closeTab = useCallback(
+    (kind: Kind, id: string) => {
+      const next = closeRecord(`${kind}:${id}`);
+      if (next) {
+        const { kind: nextKind, id: nextId } = parseKey(next);
+        navigate(withTableQuery(recordPath(nextKind as Kind, nextId), route.query));
+      } else navigate(withTableQuery(tablePath(kind), route.query));
+    },
+    [route.query]
+  );
 
   const value = useMemo<CompendiumContextValue>(
-    () => ({ token, party, phone, wide, view, query: route.query, go, setQuery, openNew, openSearch }),
+    () => ({ token, party, phone, wide, view, query: route.query, go, setQuery, openNew, openSearch, closeTab }),
     // `view` is read from the address, which `route` already names.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [token, party, phone, wide, route, go, setQuery, openNew, openSearch]
+    [token, party, phone, wide, route, go, setQuery, openNew, openSearch, closeTab]
   );
   const shortcut = useMemo(() => shortcutLabel("K", currentDevice()), []);
   const kindInView: Kind | null = view.view === "tables" || view.view === "record" ? view.kind : null;
@@ -90,7 +188,7 @@ export function CompendiumShell({
   useRecordLight(shell, recordKey, {
     content: ":scope > .cx-content",
     // Beside a docked table only the record fades; elsewhere the record is the whole content.
-    record: ".cp-recordlayout.is-docked > :not(.cp-dock-table)"
+    record: ".cp-panes .cp-pane--record > .cp-record"
   });
 
   const body = ((): ReactNode => {
@@ -104,25 +202,30 @@ export function CompendiumShell({
       case "sharing":
         return <SharingView />;
       case "record": {
-        if (phone) return <RecordView key={recordKey} kind={view.kind} id={view.id} tab={view.tab} layout="phone" />;
+        const tabs = <OpenRecordTabs current={recordKey!} keys={open.keys} phone={phone} onClose={closeTab} />;
+        if (phone)
+          return (
+            <div className="cp-phone-record">
+              {tabs}
+              <RecordView key={recordKey} kind={view.kind} id={view.id} tab={view.tab} layout="phone" />
+            </div>
+          );
         const docked = wide && view.tab !== "edit";
-        // The record keeps its place among its siblings, so a change between docked and full keeps its draft.
-        return (
-          <div className={cx("cp-recordlayout", docked ? "is-docked" : "is-full")}>
-            {docked ? (
-              <div className="cp-dock-table">
-                <TablesView kind={view.kind} compact selectedId={view.id} />
+        if (!docked)
+          // Editing takes the width under the open records' tabs; a narrower laptop keeps the table in a flyout.
+          return (
+            <div className="cp-recordlayout is-full">
+              <div className="cp-pane cp-pane--record">
+                {tabs}
+                <RecordView
+                  key={recordKey}
+                  kind={view.kind}
+                  id={view.id}
+                  tab={view.tab}
+                  layout="full"
+                  onOpenTable={view.tab === "edit" ? undefined : () => setTableOpen(true)}
+                />
               </div>
-            ) : null}
-            <RecordView
-              key={recordKey}
-              kind={view.kind}
-              id={view.id}
-              tab={view.tab}
-              layout={docked ? "dock" : "full"}
-              onOpenTable={docked ? undefined : () => setTableOpen(true)}
-            />
-            {!docked && (
               <FilterFlyout
                 id={TABLE_FLYOUT_ID}
                 open={tableOpen}
@@ -133,7 +236,36 @@ export function CompendiumShell({
               >
                 <TablesView kind={view.kind} inFlyout selectedId={view.id} />
               </FilterFlyout>
+            </div>
+          );
+        // Three panes, all live (compendium spec 2.3): the filters, the results and the record under its tabs. Below
+        // 1280px the filters start folded so the record keeps room for its card.
+        const filtersFolded = open.folds.filters ?? !threePanes;
+        return (
+          <div className="cp-panes">
+            {filtersFolded ? (
+              <FoldEdge label="Filters" icon={<IconSort />} onOpen={() => setFold("filters", false)} />
+            ) : (
+              <div className="cp-pane cp-pane--filters">
+                <FilterPane kind={view.kind} onFold={() => setFold("filters", true)} />
+              </div>
             )}
+            {open.folds.results ? (
+              <FoldEdge label={kindPlural(view.kind)} icon={<IconList />} onOpen={() => setFold("results", false)} />
+            ) : (
+              <div className="cp-pane cp-pane--results">
+                <ResultsPane
+                  kind={view.kind}
+                  selectedId={view.id}
+                  openKeys={open.keys}
+                  onFold={() => setFold("results", true)}
+                />
+              </div>
+            )}
+            <div className="cp-pane cp-pane--record">
+              {tabs}
+              <RecordView key={recordKey} kind={view.kind} id={view.id} tab={view.tab} layout="dock" />
+            </div>
           </div>
         );
       }

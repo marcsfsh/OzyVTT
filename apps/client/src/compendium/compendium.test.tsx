@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -161,6 +161,7 @@ import { ToastProvider } from "@vtt/ui";
 import { goTo } from "../../test/route";
 import { CompendiumShell } from "./CompendiumShell";
 import { resetCompendiumData } from "./data";
+import { resetOpenRecords } from "./openRecords";
 
 const PARTY = [
   { id: LYRA, name: "Lyra Emberwise" },
@@ -181,6 +182,7 @@ beforeEach(() => {
   api.calls = [];
   api.seeAs = { received: false };
   resetCompendiumData();
+  resetOpenRecords();
 });
 
 describe("the Compendium's tables", () => {
@@ -214,7 +216,9 @@ describe("an SRD record", () => {
     const user = mount("/compendium/spells/fireball");
     await screen.findByRole("heading", { name: "Fireball", level: 2 });
     expect(screen.queryByRole("tab", { name: "Edit" })).toBeNull();
-    // The copy already made from it is one Compare away.
+    // The copy already made from it is one Compare away, in the record's Your copies part.
+    await user.click(screen.getByRole("tab", { name: "Your copies · 1" }));
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe("copies");
     expect(screen.getByRole("region", { name: "Your copies" })).toHaveTextContent("Brine Burst");
     await user.click(screen.getByRole("button", { name: "Make a homebrew copy" }));
     const dialog = screen.getByRole("dialog", { name: "Make a homebrew copy" });
@@ -363,5 +367,40 @@ describe("the Compendium's home", () => {
     expect(screen.getByText("Nothing needs you. Every record is published as written.")).toBeInTheDocument();
     await user.click(within(spells).getByRole("button", { name: "Open Spells" }));
     expect(window.location.pathname).toBe("/compendium/tables/spells");
+  });
+});
+
+describe("the open records", () => {
+  it("open each record shown as a tab, switch between them, and close to the neighbour and then to the table", async () => {
+    const user = mount("/compendium/spells/fireball");
+    await screen.findByRole("heading", { name: "Fireball", level: 2 });
+    act(() => goTo("/compendium/spells/counterspell"));
+    const tabs = await screen.findByRole("tablist", { name: "Open records" });
+    await waitFor(() =>
+      expect(
+        within(tabs)
+          .getAllByRole("tab")
+          .map((tab) => tab.textContent)
+      ).toEqual(["Fireball", "Counterspell"])
+    );
+    await user.click(within(tabs).getByRole("tab", { name: "Fireball" }));
+    expect(window.location.pathname).toBe("/compendium/spells/fireball");
+    await user.click(
+      within(screen.getByRole("tablist", { name: "Open records" })).getByRole("button", { name: "Close Fireball" })
+    );
+    expect(window.location.pathname).toBe("/compendium/spells/counterspell");
+    await user.click(
+      within(screen.getByRole("tablist", { name: "Open records" })).getByRole("button", { name: "Close Counterspell" })
+    );
+    expect(window.location.pathname).toBe("/compendium/tables/spells");
+  });
+
+  it("bring the open records back from the full table", async () => {
+    const user = mount("/compendium/spells/fireball");
+    await screen.findByRole("heading", { name: "Fireball", level: 2 });
+    act(() => goTo("/compendium/tables/spells"));
+    const back = await screen.findByRole("button", { name: "1 record open" });
+    await user.click(back);
+    expect(window.location.pathname).toBe("/compendium/spells/fireball");
   });
 });

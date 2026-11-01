@@ -27,7 +27,7 @@ export const kindOfSlug = (slug: string | undefined): Kind | null =>
  *   /compendium/tables/<kinds>        one kind's table (`spells`, `items`, `monsters`)
  *   /compendium/sources               Sources: packs, import and export
  *   /compendium/sharing               who sees what, as a grid
- *   /compendium/<kinds>/<id>          one record: `?tab=card|edit|sharing|history`, `&step=<step>`, `&as=<who>`
+ *   /compendium/<kinds>/<id>          one record: `?tab=card|edit|sharing|history|copies`, `&step=<step>`, `&as=<who>`
  *
  * The old `/homebrew` redirects here.
  */
@@ -35,8 +35,9 @@ export const kindOfSlug = (slug: string | undefined): Kind | null =>
 export const COMPENDIUM_ROOT = "/compendium";
 
 export type CompendiumSection = "overview" | "tables" | "sources" | "sharing";
-export type RecordTab = "card" | "edit" | "sharing" | "history";
-export const RECORD_TABS: readonly RecordTab[] = ["card", "edit", "sharing", "history"];
+/** A record's parts; `copies` is an SRD record's Your copies, the homebrew made from it. */
+export type RecordTab = "card" | "edit" | "sharing" | "history" | "copies";
+export const RECORD_TABS: readonly RecordTab[] = ["card", "edit", "sharing", "history", "copies"];
 
 export type CompendiumView =
   | Readonly<{ view: "overview" }>

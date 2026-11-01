@@ -25,7 +25,7 @@ import { useCompendium, useCompendiumGame } from "../context";
 import { useHomebrewList, useTable } from "../data";
 import { KindIcon, kindLabel, phoneFacts, type Kind } from "../kinds";
 import { PhoneHead, StateChip } from "../pieces";
-import { RECORD_TABS, recordPath, tablePath, withTableQuery, type RecordTab } from "../routes";
+import { recordPath, withTableQuery, type RecordTab } from "../routes";
 import { useNames } from "../TablesView";
 import { AddToScene } from "./AddToScene";
 import { CardTab } from "./CardTab";
@@ -35,13 +35,18 @@ import { SharingTab, audienceLock, audienceWord } from "./SharingTab";
 import { Studio, stepStates, useStudioPlan, type StudioMode } from "./Studio";
 import { editorParts } from "./editorParts";
 import { useHomebrewRecord, type HomebrewRecordState } from "./useHomebrewRecord";
+import { forgetRecord } from "../openRecords";
 
 const TAB_WORD: Readonly<Record<RecordTab, string>> = {
   card: "Card",
   edit: "Edit",
   sharing: "Sharing",
-  history: "History"
+  history: "History",
+  copies: "Your copies"
 };
+
+/** A homebrew record's parts; Edit is a button that opens the studio, not a part (compendium spec 2.3). */
+const HOMEBREW_PARTS: readonly RecordTab[] = ["card", "sharing", "history"];
 
 /** Where a published record turns up for the table, for Review's last word. */
 const WHERE_IT_APPEARS: Readonly<Record<Kind, string>> = {
@@ -84,7 +89,7 @@ export function RecordView({
   const source = row?.source ?? (table.data || table.error ? "homebrew" : null);
   if (source === null) return <p className="cp-hint cp-pad">Opening the record.</p>;
   return source === "srd" ? (
-    <SrdRecord kind={kind} id={id} layout={layout} onOpenTable={onOpenTable} />
+    <SrdRecord kind={kind} id={id} tab={tab} layout={layout} onOpenTable={onOpenTable} />
   ) : (
     <HomebrewRecordLoader kind={kind} id={id} tab={tab} layout={layout} onOpenTable={onOpenTable} />
   );
@@ -101,6 +106,7 @@ function RecordHeader({
   primary,
   menu,
   extra,
+  parts,
   layout,
   onOpenTable,
   onClose
@@ -116,6 +122,8 @@ function RecordHeader({
   menu?: ReactNode;
   /** Edit's Steps and All questions. */
   extra?: ReactNode;
+  /** The record's parts as a small switch at the right of the line row, so there are never three rows of tabs. */
+  parts?: ReactNode;
   layout: RecordLayout;
   onOpenTable?: () => void;
   onClose: () => void;
@@ -155,6 +163,7 @@ function RecordHeader({
         <span className="cp-rec-line">{line}</span>
         {who}
         {primary}
+        {parts && <span className="cp-rec-parts">{parts}</span>}
       </div>
     </header>
   );
@@ -163,15 +172,23 @@ function RecordHeader({
 function RecordTabs({
   tab,
   tabs,
+  labels = {},
   onTab,
   id
-}: Readonly<{ tab: RecordTab; tabs: readonly RecordTab[]; onTab: (tab: RecordTab) => void; id: string }>) {
+}: Readonly<{
+  tab: RecordTab;
+  tabs: readonly RecordTab[];
+  /** A part's own label in place of its word ("Your copies · 2"). */
+  labels?: Partial<Record<RecordTab, string>>;
+  onTab: (tab: RecordTab) => void;
+  id: string;
+}>) {
   return (
     <Tabs
       className="cp-rec-tabs"
       ariaLabel="Record"
       idBase={`cp-rec-${id}`}
-      tabs={tabs.map((entry) => ({ id: entry, label: TAB_WORD[entry] }))}
+      tabs={tabs.map((entry) => ({ id: entry, label: labels[entry] ?? TAB_WORD[entry] }))}
       activeId={tab}
       onChange={(next) => onTab(next as RecordTab)}
     />
@@ -192,10 +209,11 @@ function useRecordLine(kind: Kind, id: string, fallback: string): string {
 function SrdRecord({
   kind,
   id,
+  tab,
   layout,
   onOpenTable
-}: Readonly<{ kind: Kind; id: string; layout: RecordLayout; onOpenTable?: () => void }>) {
-  const { token, party, query, go, setQuery, openNew } = useCompendium();
+}: Readonly<{ kind: Kind; id: string; tab: RecordTab; layout: RecordLayout; onOpenTable?: () => void }>) {
+  const { token, party, query, go, setQuery, openNew, closeTab } = useCompendium();
   const names = useNames(token);
   const table = useTable(token, kind);
   const [record, setRecord] = useState<HomebrewSrdRecord | null>(null);
@@ -217,12 +235,14 @@ function SrdRecord({
   }, [token, id]);
   const line = useRecordLine(kind, id, `SRD 5.2.1 ${kindLabel(kind)}`);
   const game = useCompendiumGame();
-  const close = () => go(withTableQuery(tablePath(kind), query));
-  if (error) return <RecordProblem text={error} onClose={close} />;
+  const close = () => closeTab(kind, id);
+  if (error) return <RecordProblem text={error} recordKey={`${kind}:${id}`} onClose={close} />;
   if (!record) return <p className="cp-hint cp-pad">Opening the record.</p>;
   const card = cardOfBody(kind, record.record, id);
   const name = cardName(card);
   const copies = (table.data ?? []).filter((entry) => entry.basedOn?.id === id && !entry.archived);
+  // An SRD record's parts are its Card and Your copies (compendium spec 2.3).
+  const part: RecordTab = tab === "copies" ? "copies" : "card";
   const copyButton = (
     <Button
       variant="primary"
@@ -241,6 +261,17 @@ function SrdRecord({
         name={name}
         line={line}
         chips={<Badge tone="info">SRD 5.2.1</Badge>}
+        parts={
+          <RecordTabs
+            tab={part}
+            tabs={["card", "copies"]}
+            labels={{ copies: `Your copies · ${copies.length}` }}
+            onTab={(next) =>
+              go(withTableQuery(recordPath(kind, id), query, { tab: next === "card" ? null : next }), { replace: true })
+            }
+            id={id}
+          />
+        }
         primary={
           layout === "phone" ? null : (
             <>
@@ -253,21 +284,27 @@ function SrdRecord({
         onOpenTable={onOpenTable}
         onClose={close}
       />
-      <RecordTabs tab="card" tabs={["card"]} onTab={() => undefined} id={id} />
-      <div className="cp-rec-body scroll-y" role="tabpanel" id={`cp-rec-${id}-panel-card`}>
-        <p className="cp-hint">Read only. A homebrew copy keeps a link to it, for Compare.</p>
-        <CardTab
-          token={token}
-          kind={kind}
-          recordId={id}
-          doc={null}
-          gmCard={card}
-          names={names}
-          party={party}
-          as={query.get("as")}
-          onAs={(as) => setQuery((params) => (as ? params.set("as", as) : params.delete("as")))}
-        />
-        {copies.length > 0 && (
+      <div className="cp-rec-body scroll-y" role="tabpanel" id={`cp-rec-${id}-panel-${part}`}>
+        {part === "card" && (
+          <>
+            <p className="cp-hint">Read only. A homebrew copy keeps a link to it, for Compare.</p>
+            <CardTab
+              token={token}
+              kind={kind}
+              recordId={id}
+              doc={null}
+              gmCard={card}
+              names={names}
+              party={party}
+              as={query.get("as")}
+              onAs={(as) => setQuery((params) => (as ? params.set("as", as) : params.delete("as")))}
+            />
+          </>
+        )}
+        {part === "copies" && copies.length === 0 && (
+          <p className="cp-hint">No homebrew copies yet. Make a homebrew copy to start one from this record.</p>
+        )}
+        {part === "copies" && copies.length > 0 && (
           <section className="cp-copies" aria-label="Your copies">
             <h4 className="cp-h">Your copies</h4>
             <ul className="cp-list">
@@ -298,7 +335,13 @@ function SrdRecord({
   );
 }
 
-function RecordProblem({ text, onClose }: Readonly<{ text: string; onClose: () => void }>) {
+function RecordProblem({
+  text,
+  recordKey,
+  onClose
+}: Readonly<{ text: string; recordKey: string; onClose: () => void }>) {
+  // A record that no longer reads (deleted or archived elsewhere) leaves the open records.
+  useEffect(() => forgetRecord(recordKey), [recordKey]);
   return (
     <div className="cp-empty">
       <p>{text}</p>
@@ -314,7 +357,7 @@ function HomebrewRecordLoader({
   layout,
   onOpenTable
 }: Readonly<{ kind: Kind; id: string; tab: RecordTab; layout: RecordLayout; onOpenTable?: () => void }>) {
-  const { token, query, go } = useCompendium();
+  const { token, closeTab } = useCompendium();
   const list = useHomebrewList(token);
   const [doc, setDoc] = useState<HomebrewRecordDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -337,7 +380,7 @@ function HomebrewRecordLoader({
       live = false;
     };
   }, [token, id]);
-  if (error) return <RecordProblem text={error} onClose={() => go(withTableQuery(tablePath(kind), query))} />;
+  if (error) return <RecordProblem text={error} recordKey={`${kind}:${id}`} onClose={() => closeTab(kind, id)} />;
   if (!doc || !list.data) return <p className="cp-hint cp-pad">Opening the record.</p>;
   return (
     <HomebrewRecord
@@ -392,7 +435,7 @@ function HomebrewRecord({
   layout: RecordLayout;
   onOpenTable?: () => void;
 }>) {
-  const { token, party, query, go, setQuery, openNew, wide, phone } = useCompendium();
+  const { token, party, query, go, setQuery, openNew, wide, phone, closeTab } = useCompendium();
   const record = useHomebrewRecord({ token, initial, records });
   const { doc, draft } = record;
   const kind = doc.type;
@@ -428,7 +471,7 @@ function HomebrewRecord({
       }),
       { replace: true }
     );
-  const close = () => go(withTableQuery(tablePath(kind), query));
+  const close = () => closeTab(kind, doc.id);
   const publishLabel = record.archived ? null : !record.published ? "Publish" : record.pending ? "Update" : null;
   const blocked = record.checklist.length > 0;
 
@@ -447,10 +490,21 @@ function HomebrewRecord({
       {publishLabel}
     </Button>
   ) : null;
+  // Edit opens the studio at `?tab=edit`; while editing, Done returns to the Card (compendium spec 2.3).
+  const editButton = record.archived ? null : tab === "edit" ? (
+    <Button size="sm" onClick={() => toTab("card")}>
+      Done
+    </Button>
+  ) : (
+    <Button size="sm" onClick={() => toTab("edit")}>
+      Edit
+    </Button>
+  );
   const primary =
-    addToScene || publish ? (
+    addToScene || publish || editButton ? (
       <>
         {addToScene}
+        {editButton}
         {publish}
       </>
     ) : null;
@@ -625,11 +679,11 @@ function HomebrewRecord({
         primary={layout === "phone" ? addToScene : primary}
         menu={menu}
         extra={extra}
+        parts={<RecordTabs tab={tab} tabs={HOMEBREW_PARTS} onTab={toTab} id={doc.id} />}
         layout={layout}
         onOpenTable={onOpenTable}
         onClose={close}
       />
-      <RecordTabs tab={tab} tabs={RECORD_TABS} onTab={toTab} id={doc.id} />
       <RecordNotices record={record} kind={kind} />
       <div
         className={cx("cp-rec-body", tab === "edit" && !record.archived ? "is-studio" : "scroll-y")}
