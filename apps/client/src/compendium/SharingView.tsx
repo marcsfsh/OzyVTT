@@ -247,7 +247,7 @@ export function SharingView() {
 
   return (
     <div className="cp-sharing cp-sharing-split">
-      <nav className="cp-sharing-sideList scroll-y" aria-label="Narrow who sees what">
+      <nav className="cp-sharing-filters scroll-y" aria-label="Narrow who sees what">
         {side}
       </nav>
       <div className="cp-sharing-main scroll-y">

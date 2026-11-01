@@ -694,6 +694,13 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
   only; a folded pane is a 44px edge. The record's parts sit at the right of its title line, never a third row of tabs.
 - The studio is one step at a time with each step's answer in the rail, Next as the Cup, and for a copy a preview that
   names what differs from its original.
+- Sources puts SOURCES at the left (the SRD, This table, each pack, Import a pack) and the chosen source at the right:
+  its name, Export a selection and More, its line, In pickers, BY KIND and NEEDS YOU. Sharing puts KINDS and WHO SEES
+  IT at the left and the published records as rows, each with Who sees it as a menu; Choose sets several (ADR-0068).
+- A record's History and Sharing keep its card and open their part in a side column: VERSIONS as compact rows (a
+  chosen one under the cyan notice with Restore this version, Back to now and Compare with now) and SHARE with a box
+  for Everyone and each character and a Cup that says what it will do. Two devices' changes open as a dialog; closed,
+  an amber line with Choose stays.
 - An SRD record carries a quiet SRD 5.2.1 tag; homebrew carries a magenta Homebrew tag, and homebrew counts are magenta
   wherever they show.
 

@@ -397,8 +397,9 @@ Codex's tools in Settings.
 Job: the rules content, SRD and homebrew, and who sees it. Status: frame Built (`G-compendium/SPEC.md`,
 `G-compendium/PLAN.md`, ADR-0055): the Titled bar, a home of shelves, browsing and records as three panes (filters,
 results and the record, with the open records as tabs), and the studio with each step's answer in its rail. G4 to G6
-Designed (`G-compendium-pages/SPEC.md`, `G-compendium-pages/PLAN.md`, ADR-0068): the sources and Sharing's kinds at the
-side, a record's history as compact rows and its sharing in the side column, and merging as A's dialog. Its rules settle
+Built in part (`G-compendium-pages/SPEC.md`, `G-compendium-pages/PLAN.md`, ADR-0068): the sources and Sharing's kinds at
+the side, a record's history as compact rows and its sharing in the side column, and merging as A's dialog. Not built: a
+version drawn as the card it was, a version in the address, and when a record reached each character in Sharing's menu. Its rules settle
 search's dialog (G9), the catalog picker (G11) and the other kinds' editors (G7).
 
 | Id  | Surface                                        | Opens at                  | Who | Files                                                                                                                                                                                                       |

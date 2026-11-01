@@ -955,7 +955,10 @@ names no family is the GM's own ruling on the whole command.
   sends. The monster wizard compares its numbers with the SRD stat blocks of its CR, read from the bundle
   by `content:monster-benchmarks`. Its sections read Home (the shelves), Browse (the tables), Sources and
   Sharing over the same addresses. The studio's rail shows each step's answer (`homebrew/wizard/stepAnswers.ts`), and
-  a copy's preview names what differs from its original (`useOriginalBody` in `record/HistoryTab.tsx`).
+  a copy's preview names what differs from its original (`useOriginalBody` in `record/HistoryTab.tsx`). Sources keeps
+  the chosen source in its address (`/compendium/sources?source={srd|packId}`, This table by default) and counts a
+  pack's kinds from the homebrew rows; Sharing keeps `?kind=` and `?who=shared|hidden`; a record's History and Sharing
+  tabs render the card with their part in a side column, and a merge opens as a dialog over the record (ADR-0068).
 - Add to an encounter on a monster's card (`compendium/record/AddToScene.tsx`) is client orchestration over two
   existing commands: `actor:add-from-definition` at the staging default, then `encounter:set-combatants` with
   the encounter's ids merged from a fresh snapshot and `expectedRevision`. It offers only prepared encounters that
