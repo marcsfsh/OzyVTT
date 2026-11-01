@@ -10,6 +10,7 @@ import { OTHER_STEP, REVIEW_STEP, moreFields, wizardSteps } from "../../homebrew
 import { isCustomQuestion, type WizardDef, type WizardStep } from "../../homebrew/wizard/types";
 import "../../homebrew/homebrew.css";
 import "../../homebrew/wizard/wizard.css";
+import { stepAnswer } from "../../homebrew/wizard/stepAnswers";
 
 /**
  * The record's questions, as C's studio lays them out: the steps down the left, each marked done, current or missing
@@ -153,7 +154,12 @@ export function Studio(props: StudioProps) {
 
   const stepItems: StepItem[] = steps.map((entry) => {
     const state = states.get(entry.id);
-    return { label: entry.title, ...(state === "done" || state === "incomplete" ? { state } : {}) };
+    const answer = stepAnswer(def.type, entry.id, draft);
+    return {
+      label: entry.title,
+      ...(answer ? { detail: answer } : {}),
+      ...(state === "done" || state === "incomplete" ? { state } : {})
+    };
   });
   const blocked = checklist.length > 0;
   const isReview = step.id === REVIEW_STEP;
@@ -255,7 +261,7 @@ export function Studio(props: StudioProps) {
         </Button>
         <span className="cp-grow" />
         {!isReview && next ? (
-          <Button size="sm" className="cp-next" onClick={() => go(index + 1)}>
+          <Button variant="primary" size="sm" className="cp-next" onClick={() => go(index + 1)}>
             <IconArrow /> {props.phone ? "Next" : `Next: ${next.title}`}
           </Button>
         ) : (

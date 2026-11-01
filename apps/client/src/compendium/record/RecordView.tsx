@@ -14,7 +14,9 @@ import {
   SegmentedControl,
   Tabs,
   cx,
-  WhoSeesItSwitch
+  WhoSeesItSwitch,
+  Switch,
+  Tag
 } from "@vtt/ui";
 import { homebrewApi, type HomebrewRecordDocument, type HomebrewSrdRecord } from "../../homebrew/api";
 import { closingSave } from "../../homebrew/closingSaves";
@@ -36,6 +38,9 @@ import { Studio, stepStates, useStudioPlan, type StudioMode } from "./Studio";
 import { editorParts } from "./editorParts";
 import { useHomebrewRecord, type HomebrewRecordState } from "./useHomebrewRecord";
 import { forgetRecord } from "../openRecords";
+import { useOriginalBody } from "./HistoryTab";
+import type { Draft } from "../../homebrew/schema";
+import { compareBodies } from "./words";
 
 const TAB_WORD: Readonly<Record<RecordTab, string>> = {
   card: "Card",
@@ -491,6 +496,7 @@ function HomebrewRecord({
     </Button>
   ) : null;
   // Edit opens the studio at `?tab=edit`; while editing, Done returns to the Card (compendium spec 2.3).
+  // While editing, Next is the studio's Cup, so Done steps down (ADR-0073), and Publish waits on Review's foot.
   const editButton = record.archived ? null : tab === "edit" ? (
     <Button size="sm" onClick={() => toTab("card")}>
       Done
@@ -501,11 +507,11 @@ function HomebrewRecord({
     </Button>
   );
   const primary =
-    addToScene || publish || editButton ? (
+    addToScene || (tab !== "edit" && publish) || editButton ? (
       <>
         {addToScene}
         {editButton}
-        {publish}
+        {tab !== "edit" && publish}
       </>
     ) : null;
 
@@ -565,6 +571,8 @@ function HomebrewRecord({
           <IconWarning /> Changed on two devices
         </Badge>
       )}
+      {tab === "edit" && <Tag tone="homebrew">Homebrew</Tag>}
+      {tab === "edit" && doc.basedOn && <span className="cp-based-on">Based on {doc.basedOn.name}</span>}
       {layout !== "phone" && <SaveState status={record.status} onRetry={record.retry} className="cp-savestate" />}
     </>
   );
@@ -632,7 +640,9 @@ function HomebrewRecord({
             onPublish={() => void record.publish()}
             busy={record.busy}
             published={reviewPublished}
-            preview={<CompendiumCard card={card} names={names} />}
+            preview={
+              <StudioPreview kind={kind} doc={doc} draft={draft} card={<CompendiumCard card={card} names={names} />} />
+            }
             previewLine={[name, line].join(" · ")}
             wide={wide}
             phone={phone}
@@ -728,5 +738,33 @@ function RecordNotices({ record, kind }: Readonly<{ record: HomebrewRecordState;
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * The studio's preview (compendium spec 2.4): the live card, and for a copy a "Mark what differs" switch, on by
+ * default, naming what differs from the record it was copied from in amber.
+ */
+function StudioPreview({
+  kind,
+  doc,
+  draft,
+  card
+}: Readonly<{ kind: Kind; doc: HomebrewRecordDocument; draft: Draft; card: ReactNode }>) {
+  const { token } = useCompendium();
+  const original = useOriginalBody(token, doc.basedOn ?? null);
+  const [mark, setMark] = useState(true);
+  if (!doc.basedOn) return <>{card}</>;
+  const differs = original && original !== "gone" ? compareBodies(kind, original, draft) : [];
+  return (
+    <>
+      <Switch checked={mark} onChange={setMark} label="Mark what differs" />
+      {mark && differs.length > 0 && (
+        <p className="cp-differs">
+          Differs from {doc.basedOn.name}: {[...new Set(differs.map((row) => row.label))].join(", ")}
+        </p>
+      )}
+      {card}
+    </>
   );
 }

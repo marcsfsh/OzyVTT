@@ -1564,3 +1564,13 @@
   padding: var(--space-2) 0;
   background: var(--surface-1);
 }
+/* What a copy changed from its original, over the studio's preview. */
+.cp-differs {
+  margin: var(--space-2) 0;
+  color: var(--caution-text);
+  font-size: var(--fs-sm);
+}
+.cp-based-on {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}

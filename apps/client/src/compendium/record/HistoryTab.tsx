@@ -239,25 +239,7 @@ function BasedOn({
   onOpen: (source: NonNullable<HomebrewRecordDocument["basedOn"]>) => void;
 }>) {
   const source = doc.basedOn!;
-  const [body, setBody] = useState<Body | null | "gone">(null);
-  useEffect(() => {
-    let live = true;
-    const read =
-      source.source === "srd"
-        ? homebrewApi.srdRecord(token, source.id).then((answer) => answer.record)
-        : homebrewApi.get(token, source.id).then((answer) => answer.record);
-    read.then(
-      (record) => {
-        if (live) setBody(record);
-      },
-      () => {
-        if (live) setBody("gone");
-      }
-    );
-    return () => {
-      live = false;
-    };
-  }, [token, source.source, source.id]);
+  const body = useOriginalBody(token, source);
   const srd = source.source === "srd";
   const rows = body && body !== "gone" ? compareBodies(kind, body, draft) : [];
   return (
@@ -294,4 +276,34 @@ function BasedOn({
       )}
     </section>
   );
+}
+
+/** The record a copy was made from, read once: its body, null while it reads, or "gone" when it no longer reads. */
+export function useOriginalBody(
+  token: string,
+  source: NonNullable<HomebrewRecordDocument["basedOn"]> | null
+): Body | null | "gone" {
+  const [body, setBody] = useState<Body | null | "gone">(null);
+  const which = source?.source ?? null;
+  const id = source?.id ?? null;
+  useEffect(() => {
+    if (!which || !id) return;
+    let live = true;
+    const read =
+      which === "srd"
+        ? homebrewApi.srdRecord(token, id).then((answer) => answer.record)
+        : homebrewApi.get(token, id).then((answer) => answer.record);
+    read.then(
+      (record) => {
+        if (live) setBody(record);
+      },
+      () => {
+        if (live) setBody("gone");
+      }
+    );
+    return () => {
+      live = false;
+    };
+  }, [token, which, id]);
+  return body;
 }

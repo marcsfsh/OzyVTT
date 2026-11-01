@@ -12,6 +12,8 @@ export interface StepItem {
   /** Overrides the position-derived state for a non-current step, so a visited but unanswered step stops
       showing a check mark. Never overrides `current`. */
   state?: "done" | "incomplete";
+  /** One line under the label in the vertical list: the step's current answer ("AC 17 · HP 27 · 30 ft."). */
+  detail?: ReactNode;
 }
 
 interface StepsProps {
@@ -108,13 +110,26 @@ export function Steps({
               <span className="nh-step-marker" aria-hidden="true">
                 {state === "done" ? <IconCheck /> : state === "incomplete" ? <IconWarning /> : i + 1}
               </span>
-              <span className="nh-step-label">
-                {step.label}
-                {/* The check is decorative, so state is spoken only when the flow declared one. */}
-                {step.state != null && state !== "current" && (
-                  <span className="nh-sr-only">{state === "done" ? ", done" : ", not finished"}</span>
-                )}
-              </span>
+              {step.detail != null ? (
+                <span className="nh-step-text">
+                  <span className="nh-step-label">
+                    {step.label}
+                    {/* The check is decorative, so state is spoken only when the flow declared one. */}
+                    {step.state != null && state !== "current" && (
+                      <span className="nh-sr-only">{state === "done" ? ", done" : ", not finished"}</span>
+                    )}
+                  </span>
+                  <span className="nh-step-detail">{step.detail}</span>
+                </span>
+              ) : (
+                <span className="nh-step-label">
+                  {step.label}
+                  {/* The check is decorative, so state is spoken only when the flow declared one. */}
+                  {step.state != null && state !== "current" && (
+                    <span className="nh-sr-only">{state === "done" ? ", done" : ", not finished"}</span>
+                  )}
+                </span>
+              )}
             </>
           );
           return (
