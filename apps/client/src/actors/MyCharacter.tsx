@@ -1,12 +1,10 @@
-import { useMediaQuery } from "../lib/useMediaQuery";
 import { useState } from "react";
-import type { ActorDefinition, PartyVisibility, PlayerActor, PlayerView } from "@vtt/domain";
-import { abilityModifier } from "@vtt/rules-5e";
-import { Button, Modal, useToast } from "@vtt/ui";
+import type { PartyVisibility, PlayerActor, PlayerView } from "@vtt/domain";
+import { Button, EmptyState, Group, Modal, useToast } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { RandomCharacterModal } from "../builder/RandomCharacter";
-import { BandPlate } from "../sheet/SheetBand";
-import { CLAIM_WORD, classLine, hpLabel, presenceDot, presenceLabel } from "./actor-display";
+import { PartyMemberBand } from "./PartyMemberBand";
+import { CLAIM_WORD, classLine, presenceDot, presenceLabel } from "./actor-display";
 import { command } from "../lib/command";
 import { aidGiverOf, isKnockedOut, StabilizeControl } from "../encounter/StabilizeControl";
 import { RestPrompt } from "../rest/RestPrompt";
@@ -37,76 +35,6 @@ const TIERS: readonly PartyVisibility[] = ["off", "name-and-class", "full-sheet"
 export function partyVisibilityOf(state: PlayerView): PartyVisibility {
   const raw = (state as { partyVisibility?: unknown }).partyVisibility;
   return TIERS.includes(raw as PartyVisibility) ? (raw as PartyVisibility) : "name-and-class";
-}
-
-const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"] as const;
-const signed = (value: number) => (value >= 0 ? `+${value}` : String(value));
-
-/**
- * A party member's sheet, read-only. Not the full `CharacterSheet`, which renders damage/heal
- * controls the server would refuse on someone else's character.
- */
-function PartyMemberSheet({
-  actor,
-  resources,
-  onClose
-}: Readonly<{ actor: PlayerActor; resources: boolean; onClose: () => void }>) {
-  const definition: ActorDefinition | undefined = actor.definition;
-  const identity = definition?.character;
-  // The server derives `classLine` for other players' characters; your own falls back to the stored sheet.
-  const line = actor.classLine ?? classLine(definition);
-  // A sheet from the bottom on a phone (theme rule 16), its head the member's name with the close at its right.
-  const phone = useMediaQuery("(max-width: 760px)");
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="md"
-      align={phone ? "bottom" : "center"}
-      title={actor.name}
-      ariaLabel={`${actor.name}'s sheet`}
-    >
-      <div className="party-sheet">
-        <p className="party-sheet-line">
-          {line ?? "No class recorded"}
-          {identity?.race && <> · {identity.race.name}</>}
-          {identity?.background && <> · {identity.background.name}</>}
-        </p>
-        <BandPlate
-          armorClass={actor.armorClass ?? definition?.armorClass}
-          hp={actor.hp.kind === "exact" ? actor.hp : null}
-          hpText={hpLabel(actor.hp)}
-          speed={actor.speedFeet ?? definition?.speedFeet}
-        />
-        {definition && (
-          <ul className="party-sheet-abilities">
-            {ABILITIES.map((ability) => (
-              <li key={ability}>
-                <span className="party-sheet-ability">{ability.toUpperCase()}</span>
-                <strong>{definition.abilityScores[ability]}</strong>
-                <span className="party-sheet-mod">{signed(abilityModifier(definition.abilityScores[ability]))}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {actor.conditions.length > 0 && (
-          <p className="party-sheet-line">Conditions: {actor.conditions.map((condition) => condition.id).join(", ")}</p>
-        )}
-        {/* Resources tier only; a missing pool means the server did not send one. */}
-        {resources && actor.hitDice && (
-          <p className="party-sheet-line">
-            Hit dice:{" "}
-            {actor.hitDice.entries.map((entry) => `${entry.remaining}/${entry.maximum} ${entry.die}`).join(" · ")}
-          </p>
-        )}
-        {resources && actor.spellSlots && actor.spellSlots.length > 0 && (
-          <p className="party-sheet-line">
-            Spell slots: {actor.spellSlots.map((slot) => `L${slot.level} × ${slot.remaining}`).join(" · ")}
-          </p>
-        )}
-      </div>
-    </Modal>
-  );
 }
 
 /**
@@ -268,11 +196,7 @@ export function MyCharacter({
         </Modal>
       )}
       {openActor && (
-        <PartyMemberSheet
-          actor={openActor}
-          resources={tier === "sheet-and-resources"}
-          onClose={() => setOpenId(null)}
-        />
+        <PartyMemberBand actor={openActor} resources={tier === "sheet-and-resources"} onClose={() => setOpenId(null)} />
       )}
       <RandomCharacterModal
         open={rolling}
@@ -308,33 +232,37 @@ export function MyCharacter({
 
   return (
     <section className="my-character pane-frame pane-scene frame-col anim-view" aria-label="My character">
-      <div className="my-character-head neon-beam">
-        <h2>My character</h2>
-        <div className="my-character-head-actions">
-          {/* Always offered: the route answers with the builder or its policy gate (shell/LayerView.tsx). */}
-          <Button variant="secondary" onClick={onCreateCharacter}>
-            Create a character
-          </Button>
-          {randomOpen && (
-            <Button variant="secondary" onClick={() => setRolling(true)}>
-              Roll a random one
-            </Button>
-          )}
-        </div>
-      </div>
       <div className="my-character-body scroll-y frame-fill">
-        {/* Nobody claimed: point at the Table's claim picker, which is the one place to claim. */}
-        <div className="scene-empty">
-          <p>You haven't claimed a character yet.</p>
-          <Button variant="primary" arrow onClick={onGoToTable}>
-            Go to the table
-          </Button>
-        </div>
-        {tier !== "off" && party.length > 0 && (
-          <div className="my-character-party">
-            <h3 className="my-character-party-head">The party</h3>
-            <PartyList state={state} mine={null} onOpen={(actorId) => setOpenId(actorId)} />
+        {/* Nobody claimed (characters rule 8): T rule 3's empty state, pointing at the Table's claim picker, which is
+            the one place to claim. The builder's doors sit under it while the GM allows them. */}
+        <EmptyState
+          className="my-character-empty"
+          action={
+            <Button variant="secondary" arrow onClick={onGoToTable}>
+              Pick a character
+            </Button>
+          }
+        >
+          You aren't playing anyone yet.
+        </EmptyState>
+        {(builderOpen || randomOpen) && (
+          <div className="my-character-doors">
+            {builderOpen && (
+              <Button variant="secondary" onClick={onCreateCharacter}>
+                Create a character
+              </Button>
+            )}
+            {randomOpen && (
+              <Button variant="secondary" onClick={() => setRolling(true)}>
+                Roll a random one
+              </Button>
+            )}
           </div>
+        )}
+        {tier !== "off" && party.length > 0 && (
+          <Group kind="read" title="The party" headingLevel={3} className="my-character-party">
+            <PartyList state={state} mine={null} onOpen={(actorId) => setOpenId(actorId)} />
+          </Group>
         )}
       </div>
       {dialogs}
