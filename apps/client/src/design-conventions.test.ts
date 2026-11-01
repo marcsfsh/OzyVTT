@@ -287,7 +287,6 @@ const VIEWPORT_UNIT = /\b\d+(?:\.\d+)?(?:d|s)?vh\b/g;
 const VIEWPORT_ALLOW: ReadonlyArray<readonly [file: string, values: readonly string[], why: string]> = [
   ["apps/client/src/encounter/pickers.css", ["52vh"], "the cap on a picker's list in its modal"],
   ["apps/client/src/encounter/fight-menu.css", ["85vh"], "the cap on the fixed encounter menu"],
-  ["apps/client/src/encounter/monster-browser.css", ["92vh"], "the cap on the monster browser modal"],
   ["apps/client/src/sheet/sheet.css", ["92dvh"], "the cap on the sheet's dialog"]
 ];
 

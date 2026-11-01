@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ContentMonsterSummary } from "@vtt/domain";
-import { IconChevron, Modal, Input, Select, Switch, cx } from "@vtt/ui";
+import { Button, Modal, Input, Select, Switch, cx } from "@vtt/ui";
 import { HomebrewMarks, useHomebrewMarks } from "../homebrew/marks";
 import { command, read } from "../lib/command";
 import { formatChallenge, titleCase } from "./format";
@@ -49,7 +49,8 @@ export function MonsterBrowser({
   onClose,
   onAdded,
   visibility = "public",
-  joinEncounter = false
+  joinEncounter = false,
+  targetName
 }: Readonly<{
   onClose: () => void;
   onAdded?: (actorId: string) => void;
@@ -57,6 +58,8 @@ export function MonsterBrowser({
   visibility?: "public" | "gm-only";
   /** True while a fight is running: the new monster joins the roster and the turn order. */
   joinEncounter?: boolean;
+  /** The encounter the monsters go to, for the dialog's Add to {name}. */
+  targetName?: string;
 }>) {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[] | null>(null);
   const [attribution, setAttribution] = useState("");
@@ -138,16 +141,71 @@ export function MonsterBrowser({
     });
   };
 
+  // Counts for each filter's options, with the other filters applied (G's filter panel).
+  const query = search.trim().toLowerCase();
+  const passes = (monster: ContentMonsterSummary, except: "band" | "type" | "size") => {
+    const { min, max } = CR_BANDS.find((candidate) => candidate.id === band)!;
+    return (
+      (!query || monster.name.toLowerCase().includes(query) || monster.type.toLowerCase().includes(query)) &&
+      (except === "band" || (monster.challengeRating >= min && monster.challengeRating <= max)) &&
+      (except === "type" || type === "any" || monster.type === type) &&
+      (except === "size" || size === "any" || monster.size === size)
+    );
+  };
+  const countOf = (except: "band" | "type" | "size", test: (monster: ContentMonsterSummary) => boolean) =>
+    (monsters ?? []).filter((monster) => passes(monster, except) && test(monster)).length;
+  const chosen = shown.find((monster) => monster.id === readingId) ?? null;
+  const filterGroup = (
+    title: string,
+    options: readonly Readonly<{ id: string; label: string; count: number }>[],
+    value: string,
+    onPick: (id: string) => void
+  ) => (
+    <div className="monster-browser-facet" role="group" aria-label={title}>
+      <span className="monster-browser-facet-title">{title}</span>
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          className={cx("monster-browser-option interactive", value === option.id && "is-on")}
+          aria-pressed={value === option.id}
+          onClick={() => onPick(option.id)}
+        >
+          <span>{option.label}</span>
+          <span className="monster-browser-count">{option.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <Modal
       open
       onClose={onClose}
-      size="lg"
+      size="full"
       className="monster-browser"
       title="Add monsters"
       ariaLabel="Add monsters from the bestiary"
+      footer={
+        <div className="monster-browser-foot">
+          <Switch label="Roll hit points (off uses the average)" checked={rollHitPoints} onChange={setRollHitPoints} />
+          <p className="monster-browser-target">
+            Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong>
+          </p>
+          <p className="monster-browser-feedback" role="status">
+            {feedback}
+          </p>
+          {chosen && (
+            <Button variant="primary" disabled={busyIds.has(chosen.id)} onClick={() => add(chosen)}>
+              {targetName ? `Add to ${targetName}` : `Add ${chosen.name}`}
+            </Button>
+          )}
+        </div>
+      }
     >
-      <div className="monster-browser-controls">
+      {/* The Compendium's browse (C3 running spec 2.4): the search and sort at the head, the filters with their
+          counts, the rows, and the chosen monster's stat block. */}
+      <div className="monster-browser-head">
         <Input
           type="search"
           placeholder="Search by name or type…"
@@ -156,44 +214,11 @@ export function MonsterBrowser({
           onChange={(event) => setSearch(event.target.value)}
           autoFocus
         />
-        <div className="monster-browser-filters">
-          <Select
-            aria-label="Challenge rating"
-            value={band}
-            onChange={(event) => setBand(event.target.value as typeof band)}
-          >
-            {CR_BANDS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-          <Select aria-label="Monster type" value={type} onChange={(event) => setType(event.target.value)}>
-            <option value="any">Any type</option>
-            {types.map((option) => (
-              <option key={option} value={option}>
-                {titleCase(option)}
-              </option>
-            ))}
-          </Select>
-          <Select aria-label="Size" value={size} onChange={(event) => setSize(event.target.value)}>
-            <option value="any">Any size</option>
-            {SIZES.map((option) => (
-              <option key={option} value={option}>
-                {titleCase(option)}
-              </option>
-            ))}
-          </Select>
-          <Select aria-label="Sort" value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
-            <option value="name">By name</option>
-            <option value="cr-up">Lowest CR first</option>
-            <option value="cr-down">Highest CR first</option>
-          </Select>
-        </div>
-        <Switch label="Roll hit points (off uses the average)" checked={rollHitPoints} onChange={setRollHitPoints} />
-        <p className="monster-browser-target">
-          Adds land in the staging tray · <strong>{visibility === "gm-only" ? "GM only" : "Shown to players"}</strong>
-        </p>
+        <Select aria-label="Sort" value={sort} onChange={(event) => setSort(event.target.value as Sort)}>
+          <option value="name">By name</option>
+          <option value="cr-up">Lowest CR first</option>
+          <option value="cr-down">Highest CR first</option>
+        </Select>
       </div>
       {error && (
         <p className="monster-browser-status" role="alert">
@@ -202,50 +227,95 @@ export function MonsterBrowser({
       )}
       {!error && !monsters && <p className="monster-browser-status">Loading the bestiary…</p>}
       {monsters && (
-        <ol className="monster-browser-list scroll-y">
-          {shown.map((monster) => (
-            <li key={monster.id} className={cx(readingId === monster.id && "is-reading")}>
-              <button
-                type="button"
-                className="monster-browser-name interactive"
-                aria-expanded={readingId === monster.id}
-                onClick={() => setReadingId((open) => (open === monster.id ? null : monster.id))}
-              >
-                <strong>
-                  {monster.name}
-                  <HomebrewMarks source={monster.source} mark={marks.get(monster.id)} />
-                  {addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}
-                </strong>
-                <small>
-                  CR {formatChallenge(monster.challengeRating)}
-                  {monster.experiencePoints !== null && ` (${monster.experiencePoints.toLocaleString()} XP)`} ·{" "}
-                  {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}
-                </small>
-                <span className={cx("monster-browser-caret", readingId === monster.id && "is-open")} aria-hidden="true">
-                  <IconChevron />
-                </span>
-              </button>
-              <button
-                type="button"
-                className="monster-browser-add"
-                disabled={busyIds.has(monster.id)}
-                onClick={() => add(monster)}
-              >
-                {busyIds.has(monster.id) ? "Adding…" : "Add"}
-              </button>
-              {readingId === monster.id && <BestiaryStatBlock monster={monster} />}
-            </li>
-          ))}
-          {shown.length === 0 && (
-            <li className="monster-browser-none">
-              {search.trim() ? `No monsters match "${search}" with these filters.` : "No monsters match these filters."}
-            </li>
-          )}
-        </ol>
+        <div className="monster-browser-panes">
+          <div className="monster-browser-filters scroll-y" aria-label="Filters" role="region">
+            {filterGroup(
+              "CR",
+              CR_BANDS.map((option) => ({
+                id: option.id,
+                label: option.label,
+                count: countOf(
+                  "band",
+                  (monster) => monster.challengeRating >= option.min && monster.challengeRating <= option.max
+                )
+              })),
+              band,
+              (id) => setBand(id as typeof band)
+            )}
+            {filterGroup(
+              "Type",
+              [
+                { id: "any", label: "Any type", count: countOf("type", () => true) },
+                ...types.map((option) => ({
+                  id: option,
+                  label: titleCase(option),
+                  count: countOf("type", (monster) => monster.type === option)
+                }))
+              ],
+              type,
+              setType
+            )}
+            {filterGroup(
+              "Size",
+              [
+                { id: "any", label: "Any size", count: countOf("size", () => true) },
+                ...SIZES.map((option) => ({
+                  id: option,
+                  label: titleCase(option),
+                  count: countOf("size", (monster) => monster.size === option)
+                }))
+              ],
+              size,
+              setSize
+            )}
+          </div>
+          <ol className="monster-browser-list scroll-y">
+            {shown.map((monster) => (
+              <li key={monster.id} className={cx(readingId === monster.id && "is-reading")}>
+                <button
+                  type="button"
+                  className="monster-browser-name interactive"
+                  aria-pressed={readingId === monster.id}
+                  onClick={() => setReadingId((open) => (open === monster.id ? null : monster.id))}
+                >
+                  <strong>
+                    {monster.name}
+                    <HomebrewMarks source={monster.source} mark={marks.get(monster.id)} />
+                    {addedIds.has(monster.id) && <span className="monster-browser-added">Added</span>}
+                  </strong>
+                  <small>
+                    <span className="monster-browser-cr">CR {formatChallenge(monster.challengeRating)}</span>
+                    {monster.experiencePoints !== null && ` (${monster.experiencePoints.toLocaleString()} XP)`} ·{" "}
+                    {titleCase(monster.size)} {monster.type} · AC {monster.armorClass} · HP {monster.hitPoints}
+                  </small>
+                </button>
+                <Button
+                  size="sm"
+                  className="monster-browser-add"
+                  disabled={busyIds.has(monster.id)}
+                  onClick={() => add(monster)}
+                >
+                  {busyIds.has(monster.id) ? "Adding…" : "Add"}
+                </Button>
+              </li>
+            ))}
+            {shown.length === 0 && (
+              <li className="monster-browser-none">
+                {search.trim()
+                  ? `No monsters match "${search}" with these filters.`
+                  : "No monsters match these filters."}
+              </li>
+            )}
+          </ol>
+          <div className="monster-browser-detail scroll-y" aria-label="The chosen monster" role="region">
+            {chosen ? (
+              <BestiaryStatBlock monster={chosen} />
+            ) : (
+              <p className="monster-browser-status">Choose a monster to read its stat block.</p>
+            )}
+          </div>
+        </div>
       )}
-      <p className="monster-browser-feedback" role="status">
-        {feedback}
-      </p>
       {attribution && <p className="monster-browser-attribution">{attribution}</p>}
     </Modal>
   );

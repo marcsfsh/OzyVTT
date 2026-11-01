@@ -452,7 +452,7 @@ export function FightMenu({
 }
 
 /** The live encounter's name for the menu's head, or "Encounter" when none is live. */
-function encounterName(state: GmView): string {
+export function encounterName(state: GmView): string {
   const combat = state.combat;
   return (combat.encounters ?? []).find((scene) => scene.id === combat.activeEncounterId)?.name ?? "Encounter";
 }

@@ -9,7 +9,7 @@ import { ScenePrepPanel } from "../scenes/ScenePrepPanel";
 import type { PickerMap } from "../maps/MapPicker";
 import { useConfirm } from "../components/feedback";
 import { ConfirmRow } from "./ConfirmRow";
-import { FightMenu } from "./FightMenu";
+import { encounterName, FightMenu } from "./FightMenu";
 import { ActingConsole } from "./ActingConsole";
 import { GmInitiativeRow } from "./GmInitiativeRow";
 import { useOrderLight } from "../table/orderLight";
@@ -760,7 +760,14 @@ export function GmEncounterPanel({
       )}
       {/* Mid-fight reinforcements: one command adds the monster to the roster and the turn order,
         its token waiting in the staging tray at the table's "new tokens" visibility. */}
-      {browsing && <MonsterBrowser visibility={stagingVisibility} joinEncounter onClose={() => setBrowsing(false)} />}
+      {browsing && (
+        <MonsterBrowser
+          visibility={stagingVisibility}
+          joinEncounter
+          targetName={encounterName(state)}
+          onClose={() => setBrowsing(false)}
+        />
+      )}
       {(() => {
         const sheetActor = sheetActorId ? actorsById.get(sheetActorId) : undefined;
         return sheetActor ? (
