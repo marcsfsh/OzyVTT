@@ -2,44 +2,7 @@
 .tokens-page-body {
   padding: var(--space-4) var(--pane-gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
 }
-.tokens-page-empty {
-  margin: var(--space-6) 0;
-  color: var(--text-dim);
-}
-.tokens-page-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-.tokens-page-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line-strong);
-  background: var(--bg);
-  color: var(--text-muted);
-  font: 600 12px / 1.2 var(--font-label);
-  text-align: left;
-  white-space: nowrap;
-}
-.tokens-page-table td {
-  height: 48px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--line);
-  white-space: nowrap;
-}
-.tokens-page-table tr:hover td {
-  background: var(--surface-3);
-}
-.tokens-page-name {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.tokens-page-actions {
-  text-align: right;
-}
+
 .tokens-page-rows {
   margin: 0;
   padding: 0;
@@ -65,4 +28,36 @@
 .tokens-page-row-text span {
   font-size: 13px;
   color: var(--text-dim);
+}
+
+/* The grouped Tokens page (E2 spec 2.4): a toolbar with the count and New group, then Party, the GM's groups and
+   Monsters as open groups of rows, each row with its More. */
+.tokens-page-tool {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--pane-gutter);
+  border-bottom: 1px solid var(--line);
+}
+.tokens-page-count {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.tokens-page-group {
+  margin-bottom: var(--space-4);
+}
+.tokens-page-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tokens-page-item > .tokens-page-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tokens-page-none {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
