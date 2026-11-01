@@ -44,7 +44,32 @@ export function useMapActions(token: string, reload: () => Promise<unknown>) {
     if (folder?.trim()) await setFolder(map, folder.trim());
   };
   const setKind = (map: MapAsset, kind: MapKind) => patch(map, { kind }, "Map type changed.");
-  return { rename, setFolder, newFolder, setKind, dialog };
+  /** Choose's Move to (E2 spec 2.3): one write for each chosen map in turn, then one read of the library. */
+  const moveMany = async (chosen: readonly MapAsset[], folder: string | null) => {
+    try {
+      for (const map of chosen)
+        await apiRequest(`/api/v1/map-assets/${map.id}`, {
+          token,
+          method: "PATCH",
+          body: { folder },
+          failure: "The map could not be changed."
+        });
+      await reload();
+      const count = `${chosen.length} ${chosen.length === 1 ? "map" : "maps"}`;
+      toast(folder ? `Moved ${count} to ${folder}.` : `Took ${count} out of their folder.`, { tone: "success" });
+    } catch (error) {
+      toast((error as Error).message, { tone: "error" });
+    }
+  };
+  /** Asks a new folder's name for Choose's Move to. */
+  const askFolder = () =>
+    prompt({
+      title: "New folder",
+      body: "Move the chosen maps to a new folder.",
+      placeholder: "Folder name",
+      confirmLabel: "Move"
+    });
+  return { rename, setFolder, newFolder, setKind, moveMany, askFolder, dialog };
 }
 
 /** The folders in use, in order, for pickers and filters. */

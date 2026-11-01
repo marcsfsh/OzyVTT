@@ -108,6 +108,33 @@ describe("the maps table", () => {
   });
 });
 
+describe("filing maps with Choose", () => {
+  it("moves two chosen maps to a folder, one write each and one read after, and Escape leaves Choose", async () => {
+    const user = userEvent.setup();
+    const server = serveScenes();
+    renderTab("/encounters/maps");
+    await user.click(await screen.findByRole("button", { name: "Choose" }));
+    await user.click(screen.getByRole("checkbox", { name: "Choose Old tunnels" }));
+    await user.click(screen.getByRole("checkbox", { name: "Choose Saltmere" }));
+    expect(screen.getByText("2 maps chosen")).toBeInTheDocument();
+    const reads = onLibraryChanged.mock.calls.length;
+    await user.click(screen.getByLabelText("Move the chosen maps to"));
+    await user.click(screen.getByRole("menuitem", { name: "Dungeons" }));
+    await waitFor(() =>
+      expect(
+        server.calls.filter(
+          (call) => call.method === "PATCH" && (call.body as { folder?: string } | undefined)?.folder === "Dungeons"
+        )
+      ).toHaveLength(2)
+    );
+    await waitFor(() => expect(onLibraryChanged.mock.calls.length).toBe(reads + 1));
+    await user.click(screen.getByRole("button", { name: "Choose" }));
+    expect(screen.getByRole("group", { name: "Chosen maps" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("group", { name: "Chosen maps" })).toBeNull();
+  });
+});
+
 describe("a map's page", () => {
   it("is one document: its grid, its type and folder, and where it is used", async () => {
     serveScenes();

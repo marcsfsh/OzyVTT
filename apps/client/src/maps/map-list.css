@@ -132,3 +132,34 @@
 .sc-meta-fold > summary::-webkit-details-marker {
   display: none;
 }
+/* Choose (E2 spec 2.3): a box on each card, and a bar at the foot with the count, Move to and Cancel. */
+.mp-choose {
+  margin-top: var(--space-2);
+}
+.mp-card-choose {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.mp-card-choose input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--cyan);
+}
+.mp-choose-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--pane-gutter);
+  border-top: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.mp-choose-bar > span {
+  margin-right: auto;
+  color: var(--text);
+  font-size: var(--fs-sm);
+}

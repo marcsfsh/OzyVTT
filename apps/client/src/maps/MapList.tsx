@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button,
   IconMap,
@@ -45,6 +45,33 @@ export function MapList() {
   const sort = readSort(query, MAP_SORT_KEYS, DEFAULT_MAP_SORT);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const actions = useMapActions(token, reloadMaps);
+  // Choose (E2 spec 2.3): a box on each card, a bar with Move to, and Escape to leave it.
+  const [choosing, setChoosing] = useState(false);
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const stopChoosing = () => {
+    setChoosing(false);
+    setChosen(new Set());
+  };
+  useEffect(() => {
+    if (!choosing) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") stopChoosing();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [choosing]);
+  const toggleChosen = (id: string) =>
+    setChosen((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  const moveChosen = async (folder: string | null) => {
+    const maps = library.filter((map) => chosen.has(map.id));
+    if (maps.length === 0) return;
+    await actions.moveMany(maps, folder);
+    stopChoosing();
+  };
   const library = maps ?? [];
   const usedIn = (mapId: string) => state.combat.encounters.filter((scene) => scene.mapAssetId === mapId).length;
   const shown = sortMaps(filterMaps(library, filters, usedIn), sort, usedIn);
@@ -132,6 +159,14 @@ export function MapList() {
               <span className="mp-folder-count">{entry.count}</span>
             </button>
           ))}
+          <Button
+            size="sm"
+            className="mp-choose"
+            aria-pressed={choosing}
+            onClick={() => (choosing ? stopChoosing() : setChoosing(true))}
+          >
+            {choosing ? "Done choosing" : "Choose"}
+          </Button>
         </nav>
         <MapFiltersFlyout
           open={flyoutOpen}
@@ -174,6 +209,16 @@ export function MapList() {
                       </span>
                     </button>
                     {map.folder && <Tag className="mp-card-folder">{map.folder}</Tag>}
+                    {choosing && (
+                      <label className="mp-card-choose">
+                        <input
+                          type="checkbox"
+                          checked={chosen.has(map.id)}
+                          aria-label={`Choose ${map.name}`}
+                          onChange={() => toggleChosen(map.id)}
+                        />
+                      </label>
+                    )}
                     <span className="mp-card-menu">{rowMenu(map)}</span>
                   </li>
                 );
@@ -182,6 +227,37 @@ export function MapList() {
           )}
         </div>
       </div>
+      {choosing && (
+        <div className="mp-choose-bar" role="group" aria-label="Chosen maps">
+          <span>
+            {chosen.size} {chosen.size === 1 ? "map" : "maps"} chosen
+          </span>
+          <Menu trigger="Move to" label="Move the chosen maps to" align="end" triggerButton="secondary">
+            {folders.map((folder) => (
+              <MenuItem key={folder} disabled={chosen.size === 0} onClick={() => void moveChosen(folder)}>
+                {folder}
+              </MenuItem>
+            ))}
+            <MenuItem disabled={chosen.size === 0} onClick={() => void moveChosen(null)}>
+              No folder
+            </MenuItem>
+            <MenuItem
+              icon={<IconPlus />}
+              disabled={chosen.size === 0}
+              onClick={() =>
+                void actions.askFolder().then((name) => {
+                  if (name?.trim()) void moveChosen(name.trim());
+                })
+              }
+            >
+              New folder…
+            </MenuItem>
+          </Menu>
+          <Button variant="ghost" size="sm" onClick={stopChoosing}>
+            Cancel
+          </Button>
+        </div>
+      )}
       {actions.dialog}
     </div>
   );
