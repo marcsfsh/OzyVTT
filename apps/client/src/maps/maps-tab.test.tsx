@@ -189,8 +189,9 @@ describe("adding a map as steps", () => {
     serveScenes();
     renderTab(`/encounters/maps/${IDS.tunnels}?step=grid`);
     expect(await screen.findByRole("heading", { name: "Grid" })).toBeInTheDocument();
-    expect(screen.getByText("Printed square grid")).toBeInTheDocument();
-    expect(screen.getByText("Gridless battle map")).toBeInTheDocument();
+    const ways = within(screen.getByRole("group", { name: "Calibration type" }));
+    expect(ways.getByRole("button", { name: "Printed squares" })).toBeInTheDocument();
+    expect(ways.getByRole("button", { name: "No grid printed" })).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Old tunnels" })).toBeInTheDocument();
   });
 
@@ -221,16 +222,11 @@ describe("adding a map as steps", () => {
     expect(here()).toBe("/table");
   });
 
-  it("keeps the steps as a strip on a phone, with the image in a bar", async () => {
+  it("says the step in one line on a phone, with the image in a bar", async () => {
     setViewport(390);
     serveScenes();
     renderTab("/encounters/maps/new");
-    const strip = await screen.findByRole("tablist", { name: "Steps" });
-    expect(
-      within(strip)
-        .getAllByRole("tab")
-        .map((tab) => tab.textContent)
-    ).toEqual(["Upload", "Grid", "Check", "Use"]);
+    expect(await screen.findByText("Step 1 of 4 · Upload")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Open the map" })).toHaveTextContent("No image yet");
   });
 });

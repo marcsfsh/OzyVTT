@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { Button, IconX, Steps, Tabs, cx } from "@vtt/ui";
+import { Button, IconX, Steps, cx } from "@vtt/ui";
 
 export type FrameStep = Readonly<{
   id: string;
@@ -7,13 +7,15 @@ export type FrameStep = Readonly<{
   short: string;
   state?: "done" | "incomplete";
   locked?: boolean;
+  /** A done step's answer, under its name in the rail ("70 px squares · 5 ft"). */
+  detail?: string;
 }>;
 
 /**
- * The frame both editors share, a scene's and a map's: the head, the steps down the left (each done, current or
- * unfinished), the step's questions in the middle with its actions under them, and the map pinned on the right. Below
- * 980px the steps are a strip across the top, and the map is a bar over the bottom that opens full screen, unless the
- * step is answered on the map itself (`inlineMap`), when it sits above the questions.
+ * A map's steps (Prep frame 2.4): the record's title row, the Steps rail (240px, each done step's answer under it), the
+ * step's form (380px), the map at the right, and the foot across the bottom with the way back and the step's Cup.
+ * Below 980px the rail is one line ("Step 2 of 4 · Grid"), the map sits above the form while it is marked (or waits in
+ * a bar that opens it full screen), and the foot stays pinned.
  */
 export function EditorFrame({
   className,
@@ -63,21 +65,20 @@ export function EditorFrame({
   );
   const reachable = steps.filter((step) => !step.locked).length - 1;
   const list = narrow ? (
-    <Tabs
-      className="sc-steps-strip"
-      ariaLabel="Steps"
-      idBase={stripId}
-      activeId={current}
-      onChange={onStep}
-      tabs={steps.map((step) => ({ id: step.id, label: step.short, disabled: step.locked }))}
-    />
+    <p className="sc-steps-line" id={stripId}>
+      Step {index + 1} of {steps.length} · {steps[index]?.label}
+    </p>
   ) : (
     <nav className="sc-steps scroll-y" aria-label="Steps">
       <Steps
         orientation="vertical"
         ariaLabel="Steps"
         current={index}
-        steps={steps.map((step) => ({ label: step.label, ...(step.state ? { state: step.state } : {}) }))}
+        steps={steps.map((step) => ({
+          label: step.label,
+          ...(step.state ? { state: step.state } : {}),
+          ...(step.detail ? { detail: step.detail } : {})
+        }))}
         onStepSelect={(target) => onStep(steps[target]!.id)}
         maxSelectable={reachable}
       />
@@ -89,20 +90,13 @@ export function EditorFrame({
       {narrow && list}
       <div className="sc-editor-body">
         {!narrow && list}
-        <section
-          className="sc-editor-questions"
-          aria-label={title}
-          {...(narrow
-            ? { role: "tabpanel", id: `${stripId}-panel-${current}`, "aria-labelledby": `${stripId}-tab-${current}` }
-            : {})}
-        >
+        <section className="sc-editor-questions" aria-label={title}>
           {narrow && inlineMap && <div className="sc-editor-canvas">{map}</div>}
           <div className="sc-editor-scroll scroll-y">
             <h3 className="sc-step-title">{title}</h3>
             <p className="sc-step-ask">{ask}</p>
             {questions}
           </div>
-          {foot && <div className="sc-editor-foot">{foot}</div>}
         </section>
         {!narrow && (
           <div className="sc-editor-preview" aria-label={mapLabel}>
@@ -131,6 +125,7 @@ export function EditorFrame({
           <div className="sc-mapsheet-body">{map}</div>
         </div>
       )}
+      {foot && <div className="sc-editor-foot">{foot}</div>}
     </div>
   );
 }

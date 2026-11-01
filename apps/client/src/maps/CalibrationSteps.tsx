@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Button, ChoiceGrid, IconArrow, Input } from "@vtt/ui";
+import { Button, Group, IconArrow, Input, SegmentedControl } from "@vtt/ui";
 import { CrosshairControls, type Crosshair } from "./calibration-overlays";
 import type { MapKind, Point } from "./map-catalog";
 
@@ -66,42 +66,39 @@ export function ExpiredNotice() {
   );
 }
 
-/** Step 0: a printed grid or a known distance. Regional and world maps only have the distance path. */
+/**
+ * Step 0: a printed grid or a known distance, as two options on Base lines (Prep frame 2.4). Regional and world maps
+ * only have the distance path.
+ */
 export function ModeStep({
   map,
   mode,
   onChange
 }: Readonly<{ map: MapRef; mode: "square" | "gridless"; onChange: (mode: "square" | "gridless") => void }>) {
-  const options =
-    map.kind === "battlemap"
-      ? [
-          {
-            value: "square",
-            title: "Printed square grid",
-            description: "Drag over a 3 × 3 block of printed squares. OzyVTT works out the grid from it."
-          },
-          {
-            value: "gridless",
-            title: "Gridless battle map",
-            description: "No grid lines. Distance comes from two points a known distance apart."
-          }
-        ]
-      : [
-          {
-            value: "gridless",
-            title: "Real-world scale",
-            description: `Measure a known span so markers and rulers can use ${map.kind === "world" ? "world" : "regional"} distances.`
-          }
-        ];
+  if (map.kind !== "battlemap")
+    return (
+      <p className="map-mode-line">
+        Real-world scale: measure a known span so markers and rulers can use{" "}
+        {map.kind === "world" ? "world" : "regional"} distances.
+      </p>
+    );
   return (
-    <ChoiceGrid
-      className="map-mode-choice"
-      ariaLabel="Calibration type"
-      searchable={false}
-      options={options}
-      value={map.kind === "battlemap" ? mode : "gridless"}
-      onChange={(value) => onChange(value as "square" | "gridless")}
-    />
+    <div className="map-mode-choice">
+      <SegmentedControl
+        ariaLabel="Calibration type"
+        value={mode}
+        onChange={(value) => onChange(value as "square" | "gridless")}
+        options={[
+          { value: "square", label: "Printed squares" },
+          { value: "gridless", label: "No grid printed" }
+        ]}
+      />
+      <p className="map-mode-line">
+        {mode === "square"
+          ? "Drag over a 3 × 3 block of printed squares. OzyVTT works out the grid from it."
+          : "No grid lines. Distance comes from two points a known distance apart."}
+      </p>
+    </div>
   );
 }
 
@@ -118,10 +115,12 @@ export function MarkStep({
   return (
     <div className="map-step-panel">
       {squareMode ? (
-        <p className="map-step-hint">
-          Start exactly on one printed-grid intersection. Hold and drag diagonally across a block containing{" "}
-          <strong>nine squares</strong>, then release exactly on the opposite intersection.
-        </p>
+        <Group title="Mark three squares" className="map-mark-cradle">
+          <p className="map-step-hint">
+            Start exactly on one printed-grid intersection. Hold and drag diagonally across a block containing{" "}
+            <strong>nine squares</strong>, then release exactly on the opposite intersection.
+          </p>
+        </Group>
       ) : (
         <p className="map-step-hint">
           Click point <strong>A</strong>, then point <strong>C</strong>. Pick two landmarks whose distance apart you

@@ -1,17 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import {
-  Button,
-  Combobox,
-  Field,
-  IconChevronLeft,
-  IconList,
-  IconMap,
-  IconPlus,
-  Input,
-  Select,
-  cx,
-  useToast
-} from "@vtt/ui";
+import { Button, Combobox, Crumb, Field, IconMap, IconPlus, Input, Select, TitleLine, cx, useToast } from "@vtt/ui";
 import { navigate, pathForGmTab, useRoute } from "../router";
 import { EncounterMap } from "../scene/EncounterMap";
 import { useAuthorizedMapImage } from "../scene/mapImage";
@@ -165,42 +153,48 @@ function UseStep({ map }: Readonly<{ map: MapAsset }>) {
 const MAP_FRAME_STEPS = (map: MapAsset | null) => {
   const grid = map ? gridStateOf(map) : "none";
   const set = grid === "grid" || grid === "scale";
+  // Each done step's answer sits under it in the rail (Prep frame 2.4).
+  const answer: Partial<Record<MapStep, string>> = map
+    ? {
+        upload: map.name,
+        ...(set ? { grid: gridLine(grid, map), check: "Checked" } : {}),
+        use: MAP_KIND_LABEL[map.kind]
+      }
+    : {};
   return MAP_STEPS.map((candidate) => ({
     id: candidate,
     label: STEP_LABEL[candidate],
     short: STEP_SHORT[candidate],
+    ...(answer[candidate] ? { detail: answer[candidate] } : {}),
     ...(map
       ? { state: candidate === "upload" || candidate === "use" || set ? ("done" as const) : ("incomplete" as const) }
       : { locked: candidate !== "upload" })
   }));
 };
 
-/** The head both map editors share: the way back, and the map's name. */
+/**
+ * The head both map editors share, the record's title row (theme spec 2.2): Maps as the crumb, the map's name, its
+ * kind and size in one line, and Cancel, which leaves the steps for the map's page or the list.
+ */
 function MapEditorHead({ map }: Readonly<{ map: MapAsset | null }>) {
-  const { go, narrow } = useScenes();
+  const { go } = useScenes();
+  const back = backPathOf(useRoute().query);
+  const leave = () => go(back ?? (map ? pathForMap(map.id) : SCENES_PATHS.maps));
   return (
     <>
-      {narrow ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={map ? `Back to ${map.name}` : "Back to the maps"}
-          onClick={() => go(map ? pathForMap(map.id) : SCENES_PATHS.maps)}
-        >
-          <IconChevronLeft />
-        </Button>
-      ) : (
-        <Button size="sm" onClick={() => go(SCENES_PATHS.maps)}>
-          <IconList /> Maps
-        </Button>
-      )}
-      <h2 className="sc-scene-title">{map ? map.name : "Add a map"}</h2>
-      <span className="sc-grow" />
-      {map && !narrow && (
-        <Button size="sm" onClick={() => go(pathForMap(map.id))}>
-          Open the map
-        </Button>
-      )}
+      <div className="sc-rec-main">
+        <TitleLine crumb={<Crumb label="Maps" onClick={() => go(SCENES_PATHS.maps)} />}>
+          <h2 className="sc-scene-title">{map ? map.name : "Add a map"}</h2>
+        </TitleLine>
+        {map && (
+          <p className="sc-rec-line">
+            {MAP_KIND_LABEL[map.kind]} · {map.width} × {map.height} px
+          </p>
+        )}
+      </div>
+      <Button size="sm" onClick={leave}>
+        Cancel
+      </Button>
     </>
   );
 }

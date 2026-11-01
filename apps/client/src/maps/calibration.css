@@ -115,25 +115,26 @@
   height: auto;
   user-select: none;
 }
-/* Calibration grid preview lines: fixed colours, since SVG presentation attributes cannot use var(). */
+/* The grid the marked block makes, in cyan (Prep frame 2.4). CSS paint can read the theme's tokens. */
 .map-preview line {
-  stroke: rgb(45 226 255 / 0.6);
+  stroke: color-mix(in srgb, var(--cyan) 60%, transparent);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 .map-preview line.major {
-  stroke: rgb(255 46 154 / 0.85);
+  stroke: var(--cyan);
   stroke-width: 1.5;
 }
+/* The marked block: a 2px dashed cyan edge on a 12% cyan fill. */
 .map-preview .grid-area-preview rect {
-  fill: rgb(255 46 154 / 0.18);
-  stroke: #7cefff;
-  stroke-width: 2.5;
+  fill: color-mix(in srgb, var(--cyan) 12%, transparent);
+  stroke: var(--cyan);
+  stroke-width: 2;
   stroke-dasharray: 8 5;
   vector-effect: non-scaling-stroke;
 }
 .map-preview .grid-area-preview line {
-  stroke: #ff2e9a;
+  stroke: var(--cyan);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
@@ -470,4 +471,19 @@
   border-left-width: 2px;
   border-radius: 0;
   background: var(--surface-2);
+}
+
+/* The grid's two ways, on Base lines, with the chosen one's line under them. */
+.map-mode-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.map-mode-line {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.map-mark-cradle .map-step-hint {
+  margin: 0;
 }
