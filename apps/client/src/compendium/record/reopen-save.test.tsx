@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("../../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
@@ -189,5 +189,24 @@ describe("a homebrew record reopened while it saves", () => {
         }),
       { timeout: 4000 }
     );
+  });
+
+  it("opens the merge as a dialog; closing it leaves the amber line, and Choose opens it again", async () => {
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole("textbox", { name: "Summary" });
+    server.record = { ...server.record, name: "Lucky Star" };
+    server.rev = 2;
+    await user.type(field("Summary"), "Once a day");
+
+    const dialog = await screen.findByRole("dialog", { name: "Changed on two devices" }, { timeout: 4000 });
+    expect(within(dialog).getByRole("button", { name: "Keep both changes" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: /^Close/ }));
+    expect(screen.queryByRole("dialog", { name: "Changed on two devices" })).toBeNull();
+    const line = document.querySelector(".cp-merge-line") as HTMLElement;
+    expect(line).toHaveAttribute("role", "status");
+    expect(line).toHaveTextContent("Changed on two devices");
+    await user.click(within(line).getByRole("button", { name: "Choose" }));
+    expect(await screen.findByRole("dialog", { name: "Changed on two devices" })).toBeInTheDocument();
   });
 });

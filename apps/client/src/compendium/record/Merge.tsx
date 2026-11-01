@@ -65,10 +65,14 @@ export function MergePanel({
   base,
   local,
   phone,
+  dialog = false,
   onResolve
 }: Readonly<{
   kind: Kind;
   conflict: Conflict;
+  /** In A's dialog (G pages spec 2.4): every field both changed shows its two choices, and Keep what is ticked is the
+   *  Cup beside Keep both changes. */
+  dialog?: boolean;
   /** The copy this editor last saved, which both devices changed from. */
   base: Draft;
   local: Draft;
@@ -78,7 +82,8 @@ export function MergePanel({
   const server = useMemo(() => withDefaults(conflict.server.type, conflict.server.record), [conflict.server]);
   const rows = useMemo(() => mergeRows(kind, base, local, server), [kind, base, local, server]);
   const [keeps, setKeeps] = useState(() => defaultKeeps(rows));
-  const [choosing, setChoosing] = useState(false);
+  const [choosingHere, setChoosing] = useState(false);
+  const choosing = dialog || choosingHere;
   const keepOf = (row: MergeRow): Side => keeps[row.key] ?? (row.changedHere ? "here" : "there");
   const both = rows.filter((row) => row.changedHere && row.changedThere);
   return (
@@ -149,19 +154,35 @@ export function MergePanel({
           </tbody>
         </table>
       )}
-      <div className="cp-actions-row">
-        <Button
-          variant="primary"
-          onClick={() => onResolve(mergedDraft(local, server, choosing ? keeps : defaultKeeps(rows)))}
-        >
-          {choosing ? "Keep what is ticked" : "Keep both changes"}
-        </Button>
-        {rows.length > 0 && (
-          <Button variant="secondary" onClick={() => setChoosing(!choosing)}>
-            {choosing ? "Back to both changes" : "Choose field by field"}
+      {dialog ? (
+        <div className="cp-actions-row">
+          {rows.length > 0 && (
+            <Button variant="primary" onClick={() => onResolve(mergedDraft(local, server, keeps))}>
+              Keep what is ticked
+            </Button>
+          )}
+          <Button
+            variant={rows.length > 0 ? "secondary" : "primary"}
+            onClick={() => onResolve(mergedDraft(local, server, defaultKeeps(rows)))}
+          >
+            Keep both changes
           </Button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="cp-actions-row">
+          <Button
+            variant="primary"
+            onClick={() => onResolve(mergedDraft(local, server, choosing ? keeps : defaultKeeps(rows)))}
+          >
+            {choosing ? "Keep what is ticked" : "Keep both changes"}
+          </Button>
+          {rows.length > 0 && (
+            <Button variant="secondary" onClick={() => setChoosing(!choosing)}>
+              {choosing ? "Back to both changes" : "Choose field by field"}
+            </Button>
+          )}
+        </div>
+      )}
     </section>
   );
 }

@@ -1798,3 +1798,11 @@
   align-items: center;
   gap: var(--space-2);
 }
+
+/* Two devices' changes left open: the amber line with Choose over the record (G pages spec 2.4). */
+.cp-merge-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}

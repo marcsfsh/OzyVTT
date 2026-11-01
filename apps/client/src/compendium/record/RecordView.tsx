@@ -3,6 +3,7 @@ import {
   Alert,
   Badge,
   Button,
+  Modal,
   IconButton,
   IconList,
   IconMore,
@@ -451,6 +452,12 @@ function HomebrewRecord({
   // A record opened to edit has been through every step; one just made walks them first.
   const seenAll = query.get("new") !== "1";
   const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set());
+  // A save that met another device's opens the merge dialog each time the conflict appears.
+  const [mergeOpen, setMergeOpen] = useState(true);
+  const conflictAt = record.conflict?.server.updatedAt ?? null;
+  useEffect(() => {
+    if (conflictAt) setMergeOpen(true);
+  }, [conflictAt]);
   const states = stepStates(steps, placed, visited, seenAll);
   const done = steps.filter((step) => step.id !== REVIEW_STEP && states.get(step.id) === "done").length;
   const stepId = query.get("step") ?? steps[0]!.id;
@@ -718,19 +725,37 @@ function HomebrewRecord({
         id={`cp-rec-${doc.id}-panel-${tab}`}
         aria-labelledby={`cp-rec-${doc.id}-tab-${tab}`}
       >
-        {record.conflict ? (
+        {/* Closing the dialog leaves the conflict open: the amber line with Choose opens it again. */}
+        {record.conflict && !mergeOpen && (
+          <div className="cp-problem cp-merge-line" role="status">
+            <IconWarning />
+            <span className="cp-grow">Changed on two devices</span>
+            <Button size="sm" onClick={() => setMergeOpen(true)}>
+              Choose
+            </Button>
+          </div>
+        )}
+        {body}
+      </div>
+      {record.conflict && mergeOpen && (
+        <Modal
+          open
+          size="md"
+          {...(phone ? { align: "bottom" as const } : {})}
+          title="Changed on two devices"
+          onClose={() => setMergeOpen(false)}
+        >
           <MergePanel
             kind={kind}
             conflict={record.conflict}
             base={record.savedDraft()}
             local={draft}
             phone={phone}
+            dialog
             onResolve={record.resolve}
           />
-        ) : (
-          body
-        )}
-      </div>
+        </Modal>
+      )}
       {record.dialog}
     </article>
   );
