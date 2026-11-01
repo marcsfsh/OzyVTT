@@ -42,7 +42,6 @@ function renderTab(path: string) {
   );
 }
 const here = () => `${window.location.pathname}${window.location.search}`;
-const rowOf = (name: string) => screen.getByRole("button", { name }).closest("tr")!;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -50,17 +49,28 @@ afterEach(() => {
 });
 
 describe("the maps table", () => {
-  it("lists every map with its type, grid, size, folder and the encounters on it, newest first", async () => {
+  it("shelves every map as a card with its grid, type, folder and use, newest first, beside its folders", async () => {
+    const user = userEvent.setup();
     serveScenes();
     renderTab("/encounters/maps");
-    await screen.findByRole("table");
-    const names = within(screen.getByRole("table"))
-      .getAllByRole("row")
-      .slice(1)
-      .map((row) => within(row).getAllByRole("button")[0]!.textContent);
-    expect(names).toEqual(["Sunken crypt", "Old tunnels", "Saltmere"]);
-    expect(rowOf("Sunken crypt")).toHaveTextContent("Battle map50 px squares · 5 ft700 × 500Dungeons2 encounters");
-    expect(rowOf("Saltmere")).toHaveTextContent("Regional mapNo grid yet800 × 600NoneNo encounter");
+    const cards = await screen.findAllByRole("listitem");
+    const shelf = cards.filter((card) => card.classList.contains("mp-card"));
+    expect(shelf.map((card) => within(card).getAllByRole("button")[0]!.getAttribute("aria-label"))).toEqual([
+      "Sunken crypt",
+      "Old tunnels",
+      "Saltmere"
+    ]);
+    expect(shelf[0]).toHaveTextContent("50 px squares · 5 ft · Battle map");
+    expect(shelf[0]).toHaveTextContent("2 encounters");
+    expect(shelf[0]).toHaveTextContent("Dungeons");
+    expect(shelf[2]).toHaveTextContent("No grid yet · Regional map");
+    expect(shelf[2]).toHaveTextContent("No encounter");
+    // A folder shows only its maps, and the address keeps it.
+    const folders = screen.getByRole("navigation", { name: "Folders" });
+    await user.click(within(folders).getByRole("button", { name: /^Dungeons/ }));
+    expect(screen.queryByRole("button", { name: "Saltmere" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Sunken crypt" })).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).getAll("folder")).toEqual(["Dungeons"]);
   });
 
   it("shows only the types ticked in the Type dropdown, and keeps them in the address", async () => {

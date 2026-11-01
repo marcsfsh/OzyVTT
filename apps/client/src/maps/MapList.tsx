@@ -1,5 +1,18 @@
 import { useState } from "react";
-import { Button, IconMap, IconPencil, IconPlus, IconScene, Menu, MenuItem, cx, EmptyState } from "@vtt/ui";
+import {
+  Button,
+  IconMap,
+  IconMore,
+  IconPencil,
+  IconPlus,
+  IconScene,
+  Menu,
+  MenuItem,
+  Tag,
+  cx,
+  EmptyState
+} from "@vtt/ui";
+import "./map-list.css";
 import { useScenes } from "../scenes/context";
 import { MapThumb } from "../scenes/pieces";
 import { pathForMap, SCENES_PATHS } from "../scenes/routes";
@@ -20,8 +33,9 @@ import { MapFiltersFlyout, MapListToolbar } from "./MapListToolbar";
 import type { MapAsset } from "./map-catalog";
 
 /**
- * Every map in the library as a table: the Type dropdown, Filters as a flyout and Sort over several columns, newest
- * first. A row opens its map; a map with no grid offers to set it. On a phone each row keeps its grid and its type.
+ * Every map in the library as a shelf of cards beside its folders (E2 spec 2.1): the Type dropdown, Filters as a flyout
+ * and Sort, newest first. A card opens its map and carries its grid, its use and its folder; its menu files it. On a
+ * phone the folders are chips and the cards two to a row.
  */
 export function MapList() {
   const { state, token, maps, reloadMaps, go, phone } = useScenes();
@@ -35,9 +49,22 @@ export function MapList() {
   const usedIn = (mapId: string) => state.combat.encounters.filter((scene) => scene.mapAssetId === mapId).length;
   const shown = sortMaps(filterMaps(library, filters, usedIn), sort, usedIn);
   const folders = folderNamesOf(library);
+  const chosenFolder = filters.folders.length === 1 ? filters.folders[0] : null;
+  const folderEntries: ReadonlyArray<Readonly<{ id: string; label: string; value: string | null; count: number }>> = [
+    { id: "all", label: "All maps", value: null, count: library.length },
+    ...folders.map((folder) => ({
+      id: `f-${folder}`,
+      label: folder,
+      value: folder,
+      count: library.filter((map) => map.folder === folder).length
+    })),
+    ...(library.some((map) => map.folder === null)
+      ? [{ id: "none", label: "No folder", value: "", count: library.filter((map) => map.folder === null).length }]
+      : [])
+  ];
 
   const rowMenu = (map: MapAsset) => (
-    <Menu trigger="⋯" label={`${map.name} actions`} align="end" hideCaret>
+    <Menu trigger={<IconMore />} icon label={`${map.name} actions`} align="end">
       <MenuItem icon={<IconMap />} onClick={() => go(pathForMap(map.id, "grid"))}>
         {map.calibration || map.scale ? "Set the grid again" : "Set the grid"}
       </MenuItem>
@@ -85,7 +112,27 @@ export function MapList() {
         flyoutOpen={flyoutOpen}
         onFlyout={setFlyoutOpen}
       />
-      <div className="sc-list-main">
+      <div className="sc-list-main mp-main">
+        {/* The folders at the side (E2 spec 2.1): every map, each folder with its count, and the maps in none. The
+            chosen folder is the address's folder filter, so a map's page and Back keep it. */}
+        <nav className={cx("mp-folders", phone && "is-chips")} aria-label="Folders">
+          {folderEntries.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={cx("mp-folder interactive", chosenFolder === entry.value && "is-on")}
+              aria-pressed={chosenFolder === entry.value}
+              onClick={() =>
+                replaceQuery((params) =>
+                  writeMapFilters(params, { ...filters, folders: entry.value === null ? [] : [entry.value] })
+                )
+              }
+            >
+              <span>{entry.label}</span>
+              <span className="mp-folder-count">{entry.count}</span>
+            </button>
+          ))}
+        </nav>
         <MapFiltersFlyout
           open={flyoutOpen}
           onClose={() => setFlyoutOpen(false)}
@@ -102,66 +149,36 @@ export function MapList() {
             </EmptyState>
           ) : shown.length === 0 ? (
             <p className="sc-hint sc-list-none">No map matches. Change the filters to see more.</p>
-          ) : phone ? (
-            <ul className="sc-rows">
-              {shown.map((map) => (
-                <li key={map.id}>
-                  <button type="button" className="sc-row" onClick={() => go(pathForMap(map.id))}>
-                    <MapThumb mapAssetId={map.id} />
-                    <span className="sc-row-main">
-                      <strong>{map.name}</strong>
-                      <small className={cx(gridStateOf(map) === "none" && "sc-caution")}>
-                        {gridLine(gridStateOf(map), map)} · {MAP_KIND_LABEL[map.kind]}
-                      </small>
-                    </span>
-                  </button>
-                  {rowMenu(map)}
-                </li>
-              ))}
-            </ul>
           ) : (
-            <table className="sc-table sc-maps-table">
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Grid</th>
-                  <th scope="col">Size</th>
-                  <th scope="col">Folder</th>
-                  <th scope="col">Used in</th>
-                  <th scope="col">Modified</th>
-                  <th scope="col">
-                    <span className="nh-sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((map) => {
-                  const uses = usedIn(map.id);
-                  return (
-                    <tr key={map.id} className="sc-tr">
-                      <td>
-                        <button type="button" className="sc-rowlink" onClick={() => go(pathForMap(map.id))}>
-                          <MapThumb mapAssetId={map.id} />
-                          <b>{map.name}</b>
-                        </button>
-                      </td>
-                      <td>{MAP_KIND_LABEL[map.kind]}</td>
-                      <td className={cx(gridStateOf(map) === "none" && "sc-caution")}>
-                        {gridLine(gridStateOf(map), map)}
-                      </td>
-                      <td className="tabular">
-                        {map.width} × {map.height}
-                      </td>
-                      <td>{map.folder ?? "None"}</td>
-                      <td>{uses === 0 ? "No encounter" : `${uses} ${uses === 1 ? "encounter" : "encounters"}`}</td>
-                      <td className="sc-col-date">{whenLabel(map.updatedAt)}</td>
-                      <td className="sc-col-menu">{rowMenu(map)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <ul className="mp-cards">
+              {shown.map((map) => {
+                const uses = usedIn(map.id);
+                return (
+                  <li key={map.id} className="mp-card">
+                    <button
+                      type="button"
+                      className="mp-card-open interactive"
+                      aria-label={map.name}
+                      onClick={() => go(pathForMap(map.id))}
+                    >
+                      <MapThumb mapAssetId={map.id} className="mp-card-pic" />
+                      <span className="mp-card-text">
+                        <strong>{map.name}</strong>
+                        <small className={cx(gridStateOf(map) === "none" && "sc-caution")}>
+                          {gridLine(gridStateOf(map), map)} · {MAP_KIND_LABEL[map.kind]}
+                        </small>
+                        <small>
+                          {uses === 0 ? "No encounter" : `${uses} ${uses === 1 ? "encounter" : "encounters"}`} ·{" "}
+                          {whenLabel(map.updatedAt)}
+                        </small>
+                      </span>
+                    </button>
+                    {map.folder && <Tag className="mp-card-folder">{map.folder}</Tag>}
+                    <span className="mp-card-menu">{rowMenu(map)}</span>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

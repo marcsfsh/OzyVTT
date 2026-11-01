@@ -1,0 +1,126 @@
+/* The map list in folders (E2 spec 2.1 and 4): a 200px column of folders with their counts beside a shelf of map
+   cards; on a phone the folders are a row of chips and the cards two to a row. */
+.sc-list-main.mp-main {
+  flex-direction: row;
+}
+.mp-main > .sc-list-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mp-folders {
+  display: flex;
+  flex: 0 0 200px;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-2);
+  border-right: 1px solid var(--line);
+}
+.mp-folder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: 500 14px / 1.2 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.mp-folder.is-on {
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--cyan);
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
+}
+.mp-folder-count {
+  color: var(--text-muted);
+  font: 400 15px / 1 var(--font-numeric);
+}
+.mp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  list-style: none;
+}
+.mp-card {
+  position: relative;
+  display: grid;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-1);
+}
+.mp-card-open {
+  display: grid;
+  gap: 6px;
+  padding: 0 0 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-card-pic.sc-thumb {
+  width: 100%;
+  height: 120px;
+}
+.mp-card-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mp-card-text {
+  display: grid;
+  gap: 2px;
+  padding: 0 10px;
+}
+.mp-card-text strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.mp-card-text small {
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.mp-card-folder {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.mp-card-menu {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+@media (max-width: 760px) {
+  .sc-list-main.mp-main {
+    flex-direction: column;
+  }
+  .mp-folders.is-chips {
+    flex: none;
+    flex-direction: row;
+    gap: 6px;
+    padding: var(--space-2) var(--space-3);
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .mp-folders.is-chips .mp-folder {
+    flex: none;
+    box-shadow: var(--base-line);
+  }
+  .mp-folders.is-chips .mp-folder.is-on {
+    box-shadow: var(--base-line-on);
+  }
+  .mp-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .mp-card-pic.sc-thumb {
+    height: 90px;
+  }
+}
