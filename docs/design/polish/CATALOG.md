@@ -286,7 +286,7 @@ Designed in their own rounds.
 
 ### E2. Maps
 
-E2.1 and E2.2 Designed (`E2-maps-tokens/SPEC.md`, ADR-0063); E2.3 is E's Steps; E2.4 waits for F3.
+E2.1 and E2.2 Built in part (`E2-maps-tokens/SPEC.md`, ADR-0063; the map beside its list and the picker are left); E2.3 is E's Steps; E2.4 waits for F3.
 
 | Id   | Surface                         | Opens at                         | Who | Files                                                                     |
 | ---- | ------------------------------- | -------------------------------- | --- | ------------------------------------------------------------------------- |

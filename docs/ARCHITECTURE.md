@@ -160,7 +160,8 @@ four credentials and pins the answers.
 Every byte that reaches a player or the shared screen goes through a projection built for that
 audience. There are five:
 
-- **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. Players
+- **Game** (`apps/server/src/projections.ts`): `projectPlayerView` and `projectGmView`. The GM's token groups (`tokenGroups`, ADR-0063: named groups and which creature is filed in each, from
+  `commands/token-groups.ts`) reach only the GM's view. Players
   get only `public` actors, exact hit points for party characters and a health band for every other creature
   (`playerHp`), and owner-only sheet resources
   for their own character. A hidden effect's source becomes "A hidden threat". Private rolls,

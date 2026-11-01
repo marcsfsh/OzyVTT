@@ -214,6 +214,11 @@ New encounter is the bar's Cup on Prep's lists and steps down to a Base line con
 its toolbar has Filters, the state chips, the count, Your order and New map, then a card an encounter with its map as
 the picture, its one state tag (Live, Encounter parked, Replay, Ended, Prepared or Draft) and whether it is ready.
 
+Maps are a shelf of cards beside their folders (ADR-0063): All maps, each folder with its count, No folder; a card
+carries its picture, its grid and type, its use and its folder, and its More files it. Choose puts a box on each card
+and a bar at the foot with Move to. Tokens are in the GM's groups: Party, the GM's own groups, then Monsters, each
+creature with a More to set its image or move it; the groups are the GM's alone.
+
 A page header is for records only (ADR-0048). A list, a settings section or an overview starts with its content and at
 most one description line (14px, `--text-dim`, the GM only tag in front of it on a page players can also open). A
 record opens with its title row: the title in Chakra Petch 600 capitals at 24px (20px on a phone), its tags, one 13px
