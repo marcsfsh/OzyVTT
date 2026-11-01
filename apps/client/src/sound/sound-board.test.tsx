@@ -107,15 +107,25 @@ describe("the sound board", () => {
     );
     // The GM's own silent preview is not a table screen.
     expect(await screen.findByText("No table screen connected")).toBeInTheDocument();
+    // The board's parts sit at the side with their counts; the chosen one is in the address.
+    const side = screen.getByRole("navigation", { name: "Sound board" });
+    expect(within(side).getByRole("button", { name: /^Ambience/ })).toHaveTextContent("1");
+    await user.click(within(side).getByRole("button", { name: /^All sounds/ }));
+    expect(new URLSearchParams(window.location.search).get("part")).toBe("library");
     // Rain is already a layer, so its row says so in words and offers nothing again.
     expect(screen.getByText("In ambience")).toBeInTheDocument();
+    // Not on the board lists only the sounds on no part.
+    await user.click(within(side).getByRole("button", { name: /^Not on the board/ }));
+    expect(screen.queryByText("In ambience")).toBeNull();
     await user.click(screen.getByRole("button", { name: "Add Tavern Song to the playlist" }));
     expect(sent).toContainEqual([
       "sound:arrange",
       expect.objectContaining({ music: { tracks: [{ assetId: TAVERN, volume: 0.8 }], shuffle: false } })
     ]);
+    await user.click(within(side).getByRole("button", { name: /^Ambience/ }));
     await user.click(screen.getByRole("switch", { name: "Rain" }));
     expect(sent).toContainEqual(["sound:play", expect.objectContaining({ target: "ambient", assetId: RAIN })]);
+    await user.click(within(side).getByRole("button", { name: /^Playlist/ }));
     await user.click(screen.getByRole("button", { name: "Save current sound" }));
     expect(sent).toContainEqual([
       "sound:set-encounter-preset",

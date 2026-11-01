@@ -9,6 +9,8 @@ import { SoundLibraryPanel } from "./SoundLibraryPanel";
 import { LevelSlider } from "./LevelSlider";
 import { AmbienceSection, EffectsSection, MusicSection } from "./SoundSections";
 import "./sound-board.css";
+import { useMediaQuery } from "../lib/useMediaQuery";
+import { replaceQuery, useRoute } from "../router";
 
 /** Every sound the board names, to notice one the library list hasn't caught up with. */
 const boardSounds = (board: Board) => [
@@ -89,6 +91,9 @@ function Transport({
  * library it plays from, and each scene's own sound. Sound comes out of the table screen only; this device and
  * the players' stay silent.
  */
+const PARTS = ["playlist", "ambience", "effects", "library", "unused"] as const;
+type Part = (typeof PARTS)[number];
+
 export function SoundBoard({
   gmToken,
   scenes,
@@ -109,6 +114,22 @@ export function SoundBoard({
   useEffect(() => {
     if (missing) void refresh().catch(() => {});
   }, [missing, refresh]);
+  const phone = useMediaQuery("(max-width: 760px)");
+  const { query } = useRoute();
+  const part = PARTS.includes(query.get("part") as Part) ? (query.get("part") as Part) : "playlist";
+  const onBoard = new Set(view ? boardSounds(view.board) : []);
+  const unused = (library.sounds ?? []).filter((sound) => !onBoard.has(sound.id));
+  const partButton = (id: Part, label: string, count: number) => (
+    <button
+      type="button"
+      className={part === id ? "sound-board-side-row interactive is-on" : "sound-board-side-row interactive"}
+      aria-pressed={part === id}
+      onClick={() => replaceQuery((params) => (id === "playlist" ? params.delete("part") : params.set("part", id)))}
+    >
+      <span>{label}</span>
+      <span className="sound-board-side-count">{count}</span>
+    </button>
+  );
 
   return (
     <section className="sound-board pane-frame pane-scene frame-col anim-view" aria-labelledby="sound-board-title">
@@ -126,15 +147,32 @@ export function SoundBoard({
         ) : (
           <>
             <Transport view={view} nameOf={nameOf} send={send} />
-            <div className="sound-board-grid">
-              <div className="sound-board-col">
-                <MusicSection board={view.board} nameOf={nameOf} send={send} />
-                <AmbienceSection board={view.board} nameOf={nameOf} send={send} />
-                <EffectsSection board={view.board} nameOf={nameOf} send={send} />
-              </div>
-              <div className="sound-board-col">
-                <SoundLibraryPanel library={library} board={view.board} send={send} />
-                <SceneSounds board={view.board} scenes={scenes} activeEncounterId={activeEncounterId} send={send} />
+            {/* The board as kinds at the side (E3 spec 2.1): what is on the board, then the library; the chosen part
+                is in the address, its rows at the right. On a phone the parts are chips. */}
+            <div className={phone ? "sound-board-parts is-phone" : "sound-board-parts"}>
+              <nav className="sound-board-side" aria-label="Sound board">
+                <p className="sound-board-side-head">On the board</p>
+                {partButton("playlist", "Playlist", view.board.music.tracks.length)}
+                {partButton("ambience", "Ambience", view.board.ambient.length)}
+                {partButton("effects", "Effects", view.board.effects.length)}
+                <p className="sound-board-side-head">Library</p>
+                {partButton("library", "All sounds", library.sounds?.length ?? 0)}
+                {partButton("unused", "Not on the board", unused.length)}
+              </nav>
+              <div className="sound-board-part">
+                {part === "playlist" && <MusicSection board={view.board} nameOf={nameOf} send={send} />}
+                {part === "ambience" && <AmbienceSection board={view.board} nameOf={nameOf} send={send} />}
+                {part === "effects" && <EffectsSection board={view.board} nameOf={nameOf} send={send} />}
+                {(part === "library" || part === "unused") && (
+                  <SoundLibraryPanel
+                    library={part === "unused" ? { ...library, sounds: unused } : library}
+                    board={view.board}
+                    send={send}
+                  />
+                )}
+                {part === "playlist" && (
+                  <SceneSounds board={view.board} scenes={scenes} activeEncounterId={activeEncounterId} send={send} />
+                )}
               </div>
             </div>
           </>

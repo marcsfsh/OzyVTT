@@ -742,10 +742,14 @@ test("the GM plays music on the table screen and sees that the room hears it", a
 
   // Upload through the library's own file button, then put the sound on the playlist and play it.
   const chooser = gm.waitForEvent("filechooser");
+  // The board's parts sit at the side (E3 spec 2.1): the library to add a sound, then the playlist to play it.
+  const parts = gm.getByRole("navigation", { name: "Sound board" });
+  await press(parts.getByRole("button", { name: /^All sounds/ }));
   await press(gm.getByRole("button", { name: "Add sounds…" }));
   await (await chooser).setFiles({ name: "Smoke Tone.wav", mimeType: "audio/wav", buffer: toneWav(30) });
   await expect(gm.getByText("Smoke Tone.wav added to the library.")).toBeVisible();
   await press(gm.getByRole("button", { name: "Add Smoke Tone to the playlist" }));
+  await press(parts.getByRole("button", { name: /^Playlist/ }));
   await expect(gm.getByRole("button", { name: "Play Smoke Tone" })).toBeVisible();
   await press(gm.getByRole("button", { name: "Play music" }));
   await expect(gm.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
