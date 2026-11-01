@@ -242,8 +242,7 @@ button span {
 }
 
 .card,
-.table,
-.dice-proof {
+.table {
   margin-top: var(--space-10);
   padding: var(--space-6);
   border: 1px solid var(--line);

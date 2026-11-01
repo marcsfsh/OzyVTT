@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { GmView, PlayerView, RollPurpose, RollVisibility, TableRollPurpose } from "@vtt/domain";
-import { Button, Input, SegmentedControl, Select, Stepper, Tag, useOnChange, useToast } from "@vtt/ui";
+import { Button, Group, Input, SegmentedControl, Select, Stepper, Tag, useOnChange, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { natural, rollLands } from "./rollLight";
 import { useRollPreference } from "./roll-preference";
@@ -180,115 +180,119 @@ export function DicePanel({
       </section>
     );
 
+  const visibilityField = (
+    <label className="dice-visibility">
+      Visibility
+      <Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>
+        {visibilityOptions.map((value) => (
+          <option key={value} value={value}>
+            {ROLL_VISIBILITY_WORD[value]}
+          </option>
+        ))}
+      </Select>
+    </label>
+  );
+  // The roller is a Cradle (log spec 2.4): Visibility at its head, then how you roll, the dice, Advantage,
+  // Disadvantage and the modifier; More dice and Recent rolls are open groups under it.
   return (
-    <section className="dice-proof" aria-labelledby="dice-proof-heading">
+    <section className="dice-proof">
       {modeSwitch}
-      <div className="dice-heading">
-        {/* The `id` is the section's `aria-labelledby` target. */}
-        <div>
-          <h2 id="dice-proof-heading">Roll dice</h2>
+      <Group title="Roll dice" headingLevel={2} actions={visibilityField} className="dice-roller">
+        {/* The per-browser roll-input preference, shared with the character sheet's toggle. */}
+        {chooses && (
+          <div className="dice-roll-pref" role="group" aria-label="How you roll">
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Roll input mode"
+              value={rollInput}
+              onChange={(mode) => setRollInput(mode as "digital" | "manual")}
+              options={[
+                { value: "digital", label: "Digital" },
+                { value: "manual", label: "Manual" }
+              ]}
+            />
+          </div>
+        )}
+        <div className="dice-quick" role="group" aria-label="Quick rolls">
+          {QUICK_DICE.map((sides) => (
+            <Button key={sides} size="sm" className="dice-die" onClick={() => quickRoll(sides)}>
+              d{sides}
+            </Button>
+          ))}
         </div>
-        <label className="dice-visibility">
-          Visibility
-          <Select value={visibility} onChange={(event) => setVisibility(event.target.value as RollVisibility)}>
-            {visibilityOptions.map((value) => (
-              <option key={value} value={value}>
-                {ROLL_VISIBILITY_WORD[value]}
-              </option>
-            ))}
-          </Select>
-        </label>
-      </div>
-      {/* The per-browser roll-input preference, shared with the character sheet's toggle. */}
-      {chooses && (
-        <div className="dice-roll-pref" role="group" aria-label="How you roll">
-          <SegmentedControl
-            size="sm"
-            ariaLabel="Roll input mode"
-            value={rollInput}
-            onChange={(mode) => setRollInput(mode as "digital" | "manual")}
-            options={[
-              { value: "digital", label: "Digital" },
-              { value: "manual", label: "Manual" }
-            ]}
+        <div className="dice-adv-row" role="group" aria-label="Advantage and modifier">
+          <Button size="sm" className="dice-arm" aria-pressed={advantage} onClick={toggleAdvantage}>
+            Advantage
+          </Button>
+          <Button size="sm" className="dice-arm" aria-pressed={disadvantage} onClick={toggleDisadvantage}>
+            Disadvantage
+          </Button>
+          <Stepper
+            label="Modifier"
+            value={modifier}
+            onChange={setModifier}
+            format={modifierLabel}
+            aria-label="Roll modifier"
           />
         </div>
-      )}
-      <div className="dice-quick" role="group" aria-label="Quick rolls">
-        {QUICK_DICE.map((sides) => (
-          <button key={sides} onClick={() => quickRoll(sides)}>
-            d{sides}
-          </button>
-        ))}
-      </div>
-      <div className="dice-adv-row" role="group" aria-label="Advantage and modifier">
-        <button type="button" className="secondary" aria-pressed={advantage} onClick={toggleAdvantage}>
-          Advantage
-        </button>
-        <button type="button" className="secondary" aria-pressed={disadvantage} onClick={toggleDisadvantage}>
-          Disadvantage
-        </button>
-        <Stepper
-          label="Modifier"
-          value={modifier}
-          onChange={setModifier}
-          format={modifierLabel}
-          aria-label="Roll modifier"
-        />
-      </div>
-      {(advantage || disadvantage) && (
-        <p className="dice-armed">{advantage ? "Advantage" : "Disadvantage"} is armed for the next d20 roll.</p>
-      )}
-      <details className="dice-custom">
-        <summary>Custom formula (advantage keeps, drop lowest, and more)</summary>
-        <div className="dice-form">
-          <label>
-            Formula
-            <Input value={formula} onChange={(event) => setFormula(event.target.value)} placeholder="2d20kh1 + 5" />
-          </label>
-          <label>
-            Purpose
-            <Select value={purpose} onChange={(event) => setPurpose(event.target.value as TableRollPurpose)}>
-              {(Object.keys(PURPOSE_LABELS) as TableRollPurpose[]).map((value) => (
-                <option key={value} value={value}>
-                  {PURPOSE_LABELS[value]}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <Button variant="primary" onClick={customRoll}>
-            Roll
-          </Button>
-        </div>
-        <p className="dice-hint">Try 1d20, 2d20kh1 + 5, or 2d6 + 1d4 - 2.</p>
-      </details>
-      <details className="dice-custom">
-        <summary>Falling damage (1d6 per 10 ft, max 20d6)</summary>
-        <div className="dice-form">
-          <label>
-            Feet fallen
-            <Input
-              type="number"
-              min="0"
-              max="10000"
-              inputMode="numeric"
-              value={fallFeet}
-              onChange={(event) => setFallFeet(event.target.value)}
-              placeholder="30"
-            />
-          </label>
-          <Button variant="primary" onClick={rollFall} disabled={fallDice < 1}>
-            Roll {fallDice > 0 ? `${fallDice}d6` : "fall"}
-          </Button>
-        </div>
-        <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
-      </details>
+        {(advantage || disadvantage) && (
+          <p className="dice-armed">{advantage ? "Advantage" : "Disadvantage"} is armed for the next d20 roll.</p>
+        )}
+      </Group>
+      <Group kind="read" title="More dice" className="dice-more">
+        <details className="dice-custom">
+          <summary>Custom formula (advantage keeps, drop lowest, and more)</summary>
+          <div className="dice-form">
+            <label>
+              Formula
+              <Input value={formula} onChange={(event) => setFormula(event.target.value)} placeholder="2d20kh1 + 5" />
+            </label>
+            <label>
+              Purpose
+              <Select value={purpose} onChange={(event) => setPurpose(event.target.value as TableRollPurpose)}>
+                {(Object.keys(PURPOSE_LABELS) as TableRollPurpose[]).map((value) => (
+                  <option key={value} value={value}>
+                    {PURPOSE_LABELS[value]}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <Button variant="primary" onClick={customRoll}>
+              Roll
+            </Button>
+          </div>
+          <p className="dice-hint">Try 1d20, 2d20kh1 + 5, or 2d6 + 1d4 - 2.</p>
+        </details>
+        <details className="dice-custom">
+          <summary>Falling damage (1d6 per 10 ft, max 20d6)</summary>
+          <div className="dice-form">
+            <label>
+              Feet fallen
+              <Input
+                type="number"
+                min="0"
+                max="10000"
+                inputMode="numeric"
+                value={fallFeet}
+                onChange={(event) => setFallFeet(event.target.value)}
+                placeholder="30"
+              />
+            </label>
+            <Button variant="primary" onClick={rollFall} disabled={fallDice < 1}>
+              Roll {fallDice > 0 ? `${fallDice}d6` : "fall"}
+            </Button>
+          </div>
+          <p className="dice-hint">Bludgeoning damage; the faller lands Prone (SRD Falling).</p>
+        </details>
+      </Group>
       {(() => {
         return (
-          <>
-            <div className="roll-list-head">
-              <h3 className="roll-list-title">Recent rolls</h3>
-              {mineActorId && (
+          <Group
+            kind="read"
+            title="Recent rolls"
+            className="dice-recent"
+            actions={
+              mineActorId && (
                 <SegmentedControl
                   size="sm"
                   ariaLabel="Filter rolls"
@@ -299,8 +303,9 @@ export function DicePanel({
                     { value: "mine", label: "Mine" }
                   ]}
                 />
-              )}
-            </div>
+              )
+            }
+          >
             <div ref={rollList} className="roll-list scroll-y" aria-label="Recent rolls">
               {rolls.length === 0 && (
                 <p>{rollFilter === "mine" ? "No rolls from this character yet." : "No rolls yet."}</p>
@@ -345,9 +350,11 @@ export function DicePanel({
                   </article>
                 ))}
             </div>
-          </>
+          </Group>
         );
       })()}
+      {/* Who sees the next roll, in words, at the foot. */}
+      <p className="dice-foot">{ROLL_VISIBILITY_WORD[visibility]}</p>
     </section>
   );
 }

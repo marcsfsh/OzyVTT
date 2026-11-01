@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Button, Input, Modal, Select, useToast } from "@vtt/ui";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Button, IconButton, IconX, Input, Select, useToast } from "@vtt/ui";
 import { command } from "../lib/command";
 import { useRollVisibility } from "../dice/roll-visibility";
 import { noteChatSent } from "../encounter/logArrivals";
@@ -144,11 +144,41 @@ export function LogComposer({ options, talk }: Readonly<{ options?: ReactNode; t
           </Button>
         )}
       </div>
-      {options && (
-        <Modal open={optionsOpen} onClose={() => setOptionsOpen(false)} title="Dice options" size="lg">
-          {options}
-        </Modal>
-      )}
+      {options && optionsOpen && <DiceSheet onClose={() => setOptionsOpen(false)}>{options}</DiceSheet>}
     </div>
+  );
+}
+
+/**
+ * The dice options as a sheet over the panel (log spec 2.4): under the tabs, over the Log tab, with the map left in
+ * view. Its head is "Dice options" and the one close; Escape closes it too, and focus goes into it as it opens.
+ */
+function DiceSheet({ children, onClose }: Readonly<{ children: ReactNode; onClose: () => void }>) {
+  const sheet = useRef<HTMLElement>(null);
+  useEffect(() => {
+    sheet.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <section
+      ref={sheet}
+      className="dice-sheet anim-sheet"
+      role="dialog"
+      aria-labelledby="dice-sheet-title"
+      tabIndex={-1}
+    >
+      <span className="nh-sheet-handle dice-sheet-handle" aria-hidden="true" />
+      <header className="dice-sheet-head">
+        <h2 id="dice-sheet-title">Dice options</h2>
+        <IconButton label="Close" onClick={onClose}>
+          <IconX />
+        </IconButton>
+      </header>
+      <div className="dice-sheet-body scroll-y">{children}</div>
+    </section>
   );
 }

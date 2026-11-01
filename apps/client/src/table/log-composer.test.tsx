@@ -118,5 +118,13 @@ describe("the log's composer", () => {
     expect(more).toHaveTextContent("More");
     await user.click(more);
     expect(screen.getByRole("dialog", { name: "Dice options" })).toHaveTextContent("The dice options");
+    // The sheet closes with its one close, and with Escape.
+    await user.click(
+      within(screen.getByRole("dialog", { name: "Dice options" })).getByRole("button", { name: "Close" })
+    );
+    expect(screen.queryByRole("dialog", { name: "Dice options" })).toBeNull();
+    await user.click(more);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Dice options" })).toBeNull();
   });
 });

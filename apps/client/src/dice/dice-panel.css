@@ -1,19 +1,30 @@
 /* The dice panel: quick rolls, the custom formula and the recent-rolls feed. */
 
-.dice-proof h2 {
-  font-size: var(--fs-h2);
+/* The dice options (log spec 2.4): the roller as a Cradle, then More dice and Recent rolls as open groups, 18px apart,
+   and who sees the next roll at the foot. */
+.dice-proof {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.dice-proof .nh-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.dice-roller .dice-quick {
+  margin-top: 0;
+}
+.dice-foot {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 /* The GM's switch between rolling and calling for a roll: the panel's first row, so calling is never hidden. */
 .dice-mode {
   margin-bottom: var(--space-4);
 }
-.dice-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-}
+
 .dice-visibility {
   display: flex;
   align-items: center;
@@ -39,16 +50,9 @@
   margin-top: var(--space-4);
   align-items: center;
 }
-.dice-quick button {
-  padding: 0.65rem var(--space-4);
-  text-align: center;
-  background: var(--surface-2);
-}
-.dice-quick button[aria-pressed="true"] {
-  background: var(--surface-3);
-  border-color: var(--magenta);
-  color: var(--text);
-  box-shadow: var(--glow-magenta);
+.dice-die.nh-btn {
+  min-width: 44px;
+  font: 400 18px / 1 var(--font-numeric);
 }
 .dice-armed {
   margin: 0.6rem 0 0;
@@ -76,16 +80,13 @@
   margin-top: var(--space-2);
   align-items: end;
 }
-.dice-adv-row .secondary {
-  min-height: calc(var(--tap-min) + 2px);
-  padding: 0 var(--space-4);
-  text-align: center;
-}
-.dice-adv-row .secondary[aria-pressed="true"] {
-  background: var(--surface-3);
-  border-color: var(--magenta);
+/* Advantage or Disadvantage armed: the amber line; the one notice under them says it in words (T rule 21). */
+.dice-arm.nh-btn[aria-pressed="true"] {
+  --nh-sheen: inset 0 -2px 0 var(--caution);
   color: var(--text);
-  box-shadow: var(--glow-magenta);
+}
+.dice-roller .nh-group-head .nh-eyebrow {
+  white-space: nowrap;
 }
 .dice-custom {
   margin-top: var(--space-4);
@@ -116,20 +117,7 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
-.roll-list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  margin-top: var(--space-4);
-}
-.roll-list-title {
-  margin: 0;
-  font: 800 var(--fs-xs)/1 var(--font-label);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-muted);
-}
+
 /* The feed's scroll is `.scroll-y` in DicePanel's markup. The cap is for the standalone panel; in the
    dock accordion `max-height: none` gives it the section. */
 .roll-list {
