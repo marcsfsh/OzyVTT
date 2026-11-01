@@ -3,16 +3,16 @@ import {
   Alert,
   Button,
   Field,
-  IconChevronRight,
   IconMore,
   IconPlus,
   Input,
   Menu,
   MenuItem,
   Select,
+  SideListGroup,
+  SideListRow,
   Skeleton,
   useToast,
-  TitleLine,
   Crumb
 } from "@vtt/ui";
 import { CODEX_PREP_LIMITS, type CodexAutosaveSettings, type CodexPrepTemplate, type CodexSession } from "@vtt/domain";
@@ -30,9 +30,6 @@ import "./templates.css";
 
 /** Below this width templates are read and used, not edited: editing a template is a laptop task. */
 export const TEMPLATES_PHONE_QUERY = "(max-width: 760px)";
-
-const sectionCount = (template: CodexPrepTemplate) =>
-  `${template.sections.length} ${template.sections.length === 1 ? "section" : "sections"}`;
 
 /**
  * Prep templates, from the GM menu: the library of reusable session prep, one template's editor, a new session made
@@ -136,64 +133,62 @@ export function TemplatesView({
     await act(() => templateApi.remove(gmToken, template.id), "Couldn't delete the template.");
   };
 
-  const cards = (
-    <ul className={`tpl-library${phone ? " is-phone" : ""}`} aria-label="Prep templates">
-      {templates.map((template) => {
-        const on = template.id === selected?.id;
-        return (
-          <li key={template.id} className={`tpl-card${on ? " is-selected" : ""}`}>
-            <button
-              type="button"
-              className="tpl-card-open"
-              aria-current={on ? "true" : undefined}
-              onClick={() => onSelectTemplate(template.id)}
-            >
-              <CodexIcon iconId="scroll" className="tpl-card-icon" />
-              <span className="tpl-card-text">
-                <span className="tpl-card-name">{template.name}</span>
-                <span className="tpl-card-meta">
-                  {template.builtIn ? `Built in · ${sectionCount(template)}` : sectionCount(template)}
-                </span>
-              </span>
+  const templateMenu = (template: CodexPrepTemplate) => (
+    <Menu icon align="end" label={`${template.name} options`} trigger={<IconMore />}>
+      <MenuItem
+        disabled={template.builtIn}
+        onClick={() => {
+          onSelectTemplate(template.id);
+          requestAnimationFrame(() => nameRef.current?.focus());
+        }}
+      >
+        Rename
+      </MenuItem>
+      <MenuItem onClick={() => void duplicate(template)}>Duplicate</MenuItem>
+      <MenuItem disabled={template.isDefault} onClick={() => void setDefault(template, true)}>
+        Set as default
+      </MenuItem>
+      <MenuItem tone="danger" disabled={template.builtIn} onClick={() => void remove(template)}>
+        Delete
+      </MenuItem>
+    </Menu>
+  );
+  // TEMPLATES as the settled side list (F time spec 2.1): each with its section count, the chosen one lit, the default
+  // marked; a phone shows them as chips.
+  const cards = phone ? (
+    <div className="nh-filterchips" role="group" aria-label="Prep templates">
+      {templates.map((template) => (
+        <button
+          key={template.id}
+          type="button"
+          className={`nh-filterchip interactive${template.id === selected?.id ? " is-on" : ""}`}
+          aria-pressed={template.id === selected?.id}
+          onClick={() => onSelectTemplate(template.id)}
+        >
+          {template.name} <span className="cx-tag-n">{template.sections.length}</span>
+        </button>
+      ))}
+    </div>
+  ) : (
+    <SideListGroup eyebrow="Templates" className="tpl-sidelist">
+      {templates.map((template) => (
+        <SideListRow
+          key={template.id}
+          label={
+            <>
+              {template.name}
               {template.isDefault && <span className="tpl-default">Default</span>}
-              {phone && <IconChevronRight className="tpl-card-chevron" />}
-            </button>
-            {!phone && (
-              <Menu icon align="end" label={`${template.name} options`} trigger={<IconMore />}>
-                <MenuItem
-                  disabled={template.builtIn}
-                  onClick={() => {
-                    onSelectTemplate(template.id);
-                    requestAnimationFrame(() => nameRef.current?.focus());
-                  }}
-                >
-                  Rename
-                </MenuItem>
-                <MenuItem onClick={() => void duplicate(template)}>Duplicate</MenuItem>
-                <MenuItem disabled={template.isDefault} onClick={() => void setDefault(template, true)}>
-                  Set as default
-                </MenuItem>
-                <MenuItem tone="danger" disabled={template.builtIn} onClick={() => void remove(template)}>
-                  Delete
-                </MenuItem>
-              </Menu>
-            )}
-          </li>
-        );
-      })}
-      {!phone && (
-        <li className="tpl-card tpl-card-new">
-          <button
-            type="button"
-            className="tpl-card-open"
-            disabled={templates.filter((each) => !each.builtIn).length >= CODEX_PREP_LIMITS.templates}
-            onClick={() => void create()}
-          >
-            <IconPlus /> New template
-          </button>
-        </li>
-      )}
-    </ul>
+            </>
+          }
+          ariaLabel={`${template.name}${template.isDefault ? ", default" : ""}${template.builtIn ? ", built in" : ""}`}
+          leading={<CodexIcon iconId="scroll" />}
+          count={template.sections.length}
+          current={template.id === selected?.id}
+          onSelect={() => onSelectTemplate(template.id)}
+          end={templateMenu(template)}
+        />
+      ))}
+    </SideListGroup>
   );
 
   if (library.loading && !library.data)
@@ -245,20 +240,23 @@ export function TemplatesView({
     );
 
   return (
-    <div className="tpl-view">
-      <div className="tpl-toolbar">
-        <TitleLine crumb={onOpenMenu && <Crumb label="GM menu" onClick={onOpenMenu} />}>
-          <h2 className="tpl-title">Prep templates</h2>
-        </TitleLine>
-        <Button variant="secondary" size="sm" onClick={() => void create()}>
+    <div className="tpl-view tpl-cols">
+      <nav className="tpl-nav scroll-y" aria-label="Templates">
+        {onOpenMenu && <Crumb label="More" onClick={onOpenMenu} />}
+        {cards}
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={templates.filter((each) => !each.builtIn).length >= CODEX_PREP_LIMITS.templates}
+          onClick={() => void create()}
+        >
           <IconPlus /> New template
         </Button>
-      </div>
-      {error && <Alert tone="danger">{error}</Alert>}
-      {library.error && <Alert tone="danger">{library.error}</Alert>}
-      {cards}
-      {selected && (
-        <div className="tpl-work">
+      </nav>
+      <div className="tpl-main scroll-y">
+        {error && <Alert tone="danger">{error}</Alert>}
+        {library.error && <Alert tone="danger">{library.error}</Alert>}
+        {selected && (
           <TemplateEditor
             key={selected.id}
             gmToken={gmToken}
@@ -270,26 +268,28 @@ export function TemplatesView({
             onDuplicate={() => void duplicate(selected)}
             onSetDefault={(isDefault) => void setDefault(selected, isDefault)}
           />
-          <div className="tpl-side">
-            <NewSessionFromTemplate
-              key={selected.id}
-              gmToken={gmToken}
-              template={selected}
-              templates={templates}
-              sessions={sessions}
-              onCreated={async (sessionId) => {
-                await onSessionsChanged();
-                onOpenSession(sessionId);
-              }}
-            />
-            <MadeFromTemplate
-              gmToken={gmToken}
-              template={selected}
-              sessions={sessions}
-              onOpenSession={onOpenSession}
-              onChanged={onSessionsChanged}
-            />
-          </div>
+        )}
+      </div>
+      {selected && (
+        <div className="tpl-side scroll-y">
+          <NewSessionFromTemplate
+            key={selected.id}
+            gmToken={gmToken}
+            template={selected}
+            templates={templates}
+            sessions={sessions}
+            onCreated={async (sessionId) => {
+              await onSessionsChanged();
+              onOpenSession(sessionId);
+            }}
+          />
+          <MadeFromTemplate
+            gmToken={gmToken}
+            template={selected}
+            sessions={sessions}
+            onOpenSession={onOpenSession}
+            onChanged={onSessionsChanged}
+          />
         </div>
       )}
       {confirmDialog}

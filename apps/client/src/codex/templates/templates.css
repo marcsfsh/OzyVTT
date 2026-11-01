@@ -346,3 +346,41 @@
     font-size: 20px;
   }
 }
+
+/* ----- The templates page (F time spec 2.1): templates at the side, the chosen one, today's panel ----- */
+.tpl-view.tpl-cols {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 340px;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+}
+.tpl-nav {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--line-strong);
+}
+.tpl-nav > .nh-btn {
+  justify-self: start;
+}
+.tpl-main {
+  min-height: 0;
+  padding: var(--space-4);
+}
+.tpl-cols > .tpl-side {
+  min-height: 0;
+  padding: var(--space-4);
+  border-left: 1px solid var(--line-strong);
+}
+.tpl-sidelist .tpl-default {
+  margin-left: var(--space-2);
+}
+.tpl-sidelist .nh-sidelist-label {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}

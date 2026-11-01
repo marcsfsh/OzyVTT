@@ -112,10 +112,13 @@ beforeEach(() => {
 describe("The prep template library", () => {
   it("lists the templates with their sections and the default marked, and opens the default", async () => {
     renderView();
-    const library = await screen.findByRole("list", { name: "Prep templates" });
-    expect(within(library).getByText("Built in · 2 sections")).toBeInTheDocument();
-    const mine = within(library).getByRole("button", { name: /My session prep/ });
+    // TEMPLATES as the side list (F time spec 2.1): each with its section count, the default marked.
+    const library = await screen.findByRole("group", { name: "Templates" });
+    const builtIn = within(library).getByRole("button", { name: /built in$/ });
+    expect(builtIn).toHaveTextContent("2");
+    const mine = within(library).getByRole("button", { name: "My session prep, default" });
     expect(within(mine).getByText("Default")).toBeInTheDocument();
+    expect(mine).toHaveAttribute("aria-current", "true");
     expect(screen.getByRole("textbox", { name: "Template name" })).toHaveValue("My session prep");
   });
 
