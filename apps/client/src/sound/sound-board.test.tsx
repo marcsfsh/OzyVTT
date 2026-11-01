@@ -132,4 +132,28 @@ describe("the sound board", () => {
       expect.objectContaining({ encounterId: SCENE, preset: "save-current" })
     ]);
   });
+
+  it("draws the Playing bar: the track and its layers, where it is, and the controls as one row", async () => {
+    const user = userEvent.setup();
+    board = view({
+      music: {
+        tracks: [{ assetId: TAVERN, volume: 0.6, durationMs: 184_000 }],
+        current: { playId: PLAY, assetId: TAVERN, startedAt: 0, durationMs: 184_000, volume: 0.6 }
+      },
+      ambient: [{ assetId: RAIN, volume: 0.5, durationMs: 30_000, playing: { playId: PLAY, startedAt: 0 } }]
+    });
+    render(
+      <ToastProvider>
+        <SoundBoard gmToken="gm" scenes={[]} activeEncounterId={null} />
+      </ToastProvider>
+    );
+    const bar = await screen.findByRole("region", { name: "Now playing" });
+    expect(within(bar).getByText("Tavern Song")).toBeInTheDocument();
+    expect(within(bar).getByText("Rain")).toBeInTheDocument();
+    expect(within(bar).getByRole("progressbar", { name: "Track position" })).toHaveAttribute("aria-valuemax", "184");
+    await user.click(within(bar).getByRole("button", { name: "Pause" }));
+    expect(sent).toContainEqual(["sound:pause", expect.objectContaining({ paused: true })]);
+    await user.click(within(bar).getByRole("button", { name: "Stop all" }));
+    expect(sent).toContainEqual(["sound:stop", expect.objectContaining({ target: "all" })]);
+  });
 });

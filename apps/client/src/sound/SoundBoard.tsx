@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SoundBoard as Board, SoundBoardView } from "@vtt/domain";
-import { Badge, Button, Eyebrow, IconPause, IconPlay, IconSkip, IconStop } from "@vtt/ui";
+import { Eyebrow, IconButton, IconPause, IconPlay, IconSkip, IconStop } from "@vtt/ui";
 import { SharedScreenSwitch } from "../viewer/SharedScreenSwitch";
 import { ScreenSoundStatus } from "./ScreenSoundStatus";
 import { SceneSounds } from "./SceneSounds";
@@ -19,7 +19,32 @@ const boardSounds = (board: Board) => [
   ...board.effects.map((slot) => slot.assetId)
 ];
 
-function Transport({
+/** "1:23" from milliseconds. */
+const clock = (ms: number) => {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+};
+
+/** Where the current track is now, by the server's clock, frozen while the board is paused. */
+function usePosition(view: SoundBoardView): Readonly<{ at: number; length: number }> | null {
+  const [now, setNow] = useState(() => Date.now());
+  const current = view.board.music.current;
+  useEffect(() => {
+    if (!current || view.board.pausedAt !== null) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [current, view.board.pausedAt]);
+  const skew = useMemo(() => view.serverTime - Date.now(), [view.serverTime]);
+  if (!current) return null;
+  const serverNow = view.board.pausedAt ?? now + skew;
+  return { at: Math.min(current.durationMs, Math.max(0, serverNow - current.startedAt)), length: current.durationMs };
+}
+
+/**
+ * The Playing bar (E3 spec 2.2): one row under the title of what plays, whether the room hears it, the track and its
+ * layers, where the track is, and Pause or Play, Next track, Stop all and Master. It replaces the old transport.
+ */
+function PlayingBar({
   view,
   nameOf,
   send
@@ -28,60 +53,64 @@ function Transport({
   const paused = board.pausedAt !== null;
   const sounding = isSounding(board);
   const layers = board.ambient.filter((layer) => layer.playing).map((layer) => nameOf(layer.assetId));
+  const position = usePosition(view);
+  const track = board.music.current ? nameOf(board.music.current.assetId) : null;
   return (
-    <section className="sound-transport surface-glass" aria-label="Now playing">
+    <section className="sound-playing" aria-label="Now playing">
+      <span className="sound-playing-word">
+        {sounding || paused ? (paused ? "Paused" : "Playing") : "Nothing playing"}
+      </span>
       <ScreenSoundStatus screens={view.screens} nameOf={nameOf} />
-      <dl className="sound-now">
-        <div>
-          <dt>Music</dt>
-          <dd>{board.music.current ? nameOf(board.music.current.assetId) : "None"}</dd>
-        </div>
-        <div>
-          <dt>Ambience</dt>
-          <dd>{layers.length ? layers.join(", ") : "None"}</dd>
-        </div>
-        {paused && (
-          <div>
-            <dt className="nh-sr-only">State</dt>
-            <dd>
-              <Badge tone="caution">Paused</Badge>
-            </dd>
-          </div>
-        )}
-      </dl>
-      <div className="sound-transport-controls">
-        <Button
-          variant="primary"
+      <span className="sound-playing-what">
+        <b>{track ?? "No music"}</b>
+        {layers.length > 0 && <small>{layers.join(" · ")}</small>}
+      </span>
+      {position && (
+        <span className="sound-playing-time" role="group" aria-label="Where the track is">
+          <span className="sound-playing-clock">{clock(position.at)}</span>
+          <span
+            className="sound-playing-track"
+            role="progressbar"
+            aria-label="Track position"
+            aria-valuemin={0}
+            aria-valuemax={Math.round(position.length / 1000)}
+            aria-valuenow={Math.round(position.at / 1000)}
+            aria-valuetext={`${clock(position.at)} of ${clock(position.length)}`}
+          >
+            <span style={{ width: `${(position.at / Math.max(1, position.length)) * 100}%` }} />
+          </span>
+          <span className="sound-playing-clock">{clock(position.length)}</span>
+        </span>
+      )}
+      <span className="sound-playing-controls">
+        <IconButton
+          label={paused ? "Resume" : sounding ? "Pause" : "Play music"}
           disabled={!sounding && !paused && board.music.tracks.length === 0}
           onClick={() => void playOrPause(board, send)}
         >
-          {paused ? (
-            <>
-              <IconPlay /> Resume
-            </>
-          ) : sounding ? (
-            <>
-              <IconPause /> Pause
-            </>
-          ) : (
-            <>
-              <IconPlay /> Play music
-            </>
-          )}
-        </Button>
-        <Button disabled={board.music.tracks.length === 0} onClick={() => void send("sound:next-track", {})}>
-          <IconSkip /> Next track
-        </Button>
-        <Button disabled={!sounding && !paused} onClick={() => void send("sound:stop", { target: "all" })}>
-          <IconStop /> Stop all
-        </Button>
-        <LevelSlider
-          label="Master volume"
-          hideLabel={false}
-          saved={board.masterVolume}
-          onSend={(level) => void send("sound:arrange", { masterVolume: level })}
-        />
-      </div>
+          {sounding && !paused ? <IconPause /> : <IconPlay />}
+        </IconButton>
+        <IconButton
+          label="Next track"
+          disabled={board.music.tracks.length === 0}
+          onClick={() => void send("sound:next-track", {})}
+        >
+          <IconSkip />
+        </IconButton>
+        <IconButton
+          label="Stop all"
+          disabled={!sounding && !paused}
+          onClick={() => void send("sound:stop", { target: "all" })}
+        >
+          <IconStop />
+        </IconButton>
+      </span>
+      <LevelSlider
+        label="Master volume"
+        hideLabel={false}
+        saved={board.masterVolume}
+        onSend={(level) => void send("sound:arrange", { masterVolume: level })}
+      />
     </section>
   );
 }
@@ -146,7 +175,7 @@ export function SoundBoard({
           <p className="sound-empty">Loading the sound board…</p>
         ) : (
           <>
-            <Transport view={view} nameOf={nameOf} send={send} />
+            <PlayingBar view={view} nameOf={nameOf} send={send} />
             {/* The board as kinds at the side (E3 spec 2.1): what is on the board, then the library; the chosen part
                 is in the address, its rows at the right. On a phone the parts are chips. */}
             <div className={phone ? "sound-board-parts is-phone" : "sound-board-parts"}>
