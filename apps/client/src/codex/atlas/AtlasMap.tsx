@@ -47,7 +47,8 @@ type Gesture =
   | { mode: "pin"; pointerId: number; pinId: string; moved: boolean }
   | { mode: "pinch"; startDist: number; startZoom: number };
 
-type OpenMenu = Readonly<{ point: MapPoint; left: number; top: number }>;
+/** An open menu: the spot's (Add a pin here), or a pin's own when `pinId` is set. */
+type OpenMenu = Readonly<{ point: MapPoint; left: number; top: number; pinId?: string }>;
 
 export type AtlasMapProps = Readonly<{
   token: string;
@@ -77,6 +78,8 @@ export type AtlasMapProps = Readonly<{
   onPlace?: (point: MapPoint) => void;
   /** The spot menu's entries; without any, a right-click or a long press does nothing. */
   menu?: readonly MapMenuItem[];
+  /** A pin's own menu (F3 atlas spec 2.2): its head and entries, opened by a right-click or a long press on the pin. */
+  pinMenu?: (pinId: string) => Readonly<{ name: string; line: string; items: readonly MapMenuItem[] }> | null;
   /** Said over the map while a drop mode waits for its tap. */
   hint?: ReactNode;
   /** Laid over the map's corner: a control that belongs to the map itself. */
@@ -108,6 +111,7 @@ export function AtlasMap({
   onPinDragEnd,
   onPlace,
   menu,
+  pinMenu,
   hint,
   overlay,
   className
@@ -242,6 +246,20 @@ export function AtlasMap({
     [menu, width, height]
   );
 
+  /** Opens a pin's own menu at a screen point; the same once-a-moment guard as the spot menu. */
+  const showPinMenuAt = useCallback(
+    (pinId: string, clientX: number, clientY: number) => {
+      const frameElement = frameRef.current;
+      if (!pinMenu || !frameElement || !pinMenu(pinId)) return;
+      const now = Date.now();
+      if (now - lastMenuAt.current < 700) return;
+      lastMenuAt.current = now;
+      const rect = frameElement.getBoundingClientRect();
+      setOpenMenu({ point: { x: 0, y: 0 }, left: clientX - rect.left, top: clientY - rect.top, pinId });
+    },
+    [pinMenu]
+  );
+
   // The menu closes on Escape and on a press anywhere outside it.
   useEffect(() => {
     if (!openMenu) return;
@@ -277,6 +295,16 @@ export function AtlasMap({
     event.currentTarget.setPointerCapture?.(event.pointerId);
     if (pinId && !placing) {
       gesture.current = { mode: "pin", pointerId: event.pointerId, pinId, moved: false };
+      // A finger held still on a pin opens the pin's menu.
+      if (event.pointerType !== "mouse" && pinMenu) {
+        const { clientX, clientY } = event;
+        clearPress();
+        pressTimer.current = window.setTimeout(() => {
+          pressTimer.current = null;
+          gesture.current = { mode: "idle" };
+          showPinMenuAt(pinId, clientX, clientY);
+        }, LONG_PRESS_MS);
+      }
       return;
     }
     gesture.current = {
@@ -322,6 +350,7 @@ export function AtlasMap({
       setCamera((prev) => (prev ? { cx: prev.cx - dx, cy: prev.cy - dy, zoom: prev.zoom } : prev));
       return;
     }
+    if (state.mode === "pin" && state.pointerId === event.pointerId) clearPress();
     if (state.mode === "pin" && state.pointerId === event.pointerId && !readOnly && onPinDragEnd) {
       const point = imagePointFromClient(svg, event.clientX, event.clientY);
       if (point) {
@@ -390,6 +419,12 @@ export function AtlasMap({
       ref={surface}
       className={`atlas-map${placing ? " is-placing" : ""}${className ? ` ${className}` : ""}`}
       onContextMenu={(event) => {
+        const onPin = (event.target as Element).closest?.("[data-pin-id]")?.getAttribute("data-pin-id") ?? null;
+        if (onPin && pinMenu?.(onPin)) {
+          event.preventDefault();
+          showPinMenuAt(onPin, event.clientX, event.clientY);
+          return;
+        }
         if (!menu || menu.length === 0) return;
         event.preventDefault();
         showMenuAt(event.clientX, event.clientY);
@@ -538,41 +573,54 @@ export function AtlasMap({
         </div>
       )}
       {overlay && <div className="atlas-map-overlay">{overlay}</div>}
-      {openMenu && menu && (
-        <div
-          ref={menuRef}
-          className="atlas-spotmenu anim-popover"
-          role="menu"
-          aria-label="This spot"
-          style={{ left: openMenu.left, top: openMenu.top }}
-          onKeyDown={(event) => {
-            const items = [...(menuRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']") ?? [])];
-            const at = items.indexOf(document.activeElement as HTMLElement);
-            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-              event.preventDefault();
-              const step = event.key === "ArrowDown" ? 1 : -1;
-              items[(at + step + items.length) % items.length]?.focus();
-            }
-          }}
-        >
-          {menu.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="menuitem"
-              className="atlas-spotmenu-item"
-              onClick={() => {
-                const point = openMenu.point;
-                setOpenMenu(null);
-                item.onSelect(point);
+      {openMenu &&
+        (() => {
+          const forPin = openMenu.pinId ? (pinMenu?.(openMenu.pinId) ?? null) : null;
+          const items = forPin ? forPin.items : menu;
+          if (!items || items.length === 0) return null;
+          return (
+            <div
+              ref={menuRef}
+              className="atlas-spotmenu anim-popover"
+              role="menu"
+              aria-label={forPin ? `Pin: ${forPin.name}` : "This spot"}
+              style={{ left: openMenu.left, top: openMenu.top }}
+              onKeyDown={(event) => {
+                const all = [...(menuRef.current?.querySelectorAll<HTMLElement>("[role='menuitem']") ?? [])];
+                const at = all.indexOf(document.activeElement as HTMLElement);
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  const step = event.key === "ArrowDown" ? 1 : -1;
+                  all[(at + step + all.length) % all.length]?.focus();
+                }
               }}
             >
-              <CodexIcon iconId={item.iconId} className="atlas-spotmenu-icon" />
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
+              {/* A pin's menu is headed as the map's menus are (C2): its name in display capitals and its line. */}
+              {forPin && (
+                <div className="atlas-spotmenu-head">
+                  <b>{forPin.name}</b>
+                  <small>{forPin.line}</small>
+                </div>
+              )}
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="menuitem"
+                  className={`atlas-spotmenu-item${item.id === "delete" ? " is-danger" : ""}`}
+                  onClick={() => {
+                    const point = openMenu.point;
+                    setOpenMenu(null);
+                    item.onSelect(point);
+                  }}
+                >
+                  <CodexIcon iconId={item.iconId} className="atlas-spotmenu-icon" />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
     </div>
   );
 }

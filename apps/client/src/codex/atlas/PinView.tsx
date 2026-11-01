@@ -10,7 +10,11 @@ import {
   IconX,
   EVERYONE,
   HIDDEN,
-  AudienceChip
+  AudienceChip,
+  IconMore,
+  Menu,
+  MenuItem,
+  Switch
 } from "@vtt/ui";
 import type { CodexEntityType } from "@vtt/domain";
 import { journalApi } from "../api";
@@ -58,7 +62,9 @@ export function PinView({
   onOpenPage,
   onOpenMap,
   onEdit,
-  onSetParty,
+  onToggleParty,
+  onToggleReveal,
+  more = [],
   onActivateScene,
   onOpenReplay,
   onClose
@@ -73,7 +79,12 @@ export function PinView({
   onOpenPage: (pageId: string) => void;
   onOpenMap: (mapId: string) => void;
   onEdit?: () => void;
-  onSetParty?: () => void;
+  /** The party's position at this pin, as a switch (F3 atlas spec 2.2): on makes it the party's pin, off clears it. */
+  onToggleParty?: (on: boolean) => void;
+  /** Players see it, as a switch: today's reveal route. */
+  onToggleReveal?: (on: boolean) => void;
+  /** The pin's menu, without Edit pin (its own button). */
+  more?: ReadonlyArray<Readonly<{ id: string; label: string; onSelect: (point: { x: number; y: number }) => void }>>;
   onActivateScene?: (encounterId: string) => void;
   onOpenReplay?: (archiveId: number) => void;
   onClose: () => void;
@@ -99,7 +110,35 @@ export function PinView({
         </IconButton>
       </header>
 
-      {pin.isParty && <p className="atlas-note">The party is here.</p>}
+      {gm && (
+        <div className="atlas-pinview-tools">
+          <Button size="sm" onClick={onEdit}>
+            <IconPencil /> Edit pin
+          </Button>
+          {more.length > 0 && (
+            <Menu icon align="end" label={`More for ${label}`} trigger={<IconMore />}>
+              {more.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  tone={item.id === "delete" ? "danger" : "default"}
+                  onClick={() => item.onSelect({ x: 0, y: 0 })}
+                >
+                  {item.label}
+                </MenuItem>
+              ))}
+            </Menu>
+          )}
+        </div>
+      )}
+
+      {gm && onToggleParty && onToggleReveal ? (
+        <div className="atlas-pinview-switches">
+          <Switch checked={pin.isParty === true} onChange={onToggleParty} label="The party's position" />
+          <Switch checked={pin.revealedToPlayers !== false} onChange={onToggleReveal} label="Players see it" />
+        </div>
+      ) : (
+        pin.isParty && <p className="atlas-note">The party is here.</p>
+      )}
 
       {linked.length > 0 && (
         <ul className="atlas-pagelist" aria-label="Linked pages">
@@ -116,6 +155,12 @@ export function PinView({
             </li>
           ))}
         </ul>
+      )}
+
+      {linked.length > 0 && (
+        <Button size="sm" variant="ghost" arrow onClick={() => onOpenPage(linked[0]!.id)}>
+          Open the whole page
+        </Button>
       )}
 
       {pin.subMapId && subMapName && (
@@ -158,17 +203,6 @@ export function PinView({
             ? "This pin links nothing yet. Edit the pin to link pages or a map."
             : "Nothing has been shared about this place yet."}
         </p>
-      )}
-
-      {gm && (
-        <div className="atlas-pinview-actions">
-          <Button variant="secondary" size="sm" onClick={onEdit}>
-            <IconPencil /> Edit pin
-          </Button>
-          <Button variant="secondary" size="sm" onClick={onSetParty}>
-            <CodexIcon iconId="flag" className="atlas-btnicon" /> Set party position here
-          </Button>
-        </div>
       )}
 
       {gm && gmToken && <PinJournal gmToken={gmToken} pinId={pin.id} onOpenReplay={onOpenReplay} />}

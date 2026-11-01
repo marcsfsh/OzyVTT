@@ -22,6 +22,8 @@ const forMarker = vi.fn();
 const setParty = vi.fn();
 const updateMap = vi.fn();
 const revealMap = vi.fn();
+const revealMarker = vi.fn();
+const deleteMarker = vi.fn();
 
 vi.mock("../api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api")>();
@@ -41,7 +43,9 @@ vi.mock("../api", async (importOriginal) => {
       updateMarker: (...a: unknown[]) => updateMarker(...a),
       updateMap: (...a: unknown[]) => updateMap(...a),
       revealMap: (...a: unknown[]) => revealMap(...a),
-      setPartyMarker: (...a: unknown[]) => setPartyMarker(...a)
+      setPartyMarker: (...a: unknown[]) => setPartyMarker(...a),
+      revealMarker: (...a: unknown[]) => revealMarker(...a),
+      deleteMarker: (...a: unknown[]) => deleteMarker(...a)
     }
   };
 });
@@ -247,8 +251,51 @@ describe("The GM's atlas", () => {
     setParty.mockResolvedValue({ marker: PIN("party", "The party", { isParty: true }), created: false });
     render(<Harness />);
     await user.click(await screen.findByRole("button", { name: /Harbourmaster's Tower/ }));
-    await user.click(await screen.findByRole("button", { name: "Set party position here" }));
+    const view = await screen.findByRole("region", { name: "Pin: Harbourmaster's Tower" });
+    const more = within(view).getByLabelText("More for Harbourmaster's Tower");
+    await user.click(more);
+    await user.click(
+      within(more.closest(".nh-menu") as HTMLElement).getByRole("menuitem", { name: "Set party position here" })
+    );
     await waitFor(() => expect(setParty).toHaveBeenCalledWith("gm", { mapId: "m1", x: 100, y: 200 }));
+  });
+
+  it("puts The party's position and Players see it on a pin's page as switches, through today's routes", async () => {
+    const user = userEvent.setup();
+    setPartyMarker.mockResolvedValue(PIN("k1", "Harbourmaster's Tower", { isParty: true }));
+    revealMarker.mockResolvedValue(PIN("k1", "Harbourmaster's Tower", { revealedToPlayers: false }));
+    render(<Harness />);
+    await user.click(await screen.findByRole("button", { name: /Harbourmaster's Tower/ }));
+    const view = within(await screen.findByRole("region", { name: "Pin: Harbourmaster's Tower" }));
+    expect(view.getByRole("button", { name: /Open the whole page/ })).toBeInTheDocument();
+    const party = view.getByRole("switch", { name: "The party's position" });
+    expect(party).not.toBeChecked();
+    await user.click(party);
+    await waitFor(() => expect(setPartyMarker).toHaveBeenCalledWith("gm", "k1", true));
+    const players = view.getByRole("switch", { name: "Players see it" });
+    expect(players).toBeChecked();
+    await user.click(players);
+    await waitFor(() => expect(revealMarker).toHaveBeenCalledWith("gm", "k1", false));
+  });
+
+  it("opens a pin's own menu on a right-click, headed by its name, and Delete pin asks first", async () => {
+    const user = userEvent.setup();
+    deleteMarker.mockResolvedValue({ deleted: true });
+    render(<Harness />);
+    await screen.findByRole("table");
+    await waitFor(() => expect(document.querySelector('[data-pin-id="k1"]')).not.toBeNull());
+    fireEvent.contextMenu(document.querySelector('[data-pin-id="k1"] circle')!, { clientX: 5, clientY: 5 });
+    const menu = within(await screen.findByRole("menu", { name: "Pin: Harbourmaster's Tower" }));
+    expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual([
+      "Open its page",
+      "Edit pin",
+      "Set party position here",
+      "Hide from players",
+      "Delete pin"
+    ]);
+    await user.click(menu.getByRole("menuitem", { name: "Delete pin" }));
+    expect(await screen.findByRole("dialog", { name: "Delete this pin?" })).toBeInTheDocument();
+    expect(deleteMarker).not.toHaveBeenCalled();
   });
 
   it("marks a pin as the party's through its own route in the editor, and reads the pins again", async () => {

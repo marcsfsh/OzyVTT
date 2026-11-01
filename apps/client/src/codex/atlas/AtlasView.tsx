@@ -31,6 +31,7 @@ import { useConfirm } from "../../components/feedback";
 import { useMediaQuery } from "../../lib/useMediaQuery";
 import { withQuery } from "../../router";
 import { DEFAULT_COLOR, DEFAULT_ICON, CodexIcon } from "../icons";
+import { entityDef } from "../entities";
 import { CODEX_ROOT, atlasPath, pagePath } from "../routes";
 import type { QuickCreateRequest } from "../QuickCreate";
 import { useCodexQuery } from "../useCodexQuery";
@@ -350,6 +351,96 @@ export function AtlasView({
   };
   const onMarkerUpdated = (marker: CodexMarker) =>
     setMarkers((prev) => prev.map((existing) => (existing.id === marker.id ? marker : existing)));
+  // A pin's own writes, from its menu and its page's switches: today's routes, one call each.
+  const pinWrite = async (run: () => Promise<CodexMarker>, failure: string) => {
+    try {
+      onMarkerUpdated(await run());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : failure);
+    }
+  };
+  const setPinParty = async (marker: CodexMarker, isParty: boolean) => {
+    try {
+      await atlasApi.setPartyMarker(gmToken, marker.id, isParty);
+      // Making one pin the party's clears the pin that held it, so the map reads its pins again.
+      await pinFeed.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't change the party's position.");
+    }
+  };
+  const setPinRevealed = (marker: CodexMarker, revealed: boolean) =>
+    void pinWrite(() => atlasApi.revealMarker(gmToken, marker.id, revealed), "Couldn't change who sees the pin.");
+  const deletePin = async (marker: CodexMarker) => {
+    const ok = await confirm({
+      title: "Delete this pin?",
+      body: "This cannot be undone.",
+      confirmLabel: "Delete",
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await atlasApi.deleteMarker(gmToken, marker.id);
+      setMarkers((prev) => prev.filter((existing) => existing.id !== marker.id));
+      if (pinId === marker.id) clearPin();
+    } catch {
+      setError("Couldn't delete the pin.");
+    }
+  };
+  /** What a pin is, in a line: its linked page's kind, the map it opens. */
+  const pinLine = (marker: CodexMarker) => {
+    const page = pages.find((candidate) => candidate.id === marker.pageIds[0]);
+    const opens = marker.subMapId ? mapName(marker.subMapId) : null;
+    return [page ? entityDef(page.entityType).label : "Pin", opens ? `Opens ${opens}` : null]
+      .filter(Boolean)
+      .join(" · ");
+  };
+  /** A pin's menu (F3 atlas spec 2.2): its page, its map, Edit pin, the party, who sees it and Delete pin. */
+  const pinActions = (marker: CodexMarker, withEdit: boolean): MapMenuItem[] => [
+    ...(marker.pageIds[0]
+      ? [
+          {
+            id: "page",
+            label: "Open its page",
+            iconId: "scroll",
+            onSelect: () => onNavigate(pagePath(marker.pageIds[0]!))
+          }
+        ]
+      : []),
+    ...(marker.subMapId
+      ? [{ id: "map", label: "Open the map inside", iconId: "compass", onSelect: () => enterMap(marker.subMapId!) }]
+      : []),
+    ...(withEdit
+      ? [
+          {
+            id: "edit",
+            label: "Edit pin",
+            iconId: "pencil",
+            onSelect: () => {
+              setEditingPinId(marker.id);
+              selectPin(marker.id);
+            }
+          }
+        ]
+      : []),
+    {
+      id: "party",
+      label: "Set party position here",
+      iconId: "flag",
+      onSelect: () => void setPartyAt(marker.mapId, { x: marker.x, y: marker.y })
+    },
+    {
+      id: "reveal",
+      label: marker.revealedToPlayers ? "Hide from players" : "Show to players",
+      iconId: marker.revealedToPlayers ? "eyeoff" : "eye",
+      onSelect: () => setPinRevealed(marker, !marker.revealedToPlayers)
+    },
+    { id: "delete", label: "Delete pin", iconId: "trash", onSelect: () => void deletePin(marker) }
+  ];
+  const pinMenu = (id: string) => {
+    const marker = markers.find((candidate) => candidate.id === id);
+    if (!marker) return null;
+    return { name: marker.label?.trim() || "Unlabelled pin", line: pinLine(marker), items: pinActions(marker, true) };
+  };
   const createPageForMarker = (marker: CodexMarker) =>
     onQuickCreate({
       title: marker.label?.trim() || "",
@@ -410,6 +501,7 @@ export function AtlasView({
       onPinDragEnd={(markerId, point) => void moveMarker(markerId, point)}
       onPlace={(point) => void (placing === "party" ? setPartyAt(currentMap.id, point) : addPinAt(point))}
       menu={spotMenu}
+      pinMenu={pinMenu}
       hint={
         placing === "party"
           ? "Tap or click the map where the party is. Esc cancels."
@@ -472,7 +564,9 @@ export function AtlasView({
         onOpenPage={(id) => onNavigate(pagePath(id))}
         onOpenMap={enterMap}
         onEdit={() => setEditing(true)}
-        onSetParty={() => void setPartyAt(selected.mapId, { x: selected.x, y: selected.y })}
+        onToggleParty={(on) => void setPinParty(selected, on)}
+        onToggleReveal={(on) => setPinRevealed(selected, on)}
+        more={pinActions(selected, false)}
         onActivateScene={onActivateScene}
         onOpenReplay={onOpenReplay}
         onClose={deselectPin}
