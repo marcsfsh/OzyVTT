@@ -556,3 +556,89 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ----- An encounter's page, the Workbench (Prep frame 2.2) ----- */
+.sc-scene-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+/* The record's title row (theme spec 2.2): 16px 24px, the crumb and the title with its tag, one line, the actions. */
+.sc-rec-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.sc-rec-head.is-preview {
+  border-bottom-color: var(--cyan);
+}
+.sc-rec-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.sc-rec-head .sc-scene-title {
+  font: var(--fw-display) 24px / 1.1 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+}
+.sc-rec-line {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-rec-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sc-scene-page > .sc-scene-bench {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+.sc-dock-state {
+  color: var(--text-dim);
+  font: 600 11px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+/* The foot: what is ready over Make live, full width. */
+.sc-make-live {
+  gap: var(--space-2);
+}
+.sc-readylines-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sc-readylines-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.sc-readylines-list .sc-ready-line {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .sc-rec-head {
+    padding: 10px 14px;
+  }
+  .sc-rec-head .sc-scene-title {
+    font-size: 20px;
+  }
+}

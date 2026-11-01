@@ -7,6 +7,7 @@ import { command } from "../lib/command";
 import { useScenes } from "./context";
 import { pathForScene } from "./routes";
 import { count, needsOf, readinessOf, READINESS_LABEL, type SceneFacts } from "./sceneFacts";
+import { ReadyLine } from "./pieces";
 import "./scene-encounter.css";
 
 type Check = Readonly<{ id: string; ok: boolean; text: string; step?: Parameters<typeof pathForScene>[1] }>;
@@ -168,5 +169,47 @@ export function SceneEncounterTab({ facts }: Readonly<{ facts: SceneFacts }>) {
         </ul>
       </section>
     </div>
+  );
+}
+
+/** Who they face: the monsters staged and the difficulty meter, under Who is in it. */
+export function WhoTheyFace({ facts }: Readonly<{ facts: SceneFacts }>) {
+  const { state, token } = useScenes();
+  return (
+    <section className="sc-encounter-section" aria-labelledby="sc-encounter-title">
+      <h3 id="sc-encounter-title" className="sc-encounter-label">
+        Who they face
+      </h3>
+      <EncounterMeter state={state} token={token} staged={facts.combat.initiative.map((entry) => entry.actorId)} />
+    </section>
+  );
+}
+
+/**
+ * What is ready, in the panel's foot over Make live (Prep rule 3.2): "Ready to go" with a cyan lamp, or each thing
+ * missing in amber with Go to it, which turns to the tab that answers it.
+ */
+export function ReadyLines({ facts, onGo }: Readonly<{ facts: SceneFacts; onGo: (step: Check["step"]) => void }>) {
+  const { maps } = useScenes();
+  const missing = readyChecks(facts, maps).filter((check) => !check.ok);
+  return (
+    <section className="sc-readylines" aria-label={missing.length === 0 ? "Ready to go" : "Not ready yet"}>
+      {missing.length === 0 ? (
+        <ReadyLine ready text="Ready to go" />
+      ) : (
+        <ul className="sc-readylines-list">
+          {missing.map((check) => (
+            <li key={check.id}>
+              <ReadyLine ready={false} text={check.text} />
+              {check.step && (
+                <Button size="sm" onClick={() => onGo(check.step)}>
+                  Go to it
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
