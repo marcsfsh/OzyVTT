@@ -18,6 +18,7 @@ import { ToastProvider } from "@vtt/ui";
 import { RollCallPrompts } from "../encounter/RollCallPrompt";
 import { DicePanel } from "./DicePanel";
 import { RollCallPanel } from "./RollCallPanel";
+import { NeedsYou } from "../table/NeedsYou";
 
 // The GM calls for a check or a save from the players; each player rolls it from a card that follows them across the
 // app, and the GM reads who has rolled what.
@@ -76,21 +77,45 @@ const gmState = (rollCalls: readonly RollCall[] = []) =>
 describe("the GM's call for a roll", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("sits at the top of the GM's dice tab beside rolling, and counts the calls still open", async () => {
+  it("is made from the waiting list's head, and the open call waits there as a card on players", async () => {
     serve();
     const user = userEvent.setup();
-    const state = { ...gmState([openCall]), rolls: [], definitions: [] } as unknown as GmView;
-    render(<DicePanel role="gm" state={state} />, { wrapper: ToastProvider });
-    const modes = screen.getByRole("group", { name: "Roll dice or call for a roll" });
-    const call = within(modes).getByRole("button", { name: "Call for a roll · 1 open" });
-    await user.click(call);
-    expect(screen.getByRole("heading", { name: "Call for a roll" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Call for the check" })).toBeTruthy();
+    const base = gmState([openCall]);
+    // A table with nothing else waiting: no map, no turn order, no prompts.
+    const state = {
+      ...base,
+      rolls: [],
+      definitions: [],
+      rest: { requests: [] },
+      combat: {
+        ...base.combat,
+        active: false,
+        mapAssetId: null,
+        tokens: [],
+        initiative: [],
+        turnSteps: null,
+        pendingReactions: [],
+        pendingDamage: [],
+        damageRolls: [],
+        pendingRuleAsks: [],
+        targetAsks: []
+      }
+    } as unknown as GmView;
+    render(<NeedsYou state={state} token={null} />, { wrapper: ToastProvider });
+    const list = screen.getByRole("region", { name: "Waiting" });
+    // The open call is a card in the list, and the bell does not count it.
     expect(
-      within(screen.getByRole("list", { name: "Open calls" })).getByText("Wisdom (Perception) check")
+      within(within(list).getByRole("list", { name: "Open calls" })).getByText(/Wisdom \(Perception\) check/)
     ).toBeTruthy();
-    await user.click(within(modes).getByRole("button", { name: "Roll dice" }));
-    expect(screen.getByRole("button", { name: "d20" })).toBeTruthy();
+    expect(list.querySelector(".nh-bell")).toBeNull();
+    // Call for a roll opens the form in place over the list.
+    await user.click(within(list).getByRole("button", { name: "Call for a roll" }));
+    expect(screen.getByRole("heading", { name: "Call for a roll" })).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Call for the check" }));
+    expect(sent("roll-call:start")).toHaveLength(1);
+    // The dice options no longer switch to calling.
+    render(<DicePanel role="gm" state={state} />, { wrapper: ToastProvider });
+    expect(screen.queryByRole("group", { name: "Roll dice or call for a roll" })).toBeNull();
   });
 
   it("is not offered on a player's dice tab", () => {
@@ -155,7 +180,8 @@ describe("the GM's call for a roll", () => {
     const user = userEvent.setup();
     render(<RollCallPanel state={gmState([openCall])} />, { wrapper: ToastProvider });
     const card = within(screen.getByRole("list", { name: "Open calls" }));
-    expect(await card.findByText("Wisdom (Perception) check")).toBeTruthy();
+    expect(await card.findByText("Wisdom (Perception) check · DC 15")).toBeTruthy();
+    expect(card.getByText("Waiting on players · 1 of 2 answered · results shown to players")).toBeTruthy();
     expect(card.getByText("17 (d20 12) · success")).toBeTruthy();
     expect(card.getByText("Waiting")).toBeTruthy();
     await user.click(card.getByRole("button", { name: "Roll for them" }));

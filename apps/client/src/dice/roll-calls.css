@@ -68,15 +68,26 @@
   padding: 0;
   list-style: none;
 }
+/* An open call is C3's waiting card on players (log spec 2.5): a grey rim, rows of 44px, results in VT323 18px. */
 .roll-call-card {
   position: relative;
   display: grid;
-  gap: var(--space-2);
+  gap: 6px;
   min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--cyan);
-  background: var(--surface-2);
+  padding: 10px 12px 10px 14px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--line-raised);
+  background: var(--material-lip), var(--material-plate);
+}
+.roll-call-entries li {
+  min-height: 44px;
+}
+.roll-call-result {
+  font-size: 18px;
+}
+.roll-call-card-foot {
+  display: flex;
+  justify-content: flex-end;
 }
 .roll-call-card-head {
   display: flex;

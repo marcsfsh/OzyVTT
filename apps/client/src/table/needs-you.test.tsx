@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { GameStateSchema, type GmView } from "@vtt/domain";
 import { ToastProvider } from "@vtt/ui";
 
@@ -183,7 +183,7 @@ describe("the waiting list", () => {
     expect(screen.getByRole("button", { name: "Use Shield" })).toBeTruthy();
   });
 
-  it("puts a held attack first and renders nothing when nothing waits", () => {
+  it("puts a held attack first, and over the turn shows only its head when nothing waits", () => {
     expect(needsItems(table()).map((item) => item.kind)).toEqual(["damage", "dying", "ask", "rest"]);
     const quiet = table((view) => {
       view.combat.pendingDamage = [];
@@ -198,9 +198,14 @@ describe("the waiting list", () => {
         <NeedsYou state={quiet} token={null} />
       </ToastProvider>
     );
-    expect(container.querySelector(".needs-you")).toBeNull();
+    // The head stands with Call for a roll (ADR-0060), but no card, no bell and no words.
+    expect(container.querySelectorAll(".needs-card")).toHaveLength(0);
+    expect(container.querySelector(".nh-bell")).toBeNull();
+    expect(screen.queryByText("Nothing waits on you.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Call for a roll" })).toBeTruthy();
     // Alone in its own tab it says so, and keeps the way back over the turn.
     act(() => setWaitingList("tab"));
+    cleanup();
     render(
       <ToastProvider>
         <NeedsYou state={quiet} token={null} alone />

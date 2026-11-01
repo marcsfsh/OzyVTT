@@ -5,7 +5,6 @@ import { command } from "../lib/command";
 import { natural, rollLands } from "./rollLight";
 import { useRollPreference } from "./roll-preference";
 import { setRollVisibility, useRollVisibility } from "./roll-visibility";
-import { RollCallPanel } from "./RollCallPanel";
 import "./dice-panel.css";
 
 /** The purposes the picker offers: every one a free roll may carry. */
@@ -80,10 +79,6 @@ export function DicePanel({
   const [advantage, setAdvantage] = useState(false);
   const [disadvantage, setDisadvantage] = useState(false);
   const [fallFeet, setFallFeet] = useState("");
-  // The GM's own panel calls for rolls; a character's dice pane does not. Calling sits beside rolling, one tap away.
-  const gmState = role === "gm" && !mineActorId && "definitions" in state ? state : null;
-  const [mode, setMode] = useState<"roll" | "call">("roll");
-  const openCalls = gmState?.rollCalls.length ?? 0;
   const { toast } = useToast();
   // The shared per-browser dice-input preference: the GM's choice; a player's follows the table's mode.
   const { rollInput, chooses, setRollInput } = useRollPreference();
@@ -160,26 +155,6 @@ export function DicePanel({
       });
   };
 
-  const modeSwitch = gmState ? (
-    <SegmentedControl
-      className="dice-mode"
-      ariaLabel="Roll dice or call for a roll"
-      value={mode}
-      onChange={(next) => setMode(next as "roll" | "call")}
-      options={[
-        { value: "roll", label: "Roll dice" },
-        { value: "call", label: openCalls > 0 ? `Call for a roll · ${openCalls} open` : "Call for a roll" }
-      ]}
-    />
-  ) : null;
-  if (gmState && mode === "call")
-    return (
-      <section className="dice-proof" aria-labelledby="roll-call-heading">
-        {modeSwitch}
-        <RollCallPanel state={gmState} />
-      </section>
-    );
-
   const visibilityField = (
     <label className="dice-visibility">
       Visibility
@@ -196,7 +171,6 @@ export function DicePanel({
   // Disadvantage and the modifier; More dice and Recent rolls are open groups under it.
   return (
     <section className="dice-proof">
-      {modeSwitch}
       <Group title="Roll dice" headingLevel={2} actions={visibilityField} className="dice-roller">
         {/* The per-browser roll-input preference, shared with the character sheet's toggle. */}
         {chooses && (

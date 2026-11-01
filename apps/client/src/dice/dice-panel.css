@@ -20,10 +20,6 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
-/* The GM's switch between rolling and calling for a roll: the panel's first row, so calling is never hidden. */
-.dice-mode {
-  margin-bottom: var(--space-4);
-}
 
 .dice-visibility {
   display: flex;

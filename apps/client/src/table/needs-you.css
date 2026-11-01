@@ -135,3 +135,25 @@
 .needs-card .dying-tracker::before {
   display: none;
 }
+/* The call's form, in place over the list, as a Cradle: no fill and no top, a 2px base and sides that fade. */
+.needs-you-calling {
+  position: relative;
+  padding: 10px 12px 12px;
+}
+.needs-you-calling::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: var(--cradle-base);
+  border-image: var(--cradle-sides) 1;
+}
+.needs-you .roll-call-open {
+  margin: 0;
+}
+.needs-you-call.nh-btn,
+.needs-you-place.nh-btn {
+  font-size: 12.5px;
+}

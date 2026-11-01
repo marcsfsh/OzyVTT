@@ -15,7 +15,20 @@ const ABILITY_IDS = Object.keys(ABILITY_WORDS) as AbilityId[];
  * players see a prompt and roll; a save call opens a save each character answers like any other. Open calls list who
  * has rolled and what they got, and Close ends one (its unanswered saves are dismissed).
  */
-export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
+export function RollCallPanel({
+  state,
+  form = true,
+  calls = true,
+  onCalled
+}: Readonly<{
+  state: GmView;
+  /** The form that makes a call; the waiting list opens it in place over the list (log spec 2.5). */
+  form?: boolean;
+  /** The open calls, each a waiting card on players. */
+  calls?: boolean;
+  /** After a call is made, so the list can fold its form away. */
+  onCalled?: () => void;
+}>) {
   const { toast } = useToast();
   const skillCatalog = useSkillCatalog();
   const characters = state.actors.filter((actor) => actor.kind === "player-character" && !actor.archived);
@@ -79,6 +92,7 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
     });
     setBusy(false);
     if (!result.ok) toast(result.message ?? "The call was refused.", { tone: "error" });
+    else onCalled?.();
   };
 
   // The situations the GM turned on for each character's check, by call and character.
@@ -124,130 +138,137 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
 
   return (
     <>
-      <section className="roll-call-panel" aria-labelledby="roll-call-heading">
-        <h2 id="roll-call-heading" className="roll-call-heading">
-          Call for a roll
-        </h2>
-        <p className="roll-call-hint">
-          Ask the players for a check or a saving throw. Each one rolls on their own device.
-        </p>
-        <div className="roll-call-form">
-          <SegmentedControl
-            size="sm"
-            ariaLabel="Check or saving throw"
-            value={kind}
-            onChange={(value) => setKind(value as RollCall["kind"])}
-            options={[
-              { value: "check", label: "Check" },
-              { value: "save", label: "Saving throw" }
-            ]}
-          />
-          <div className="roll-call-fields">
-            <label>
-              Ability
-              <Select value={ability} onChange={(event) => pickAbility(event.target.value as AbilityId)}>
-                {ABILITY_IDS.map((id) => (
-                  <option key={id} value={id}>
-                    {ABILITY_WORDS[id]}
-                  </option>
+      {form && (
+        <section className="roll-call-panel" aria-labelledby="roll-call-heading">
+          <h2 id="roll-call-heading" className="roll-call-heading">
+            Call for a roll
+          </h2>
+          <p className="roll-call-hint">
+            Ask the players for a check or a saving throw. Each one rolls on their own device.
+          </p>
+          <div className="roll-call-form">
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Check or saving throw"
+              value={kind}
+              onChange={(value) => setKind(value as RollCall["kind"])}
+              options={[
+                { value: "check", label: "Check" },
+                { value: "save", label: "Saving throw" }
+              ]}
+            />
+            <div className="roll-call-fields">
+              <label>
+                Ability
+                <Select value={ability} onChange={(event) => pickAbility(event.target.value as AbilityId)}>
+                  {ABILITY_IDS.map((id) => (
+                    <option key={id} value={id}>
+                      {ABILITY_WORDS[id]}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              {kind === "check" && (
+                <label>
+                  Skill
+                  <Select value={skill} onChange={(event) => setSkill(event.target.value)}>
+                    <option value="">None</option>
+                    {skills.map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              )}
+              {kind === "check" && (
+                <label>
+                  Needs
+                  <Select value={sense} onChange={(event) => setSense(event.target.value as "" | "sight" | "hearing")}>
+                    <option value="">Nothing more</option>
+                    <option value="sight">Sight</option>
+                    <option value="hearing">Hearing</option>
+                  </Select>
+                </label>
+              )}
+              {kind === "check" && others.length > 0 && (
+                <label>
+                  About
+                  <Select value={about} onChange={(event) => setAbout(event.target.value)}>
+                    <option value="">None</option>
+                    {others.map((actor) => (
+                      <option key={actor.id} value={actor.id}>
+                        {actor.name}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              )}
+              <label>
+                DC
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={2}
+                  value={dc}
+                  placeholder={kind === "save" ? "15" : "None"}
+                  onChange={(event) => setDc(event.target.value.replace(/[^0-9]/g, ""))}
+                />
+              </label>
+            </div>
+            {characters.length === 0 ? (
+              <p className="roll-call-empty">No characters on the roster yet.</p>
+            ) : (
+              <div className="roll-call-who" role="group" aria-label="Who rolls">
+                {characters.map((actor) => (
+                  <button
+                    key={actor.id}
+                    type="button"
+                    className="roll-call-who-chip"
+                    aria-pressed={!left.has(actor.id)}
+                    onClick={() => toggle(actor.id)}
+                  >
+                    {actor.name}
+                  </button>
                 ))}
-              </Select>
-            </label>
-            {kind === "check" && (
-              <label>
-                Skill
-                <Select value={skill} onChange={(event) => setSkill(event.target.value)}>
-                  <option value="">None</option>
-                  {skills.map((entry) => (
-                    <option key={entry.id} value={entry.id}>
-                      {entry.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
+              </div>
             )}
             {kind === "check" && (
-              <label>
-                Needs
-                <Select value={sense} onChange={(event) => setSense(event.target.value as "" | "sight" | "hearing")}>
-                  <option value="">Nothing more</option>
-                  <option value="sight">Sight</option>
-                  <option value="hearing">Hearing</option>
-                </Select>
-              </label>
+              <div className="roll-call-reveal">
+                <RevealSwitch
+                  revealed={!blind}
+                  onChange={(shown) => setBlind(!shown)}
+                  ariaLabel="Players see their results"
+                />
+                <span>{blind ? "Results hidden from players" : "Results shown to players"}</span>
+              </div>
             )}
-            {kind === "check" && others.length > 0 && (
-              <label>
-                About
-                <Select value={about} onChange={(event) => setAbout(event.target.value)}>
-                  <option value="">None</option>
-                  {others.map((actor) => (
-                    <option key={actor.id} value={actor.id}>
-                      {actor.name}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-            )}
-            <label>
-              DC
-              <Input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={2}
-                value={dc}
-                placeholder={kind === "save" ? "15" : "None"}
-                onChange={(event) => setDc(event.target.value.replace(/[^0-9]/g, ""))}
-              />
-            </label>
+            <Button variant="primary" disabled={busy || chosen.length === 0} onClick={() => void call()}>
+              {kind === "check" ? "Call for the check" : "Call for the save"}
+            </Button>
           </div>
-          {characters.length === 0 ? (
-            <p className="roll-call-empty">No characters on the roster yet.</p>
-          ) : (
-            <div className="roll-call-who" role="group" aria-label="Who rolls">
-              {characters.map((actor) => (
-                <button
-                  key={actor.id}
-                  type="button"
-                  className="roll-call-who-chip"
-                  aria-pressed={!left.has(actor.id)}
-                  onClick={() => toggle(actor.id)}
-                >
-                  {actor.name}
-                </button>
-              ))}
-            </div>
-          )}
-          {kind === "check" && (
-            <div className="roll-call-reveal">
-              <RevealSwitch
-                revealed={!blind}
-                onChange={(shown) => setBlind(!shown)}
-                ariaLabel="Players see their results"
-              />
-              <span>{blind ? "Results hidden from players" : "Results shown to players"}</span>
-            </div>
-          )}
-          <Button variant="primary" disabled={busy || chosen.length === 0} onClick={() => void call()}>
-            {kind === "check" ? "Call for the check" : "Call for the save"}
-          </Button>
-        </div>
-      </section>
-      {state.rollCalls.length > 0 && (
+        </section>
+      )}
+      {calls && state.rollCalls.length > 0 && (
         <ul ref={openList} className="roll-call-open" aria-label="Open calls">
           {state.rollCalls.map((open) => (
             <li key={open.id} className="roll-call-card" data-call={open.id}>
               <div className="roll-call-card-head">
-                <strong>{callLabel(open, skillName)}</strong>
+                <strong>
+                  {callLabel(open, skillName)}
+                  {open.dc !== null ? ` · DC ${open.dc}` : ""}
+                </strong>
                 <span className="roll-call-meta">
-                  {open.dc !== null ? `DC ${open.dc}` : "No DC"}
-                  {open.blind ? " · Hidden from players" : ""}
-                  {open.entries.length > 0 && open.entries.every((entry) => entry.result) ? " · All in" : ""}
+                  {open.entries.length > 0 && open.entries.every((entry) => entry.result)
+                    ? "All in"
+                    : `Waiting on players · ${open.entries.filter((entry) => entry.result).length} of ${open.entries.length} answered`}
+                  {open.blind
+                    ? " · results hidden from players"
+                    : open.kind === "check"
+                      ? " · results shown to players"
+                      : ""}
                 </span>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void close(open.id)}>
-                  Close
-                </Button>
               </div>
               <ul className="roll-call-entries">
                 {open.entries.map((entry) => (
@@ -286,6 +307,11 @@ export function RollCallPanel({ state }: Readonly<{ state: GmView }>) {
                   </li>
                 ))}
               </ul>
+              <div className="roll-call-card-foot">
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void close(open.id)}>
+                  Close
+                </Button>
+              </div>
             </li>
           ))}
         </ul>

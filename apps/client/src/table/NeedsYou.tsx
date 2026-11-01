@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmActor, GmView, TargetAsk } from "@vtt/domain";
 import { AttentionBell, Button, IconChevron, IconChevronRight, useToast } from "@vtt/ui";
 import { setWaitingList, useWaitingList } from "../settings/preferences";
+import { RollCallPanel } from "../dice/RollCallPanel";
 import { useRollPreference } from "../dice/roll-preference";
 import { command, read } from "../lib/command";
 import { beginTargeting, setTargetingResult } from "../encounter/targeting";
@@ -367,7 +368,8 @@ function NeedsCard({
 /**
  * The GM's waiting list: each item says what happened in numbers and carries its own buttons. It sits at the top of the
  * Encounter tab or, by the GM's choice, in its own first tab (`alone`), and its head holds the switch between the two
- * (ADR-0058). Over the turn it renders nothing while nothing waits; alone it says so. A new item is announced.
+ * (ADR-0058). Its head always stands, with Call for a roll (ADR-0060); alone it says when nothing waits. A new item
+ * is announced.
  */
 export function NeedsYou({
   state,
@@ -379,6 +381,7 @@ export function NeedsYou({
   const onPlayers = all.filter(waitsOnPlayer).length;
   const owed = all.length - onPlayers;
   const place = useWaitingList();
+  const [calling, setCalling] = useState(false);
   const { rollMode } = useRollPreference();
   const { toast } = useToast();
   const [announcement, setAnnouncement] = useState("");
@@ -415,7 +418,8 @@ export function NeedsYou({
       <p className="nh-sr-only" aria-live="polite">
         {announcement}
       </p>
-      {(items.length > 0 || alone) && (
+      {/* The head always stands for the GM: it holds Call for a roll (log spec 2.5) and the list's switch. */}
+      {
         <section className={`needs-you${alone ? " is-alone" : " scroll-y"}`} aria-labelledby="needs-you-heading">
           <div className="needs-you-headrow">
             {/* The bell counts what the GM owes; what waits on players is said beside it, in words. */}
@@ -428,10 +432,24 @@ export function NeedsYou({
                 </span>
               )}
             </h2>
+            <Button
+              size="sm"
+              className="needs-you-call"
+              aria-expanded={calling}
+              onClick={() => setCalling((open) => !open)}
+            >
+              Call for a roll
+            </Button>
             {placeSwitch}
           </div>
-          {items.length === 0 ? (
-            <p className="table-panel-empty">Nothing waits on you.</p>
+          {/* The call's form opens in place over the list, as a Cradle. */}
+          {calling && (
+            <div className="needs-you-calling">
+              <RollCallPanel state={state} calls={false} onCalled={() => setCalling(false)} />
+            </div>
+          )}
+          {items.length === 0 && state.rollCalls.length === 0 ? (
+            alone && <p className="table-panel-empty">Nothing waits on you.</p>
           ) : (
             <ul className="needs-you-list">
               {items.map((item) => (
@@ -446,8 +464,10 @@ export function NeedsYou({
               ))}
             </ul>
           )}
+          {/* An open call waits with what waits on players, after the GM's own; the bell leaves it out. */}
+          <RollCallPanel state={state} form={false} />
         </section>
-      )}
+      }
     </>
   );
 }
