@@ -297,7 +297,7 @@ E2.1 and E2.2 Built in part (`E2-maps-tokens/SPEC.md`, ADR-0063; the map beside 
 
 ### E3. Tokens, sound and replays
 
-E3.1 Designed with E2 (`E2-maps-tokens/SPEC.md`, ADR-0063), with the token picker (C6.8). E3.2 Designed
+E3.1 Designed with E2 (`E2-maps-tokens/SPEC.md`, ADR-0063), with the token picker (C6.8). E3.2 Built in part
 (`E3-sound-screen/SPEC.md`, `E3-sound-screen/PLAN.md`, ADR-0065): the sound board as kinds at the side under one Playing
 bar with a scrubber, kind chips, and each encounter's sound on its page. E3.3 to E3.5 Designed with C4.6
 (`E3-replays/SPEC.md`, `E3-replays/PLAN.md`, ADR-0069): the list as a table with the chosen replay beside it, the whole

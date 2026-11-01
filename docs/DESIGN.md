@@ -219,6 +219,12 @@ carries its picture, its grid and type, its use and its folder, and its More fil
 and a bar at the foot with Move to. Tokens are in the GM's groups: Party, the GM's own groups, then Monsters, each
 creature with a More to set its image or move it; the groups are the GM's alone.
 
+Sound (ADR-0065) is the board's parts at the side, ON THE BOARD (Playlist, Ambience, Effects) and LIBRARY (All sounds,
+Not on the board) with their counts, beside the chosen part; on a phone they are chips. One Playing bar sits under the
+title: what plays, the room's lamp, the track and its layers, a scrubber that seeks on release, Play or Pause, Next
+track, Stop all and Master. A library row puts its sound on the board with Music, Ambience and Effect chips, lit where
+it already is. An encounter's sound is on the encounter's page.
+
 A page header is for records only (ADR-0048). A list, a settings section or an overview starts with its content and at
 most one description line (14px, `--text-dim`, the GM only tag in front of it on a page players can also open). A
 record opens with its title row: the title in Chakra Petch 600 capitals at 24px (20px on a phone), its tags, one 13px

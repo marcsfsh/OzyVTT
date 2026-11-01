@@ -103,7 +103,9 @@ Socket.IO over the same origin as HTTP. Server-to-client events come in two kind
   when the homebrew its reader receives changed (`HomebrewStore.fingerprintFor`), with a number that
   grows for that device alone and says nothing of anyone else's changes.
 - **GM-only channels** go to GM sockets alone: `sound:changed` carries the sound board and the table
-  screens' sound state. A player's socket is never sent it.
+  screens' sound state. A player's socket is never sent it. A track's position is worked out from its `startedAt` and
+  the board's clock (frozen at `pausedAt`); `sound.seek` (ADR-0065) gives the playing track a new play from a position,
+  so every screen moves with it, and the service re-arms its hand-over timer after every change.
 
 On connect the server sends a full projected snapshot. The client passes its token in `socket.auth`,
 so reconnects resume without a new join. A player's token is kept in `localStorage`; the GM's in the

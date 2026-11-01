@@ -1,51 +1,11 @@
 import type { SoundBoard } from "@vtt/domain";
-import { Badge, Button, IconButton, IconPlay, IconScene, IconX, Switch } from "@vtt/ui";
+import { Badge, Button, IconButton, IconPlay, IconX, Switch } from "@vtt/ui";
 import type { SendSound } from "./sound-data";
 
 type SceneRow = Readonly<{ id: string; name: string }>;
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
-/**
- * A sound of its own for each prepared scene: what the board holds now (the playlist and the layers that are on),
- * started when the scene goes live unless the GM switches that off.
- */
-export function SceneSounds({
-  board,
-  scenes,
-  activeEncounterId,
-  send
-}: Readonly<{ board: SoundBoard; scenes: readonly SceneRow[]; activeEncounterId: string | null; send: SendSound }>) {
-  return (
-    <section className="sound-section surface-glass" aria-labelledby="sound-scenes-title">
-      <header className="sound-section-head">
-        <h3 id="sound-scenes-title">
-          <IconScene /> Encounter sound
-        </h3>
-      </header>
-      <p className="sound-hint">
-        Saves the playlist and the ambient layers that are on. It starts when the encounter goes live.
-      </p>
-      {scenes.length === 0 ? (
-        <p className="sound-empty">Prepare an encounter in Encounters to give it a sound.</p>
-      ) : (
-        <ul className="sound-rows">
-          {scenes.map((scene) => (
-            <li key={scene.id} className="sound-row sound-scene">
-              <SceneSoundRow board={board} scene={scene} live={scene.id === activeEncounterId} send={send} />
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/**
- * One scene's own sound: what is saved (tracks and ambient layers), Save or Replace with what the board plays now,
- * whether it starts when the scene goes live, Play now and Clear. The sound board lists one per scene, and a scene's
- * own page shows its own.
- */
 export function SceneSoundRow({
   board,
   scene,
