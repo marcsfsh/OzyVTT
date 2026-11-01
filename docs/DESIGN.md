@@ -245,6 +245,14 @@ The table (Play), as Two docks (ADR-0025, ADR-0050):
   amber rim (grey for what waits on a player, listed last), the creature's 22px face, the title, its line and its
   buttons on Base lines with the main one lit on the cyan line. A tab whose entries grew since it was last opened
   carries the count after its word in quiet VT323 (Log); opening it drops the count.
+- The log is one entry a line on a hairline (ADR-0060): a roll's tags, who and what, and its total in VT323 at the right;
+  a turn's line in small capitals, the current turn in amber; damage red and healing gold. Pressing a roll's line opens
+  its card in place (the total, each die in a box, the formula), one at a time. Scrolled up, the log holds still and a
+  line at its foot says how many new lines wait. The composer is one row of who hears it (violet while a whisper), the
+  field and Send, with the quick dice and More under it; More opens the dice options as a sheet over the Log tab: the
+  roller as a Cradle, More dice and Recent rolls as open groups, who sees the next roll at its foot.
+- The GM calls for a roll from the waiting list's head: the form opens in place over the list, and an open call waits
+  in it as a grey card on players with a row per character, Roll for them and Close.
 - The bell is the one signal that something waits on the GM: 16px amber with its count on a small badge, no words. It
   shows on the list's head, the Encounter tab or the list's tab, the acting Ladder row, the live chip, a phone's Play
   tab and the Compendium's home, and renders nothing when nothing waits.

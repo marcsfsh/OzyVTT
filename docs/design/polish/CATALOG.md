@@ -199,7 +199,7 @@ five options, each built from settled parts.
 
 ### C5. Log and dice
 
-Designed (`C5-log-dice/SPEC.md`, `C5-log-dice/PLAN.md`, ADR-0060): the log one line each with a roll opening to its
+Built (`C5-log-dice/SPEC.md`, `C5-log-dice/PLAN.md`, ADR-0060): the log one line each with a roll opening to its
 card, the composer led by who hears it, the dice options as a sheet over the panel, and calls for a roll from the
 waiting list. Each question in a round offers five options, each built from settled parts.
 

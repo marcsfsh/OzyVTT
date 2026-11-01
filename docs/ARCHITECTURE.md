@@ -1157,12 +1157,16 @@ bottom tabs. `useSwitchMoments` turns to Map while a target is chosen, with the 
 Sheet view: Sheet is its own bottom tab. Prep's encounter and map pages still share one column below 980px, the map
 scrolling away above the panel (`table/scrollPast.ts`). On a phone a player's table and
 log head with the character being played (`table/PlayerIdentity.tsx`, the sheet's `BandPlate`) at the top of the pane,
-since a phone has no top bar. The Log tab is the persisted combat log, rolls drawn as cards,
-over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
+since a phone has no top bar. The Log tab is the persisted combat log (`encounter/CombatLog.tsx`, ADR-0060), one entry a
+line: a roll's line opens in place to its card, GM-only lines, whispers and natural 20s and 1s carry their tags, and a
+damage or healing number the server wrote after its verb reads red or gold. The list follows new lines only while the
+reader is at its foot; scrolled up it holds still and says how many new lines wait. It sits over the composer
+(`table/LogComposer.tsx`): a quick die sends one `1dN` and the field rolls the formula after
 `/roll` (or `/r`), both through `dice:roll` at the visibility the dice options chose (`dice/roll-visibility.ts`);
 any other text is a chat line through `chat:send`, to everyone or whispered as Who hears it says, and an unknown
-`/` word is refused before anything is sent. Dice options opens the full `DicePanel`, the GM's calls for a roll
-included. The table screen's row in the menu
+`/` word is refused before anything is sent. More (named Dice options) opens `DicePanel` as a sheet over the Log tab,
+under the panel's tabs. The GM calls for a roll from the waiting list's head: `RollCallPanel`'s form opens in place over
+the list, and each open call waits there as a card on players, which the bell does not count. The table screen's row in the menu
 (`table/TvControl.tsx`) pauses the screen, puts the live encounter back on it and docks its preview
 (`viewer/preview-open.ts`). The screen itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`, ADR-0056) draws
 the turn ladder (the round on the VCR counter, a row a turn with the acting row as its card, and the latest public roll
