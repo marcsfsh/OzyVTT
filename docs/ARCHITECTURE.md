@@ -1049,7 +1049,12 @@ on the page's address; `/codex/tags/:tag` redirects to the index filtered to it)
 time (`codex/page/SideColumn.tsx`): the tag (`TagView` over the reader's own feeds), a reveal (`RevealColumn`, the
 dialog's body without its dialog) or the versions (`codex/page/VersionsColumn.tsx`, with what changed worked out in
 the browser from each revision and the next newer one in `codex/page/versions.ts`). Quests, Tonight, the table's Codex
-tab and the page editor keep `RevealPanel` and `RevisionHistory` as dialogs.
+tab and the page editor keep `RevealPanel` and `RevisionHistory` as dialogs. A faction page's standing is the column's
+fourth part (`codex/page/StandingColumn.tsx`, `?side=standing`, which the Factions grid opens), and the GM's campaign
+feed now loads on the pages section so the column has the maps, journal entries and standing it reads. Quests keep
+their group in the address (`?status=`, "none" for every quest, and `?who=`); the story's Downtime tab is
+`/codex/story?tab=downtime` with the chosen character as `?who=` (the retired `downtime` section lands there); and a
+new chronicle record's composer is `EntryComposer`'s inline form at the head of the line (ADR-0066).
 
 The Encounters tab asks the Codex which records point at each table encounter: `GET /api/v1/codex/encounter-links` (GM only,
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the

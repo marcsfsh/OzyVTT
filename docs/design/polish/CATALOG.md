@@ -320,9 +320,10 @@ and the story's Chronicle, Timeline and Sessions tabs each with its own design. 
 Built in part (`F-finding-pages/SPEC.md`, `F-finding-pages/PLAN.md`, ADR-0064): search as panes, the pages index with
 the kinds, folders and tags at the side, a page's tag, reveal and versions in its side column, and one search dialog for
 the palette and the picker. Not built: a field's and the whole page's reveal in the column, a phone's Reveal tab from a
-hidden block, Added since marked in place, and the See as preview's own palette. F4.5, F4.7 (where it sits) and F5.1 to F5.3 Designed (`F-story-people/SPEC.md`,
+hidden block, Added since marked in place, and the See as preview's own palette. F4.5, F4.7 (where it sits) and F5.1 to F5.3 Built in part (`F-story-people/SPEC.md`,
 `F-story-people/PLAN.md`, ADR-0066): quests by status at the side, relationships as a ring on glass, a faction's
-standing in its page's side column, the composer at the head of the line, and a Downtime tab. F3.1 to F3.3 and the
+standing in its page's side column, the composer at the head of the line, and a Downtime tab. Not built: the quest page
+redrawn with Facts at the side, Add a tie on the ring's panel, and the in-world date as one menu. F3.1 to F3.3 and the
 Downtime tab's contents Designed (`F3-atlas/SPEC.md`, `F3-atlas/PLAN.md`, ADR-0067): the maps as a tree at the side, the
 pins at the right with a pin's page and menu, the pin editor in tabs, and the Downtime tab's characters at the side.
 F4.4, F4.6 and F6.1 to F6.4 Designed (`F-time-tools/SPEC.md`, `F-time-tools/PLAN.md`, ADR-0070): prep templates as one
@@ -378,7 +379,7 @@ Codex's tools in Settings.
 | ---- | ----------------------- | ---------------------- | ---------- | ---------------------------------------------------------------------------------------- |
 | F5.1 | Quests                  | `/codex/quests`        | GM, player | `codex/quests/QuestsView.tsx`, `codex/quests/QuestWriter.tsx`, `codex/quests/quests.css` |
 | F5.2 | Relationships           | `/codex/relationships` | GM, player | `codex/relationships/RelationshipsView.tsx`, `codex/relationships/relationships.css`     |
-| F5.3 | Standing with a faction | Factions grid          | GM         | `codex/StandingAdjuster.tsx`                                                             |
+| F5.3 | Standing with a faction | a faction's side column | GM        | `codex/page/StandingColumn.tsx`                                                          |
 
 ### F6. Codex tools
 

@@ -649,7 +649,21 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
   the toolbar over one bordered text field, and the fields as a Cradle with Everyone and Hidden for each. Preview saves
   first, then shows the page exactly as players get it under a violet line; See as players on a page is the same view.
   A phone has Write and Preview under its header and Done pinned at the foot.
-- The story's tabs are Chronicle, Timeline, Sessions and Downtime, as words with Filters at the right. The chronicle is
+- Quests put STATUS (All quests, Active, Not started, Done) and, for the GM, WHO SEES IT with counts at the left, and
+  the quests as rows with their progress (a 4px line and "1 of 3") under a toolbar with New quest as a Base line
+  button; a quest opens alone as its page (ADR-0066).
+- Relationships are a ring on glass: the centred page in the middle and up to eight ties around it from the top, each
+  line named at its middle, a hidden tie dashed violet, "+N more" past eight; Centre on, the views and the ties (one row
+  a neighbour, choosing one lights its line) sit on glass over it. A phone has the ring and the ties as a sheet.
+- A faction's standing opens in its page's side column: the word large with the old number and the new, steps of 10
+  and 5, the seven words with their ranges, Why it moved and Record change as the Cup. The Factions grid's cells open
+  it there.
+- Add to the chronicle opens the composer at the head of the line, above the first session: the kinds, Filed under
+  (any session or Not in a session, and the in-world date), the text, Hidden note and Link a page as options, and the
+  kind's Cup. While composing each session has Add here. An edit keeps its dialog.
+- The story's tabs are Chronicle, Timeline, Sessions and Downtime, as words with Filters at the right. Downtime puts the
+  characters with their days and the deadlines at the left and the chosen character's downtime at the right, with Log
+  downtime as the Cup and what waits to be confirmed above the rows. The chronicle is
   one line of sessions (the next amber, played ones cyan) with their entries; the timeline draws its zoom on a line in
   the horizon gradient with a card under each point; Sessions leads with the next session's card, then the played ones
   two to a row.
