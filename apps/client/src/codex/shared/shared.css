@@ -290,15 +290,24 @@
 }
 
 /* ----- Both dates in one bar ----- */
+/* The date bar is a Cradle (theme spec 2.4): no fill and no top, a 2px base and sides that fade before the top. */
 .cx-datebar {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-4);
-  padding: var(--space-2) var(--space-3);
-  background: var(--material-plate);
-  border: 1px solid var(--line);
-  box-shadow: var(--material-lip);
+  padding: 10px 14px;
+}
+.cx-datebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid transparent;
+  border-top: 0;
+  border-bottom-width: var(--cradle-base);
+  border-image: var(--cradle-sides) 1;
 }
 .cx-datebar.is-tight {
   gap: var(--space-1) var(--space-3);
@@ -319,6 +328,11 @@
   font: 700 var(--fs-sm) / 1.2 var(--font-body);
   color: var(--text);
 }
+/* The campaign's date is VT323 cyan wherever it shows (Codex frame rule 3.6). */
+.cx-datebar-date.is-date {
+  color: var(--cyan-hi);
+  font: 400 20px / 1 var(--font-numeric);
+}
 /* The GM's date opens its editor; it grows its own 44px since the bar wraps. */
 button.cx-datebar-date {
   min-height: var(--tap-min);
@@ -326,22 +340,30 @@ button.cx-datebar-date {
   background: none;
   border: 0;
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: var(--violet);
 }
-.cx-datebar-date.is-gm {
-  color: var(--violet-text);
+button.cx-datebar-date:hover {
+  text-decoration: underline;
 }
 .cx-datebar-hour {
   color: var(--text-muted);
   font-size: var(--fs-xs);
 }
+/* Hidden reads one way (rule 3.2): violet, a dashed edge and the struck eye, in a 22px tag box. */
 .cx-datebar-hidden {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px dashed color-mix(in srgb, var(--violet) 75%, transparent);
   color: var(--violet-text);
-  font: 700 var(--fs-xs) / 1 var(--font-label);
+  font: 400 13px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.cx-datebar-hidden svg {
+  width: 12px;
+  height: 12px;
 }
 .cx-datebar-actions {
   display: inline-flex;

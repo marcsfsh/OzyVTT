@@ -108,7 +108,7 @@ function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight =
         <span className="cx-datebar-key">Yours</span>
         <button
           type="button"
-          className="cx-datebar-date is-gm"
+          className={cx("cx-datebar-date", now && "is-date")}
           aria-label={now ? `Your date is ${formatWorldDate(calendar, now)}. Change it.` : "Set your date"}
           title={now ? formatWorldDate(calendar, now) : undefined}
           onClick={() => setDateOpen(true)}
@@ -122,7 +122,10 @@ function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight =
       </span>
       <span className="cx-datebar-part">
         <span className="cx-datebar-key">Players</span>
-        <strong className="cx-datebar-date" title={published ? formatWorldDate(calendar, published) : undefined}>
+        <strong
+          className={cx("cx-datebar-date", published && "is-date")}
+          title={published ? formatWorldDate(calendar, published) : undefined}
+        >
           {published ? barDate(calendar, published, now) : "Not shared yet"}
         </strong>
       </span>
@@ -173,7 +176,7 @@ function PlayerDateBar({ calendar, tight = false }: PlayerDateBarProps) {
     <div className={cx("cx-datebar", tight && "is-tight")} role="group" aria-label="Today">
       <span className="cx-datebar-part">
         <span className="cx-datebar-key">Today</span>
-        <strong className="cx-datebar-date">
+        <strong className={cx("cx-datebar-date", calendar && today && "is-date")}>
           {calendar && today
             ? tight
               ? barDate(calendar, today, null)

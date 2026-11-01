@@ -267,7 +267,7 @@ describe("The GM's Home", () => {
     await user.click(within(card).getByRole("button", { name: "Start session 6" }));
     await waitFor(() => expect(api.sessionApi.activate).toHaveBeenCalledWith("gm", "s6"));
 
-    await user.click(within(card).getByRole("button", { name: "Open prep" }));
+    await user.click(within(card).getByRole("button", { name: "Open the prep" }));
     expect(window.location.pathname).toBe("/codex/sessions/s6");
   });
 

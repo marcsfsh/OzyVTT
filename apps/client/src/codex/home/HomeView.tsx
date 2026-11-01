@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Button, IconChevronRight, IconSparkle, Skeleton, cx, AudienceChip, KindCard } from "@vtt/ui";
+import {
+  Alert,
+  Button,
+  Eyebrow,
+  Group,
+  IconChevronRight,
+  IconSparkle,
+  Skeleton,
+  cx,
+  AudienceChip,
+  KindCard
+} from "@vtt/ui";
 import type { CodexRecordKind } from "@vtt/domain";
 import { sessionApi } from "../api";
 import { findApi } from "../api-records";
@@ -24,33 +35,84 @@ import "./home.css";
 
 const PAGE_TYPES = new Set<CodexSearchType>(KIND_GROUPS.flatMap((group) => group.types));
 
-/** A card on Home: a plate with its heading, an optional count, and what it holds. */
+/**
+ * A group on Home (Codex frame 2.1): an open group you read, its heading the one eyebrow with an optional count at its
+ * right (theme spec 2.3).
+ */
 function Card({
   title,
-  icon,
   count,
-  gm = false,
   aside,
   children,
   className
 }: Readonly<{
   title: string;
-  icon: string;
   count?: number;
-  gm?: boolean;
   aside?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }>) {
   return (
-    <section className={cx("cx-card", gm && "is-gm", className)} aria-label={title}>
-      <div className="cx-card-head">
-        <CodexIcon iconId={icon} className="cx-card-icon" />
-        <h2 className="cx-card-title">{title}</h2>
-        {aside}
-        {count !== undefined && <span className="cx-card-count">{count}</span>}
-      </div>
+    <Group
+      kind="read"
+      title={title}
+      headingLevel={2}
+      className={cx("cx-homegroup", className)}
+      actions={
+        aside || count !== undefined ? (
+          <>
+            {aside}
+            {count !== undefined && <span className="cx-card-count">{count}</span>}
+          </>
+        ) : undefined
+      }
+    >
       {children}
+    </Group>
+  );
+}
+
+/** The next session leads the right column as a card: its number and date, Open the prep, and Start session N as the Cup. */
+function NextSession({
+  next,
+  starting,
+  onOpen,
+  onStart
+}: Readonly<{
+  next: ReturnType<typeof nextSessionCard>;
+  starting: boolean;
+  onOpen: (id: string) => void;
+  onStart: (id: string) => void;
+}>) {
+  const title = next
+    ? `${next.heading === "Next session" ? "Next" : next.heading} · Session ${next.sessionNumber ?? ""}`
+    : "Sessions";
+  return (
+    <section className="cx-lead" aria-label={title}>
+      <h2 className="cx-lead-title">
+        <Eyebrow>{title}</Eyebrow>
+      </h2>
+      {next ? (
+        <>
+          <p className="cx-lead-line">
+            {[realDateLabel(next.realDate), next.heading === "Next session" ? "Planned" : next.heading]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          <div className="cx-card-row">
+            <Button size="sm" onClick={() => onOpen(next.id)}>
+              Open the prep
+            </Button>
+            {next.heading === "Next session" && (
+              <Button size="sm" variant="primary" disabled={starting} onClick={() => onStart(next.id)}>
+                Start session {next.sessionNumber ?? ""}
+              </Button>
+            )}
+          </div>
+        </>
+      ) : (
+        <p className="cx-lead-line">No session yet. Make one from New.</p>
+      )}
     </section>
   );
 }
@@ -87,7 +149,6 @@ function PartyCard({
   return (
     <Card
       title="Where the party is"
-      icon="pin"
       aside={
         gm && party ? (
           <AudienceChip
@@ -174,7 +235,7 @@ function RevealCheck({
 }: Readonly<{ home: CodexHome | undefined; go: (path: string) => void; short?: boolean }>) {
   const check = home?.revealCheck;
   return (
-    <Card title="Reveal check" icon="eye" count={check?.total ?? 0} gm>
+    <Card title="Reveal check" count={check?.total ?? 0}>
       <p className="cx-hint">
         {check && check.total > 0
           ? "These revealed records point at something players can't see. Each is safe, since players get plain text there."
@@ -255,7 +316,7 @@ export function GmHome() {
     />
   );
   const firstPage = home && pageRevealed + pageHidden === 0 && (
-    <Card title="Make your first page" icon="scroll">
+    <Card title="Make your first page">
       <p className="cx-hint">
         Pages hold the people and places of your world. Players see none of it until you reveal it.
       </p>
@@ -266,12 +327,14 @@ export function GmHome() {
       </div>
     </Card>
   );
-  const sessionLine = next && (
-    <span className="cx-hint">
-      {[realDateLabel(next.realDate), next.heading === "Next session" ? "Planned" : next.heading]
-        .filter(Boolean)
-        .join(" · ")}
-    </span>
+
+  const nextCard = (
+    <NextSession
+      next={next}
+      starting={starting}
+      onOpen={(id) => go(sessionPath(id))}
+      onStart={(id) => void start(id)}
+    />
   );
 
   if (phone)
@@ -305,17 +368,8 @@ export function GmHome() {
                 </button>
               );
             })}
-            {next && (
-              <button type="button" className="cx-grouprow" onClick={() => go(sessionPath(next.id))}>
-                <CodexIcon iconId="sessions" className="cx-grouprow-icon" />
-                <span className="cx-grouprow-text">
-                  <span className="cx-grouprow-title">Session {next.sessionNumber ?? ""}</span>
-                  {sessionLine}
-                </span>
-                <IconChevronRight className="cx-grouprow-chev" />
-              </button>
-            )}
           </div>
+          {nextCard}
           <RevealCheck home={home} go={go} short />
         </div>
       </div>
@@ -324,8 +378,8 @@ export function GmHome() {
   return (
     <div className="cx-home scroll-y">
       <div className="cx-home-grid">
+        <div className="cx-home-top">{dateBar}</div>
         <div className="cx-home-col">
-          {dateBar}
           {/* The bar names the Codex, so the overview opens with one line about it (theme spec 2.2). */}
           <p className="cx-home-line">
             {pageRevealed + pageHidden} pages:{" "}
@@ -354,46 +408,18 @@ export function GmHome() {
                 />
               );
             })}
-            <Card
-              title={
-                next
-                  ? `${next.heading === "Next session" ? "Next" : next.heading} · Session ${next.sessionNumber ?? ""}`
-                  : "Sessions"
-              }
-              icon="sessions"
-              gm
-              className="cx-tile"
-            >
-              {next ? (
-                <>
-                  {sessionLine}
-                  <div className="cx-card-row">
-                    <Button size="sm" onClick={() => go(sessionPath(next.id))}>
-                      Open prep
-                    </Button>
-                    {next.heading === "Next session" && (
-                      <Button size="sm" disabled={starting} onClick={() => void start(next.id)}>
-                        Start session {next.sessionNumber ?? ""}
-                      </Button>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <p className="cx-hint">No session yet. Make one from New.</p>
-              )}
-            </Card>
           </div>
-          <Card title="Recently changed" icon="hourglass">
+          <Card title="Recently changed">
             {read.loading && !home ? (
               <Skeleton variant="text" />
             ) : home && home.recent.length > 0 ? (
-              <table className="cx-table">
-                <thead>
+              <table className="cx-table cx-recent">
+                {/* The rows read as rows (theme spec 2.3); the column names stay for a screen reader. */}
+                <thead className="nh-sr-only">
                   <tr>
                     <th scope="col">Record</th>
                     <th scope="col">Change</th>
                     <th scope="col">Who sees it</th>
-                    <th scope="col">When</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -409,14 +435,15 @@ export function GmHome() {
                           {row.title.trim() || SEARCH_TYPE_LABEL[row.type]}
                         </button>
                       </td>
-                      <td>{CHANGE_WORD[row.change]}</td>
-                      <td>
+                      <td className="cx-recent-when">
+                        <span>{CHANGE_WORD[row.change]}</span> · <span>{modifiedLabel(row.changedAt)}</span>
+                      </td>
+                      <td className="cx-recent-who">
                         <AudienceChip
                           value={{ audience: row.audience, characterIds: row.characterIds }}
                           party={party}
                         />
                       </td>
-                      <td className="cx-col-date">{modifiedLabel(row.changedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -426,8 +453,9 @@ export function GmHome() {
             )}
           </Card>
         </div>
-        <div className="cx-home-col">
-          <PartyCard token={token} party={feeds.campaign.party} maps={feeds.campaign.maps} height={230} gm go={go} />
+        <div className="cx-home-col is-side">
+          {nextCard}
+          <PartyCard token={token} party={feeds.campaign.party} maps={feeds.campaign.maps} height={180} gm go={go} />
           <RevealCheck home={home} go={go} />
         </div>
       </div>
@@ -477,11 +505,7 @@ export function PlayerHome() {
   const clocks = useMemo(() => clocksOf(feeds.timeline), [feeds.timeline]);
   const newSince = read.data?.newSince ?? [];
   const recapCard = recap && (
-    <Card
-      title="Latest recap"
-      icon="sessions"
-      aside={<span className="cx-hint">Session {recap.sessionNumber ?? ""}</span>}
-    >
+    <Card title="Latest recap" aside={<span className="cx-hint">Session {recap.sessionNumber ?? ""}</span>}>
       <div className="cx-card-text">
         <CodexMarkdown text={recap.recap} token={token} audience="player" />
       </div>
@@ -532,11 +556,11 @@ export function PlayerHome() {
   const openQuests = feeds.quests.filter((quest) => quest.status === "active" || quest.status === "not-started");
   return (
     <div className="cx-home scroll-y">
-      <div className="cx-home-grid is-player">
+      <div className="cx-home-grid">
+        <div className="cx-home-top">{dateBar}</div>
         <div className="cx-home-col">
-          {dateBar}
           {recapCard}
-          <Card title="New since your last visit" icon="star">
+          <Card title="New since your last visit">
             {read.error ? (
               <Alert tone="danger">{read.error}</Alert>
             ) : newSince.length === 0 ? (
@@ -572,9 +596,9 @@ export function PlayerHome() {
             )}
           </Card>
         </div>
-        <div className="cx-home-col">
-          <PartyCard token={token} party={feeds.party} maps={feeds.maps} height={200} gm={false} go={go} />
-          <Card title="Open quests" icon="quest">
+        <div className="cx-home-col is-side">
+          <PartyCard token={token} party={feeds.party} maps={feeds.maps} height={180} gm={false} go={go} />
+          <Card title="Open quests">
             {openQuests.length === 0 ? (
               <p className="cx-hint">No open quests.</p>
             ) : (
@@ -601,7 +625,7 @@ export function PlayerHome() {
               })
             )}
           </Card>
-          <Card title="Clocks" icon="hourglass">
+          <Card title="Clocks">
             {clocks.length === 0 ? (
               <p className="cx-hint">No clock is running.</p>
             ) : (
