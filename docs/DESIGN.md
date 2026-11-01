@@ -533,6 +533,11 @@ its pages from these patterns.
 - Time is a timeline. History is a list of versions with Compare and Restore.
 - A map is present without taking over. Anything placed on a map has two ways in: a button and then a click on the map,
   or a right-click at the spot, which is a long press on a phone.
+- A token, a door, the empty map and a drawing open A's menu (ADR-0062): the horizon edge along its top, its title and
+  line, small capital heads; beside the thing on a laptop, from the foot of the view on a phone (10px gutters, above
+  the bottom tabs, at most 70% of the height); one at a time, and closing it gives the focus back to the thing. The
+  GM's token menu holds The token and The creature, its hit points and conditions under the creature's row. A tool's
+  options are a menu from the tool, over the map on a phone.
 
 ## The character sheet
 

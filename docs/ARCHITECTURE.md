@@ -470,7 +470,8 @@ of a hidden thing. When in doubt, leave it out.
   closing Passwall and opens Guards and Wards' locks), or act on the door or wall a cast's `wallId` names
   (`resolution/cast-walls.ts`). Players get no door state and no object numbers: a secret door goes as a wall,
   and a wall with a gap cut in it as the parts that stand (`vision/audience.ts`). On the map a door's handle
-  opens its menu (`DoorMenu.tsx`), and while an action is aimed a tap on a wall or door makes it the target.
+  opens its menu (`DoorMenu.tsx`; every map menu is placed and dismissed by `scene/menuPlacement.ts`, one at a time,
+  from the view's foot on a phone, ADR-0062), and while an action is aimed a tap on a wall or door makes it the target.
 - Legendary actions are taken right after another creature's turn (`legendary.after-a-turn`): a turn
   change records the creature whose turn ended (`turn.afterActorId`), and the window stays open, one
   action a legendary creature, until the creature whose turn it is does something.

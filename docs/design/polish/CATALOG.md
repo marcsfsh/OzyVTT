@@ -143,7 +143,7 @@ Designed. The largest area; designed as one frame, then the groups.
 
 ### C2. The map
 
-Designed (`C2-map-menus/SPEC.md`, `C2-map-menus/PLAN.md`, ADR-0062): a token, a door, the empty map and a drawing open
+Built in part (`C2-map-menus/SPEC.md`, `C2-map-menus/PLAN.md`, ADR-0062): a token, a door, the empty map and a drawing open
 as A's menu at the thing, how a creature moves sits at the top of the token's menu, and each tool's options are A's menu
 from the tool. The map (C2.1) and the tray (C2.4) are C's. Each question in a round offers five options, each built from
 settled parts.
