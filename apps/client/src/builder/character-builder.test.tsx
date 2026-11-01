@@ -483,7 +483,7 @@ const gmView = {
 } as unknown as GmView;
 
 function mount() {
-  // `Save & close` toasts, so the wizard needs the provider its host page gives it.
+  // `Done` toasts, so the wizard needs the provider its host page gives it.
   return render(
     <ToastProvider>
       <CharacterBuilder state={gmView} onClose={() => {}} onCreated={() => {}} />
@@ -520,6 +520,21 @@ async function toClassFeatures(user: ReturnType<typeof userEvent.setup>, level: 
   for (let at = 1; at < level; at++) await user.click(within(stepper).getByRole("button", { name: "Increase" }));
   await user.click(screen.getByRole("button", { name: /^Next: / }));
 }
+
+describe("the builder's rail", () => {
+  it("names the step in the title row and shows a done step's answer under its name", async () => {
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole("radio", { name: /Elf/ }));
+    await user.click(within(offerNamed("Keen Senses")).getByRole("radio", { name: /Perception/ }));
+    expect(screen.getAllByText("Step 1 of 7 · Species").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Next: Background" }));
+    expect(screen.getAllByText("Step 2 of 7 · Background").length).toBeGreaterThan(0);
+    // The rail lists Species with its answer under it.
+    const rail = screen.getByRole("navigation", { hidden: true }) as HTMLElement;
+    expect(within(rail).getAllByText("Elf").length).toBeGreaterThan(0);
+  });
+});
 
 // Issue 1
 

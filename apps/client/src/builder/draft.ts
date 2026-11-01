@@ -3,7 +3,7 @@ import { BUILDER_DRAFT_VERSION, type BuilderDraft } from "./build-payload";
 
 /**
  * The character builder's parked draft, kept on the server: one per player session and one for the GM, which
- * follows the GM to any device. A reload, another tab or "Save & close" picks the build up where it was left.
+ * follows the GM to any device. A reload, another tab or Done picks the build up where it was left.
  */
 
 export type StoredDraft = Readonly<{

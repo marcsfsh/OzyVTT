@@ -113,6 +113,12 @@ export function WizardShell({
         <div className="nh-wizard-titles">
           {eyebrow != null && <span className="nh-eyebrow">{eyebrow}</span>}
           <h1 className="nh-wizard-title">{title}</h1>
+          {/* The record's title row names the step it is on (characters spec 2.2); a phone has its progress line. */}
+          {stepsPlacement === "side" && steps[current] && (
+            <span className="nh-wizard-stepline">
+              Step {current + 1} of {steps.length} · {steps[current]?.shortLabel ?? steps[current]?.label}
+            </span>
+          )}
         </div>
         {onSaveAndClose && (
           <div className="nh-wizard-headops">
@@ -166,7 +172,7 @@ export function WizardShell({
       <footer className="nh-wizard-foot">
         <div className="nh-wizard-foot-back">
           {onBack && (
-            <Button variant="secondary" onClick={onBack} disabled={busy}>
+            <Button variant="ghost" onClick={onBack} disabled={busy}>
               {backLabel}
             </Button>
           )}

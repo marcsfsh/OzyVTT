@@ -210,7 +210,7 @@
 @media (min-width: 761px) {
   .nh-wizard-body--split {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    grid-template-columns: minmax(0, 1fr) 360px;
     gap: var(--space-4);
     align-items: start;
   }
@@ -230,7 +230,7 @@
 @media (min-width: 761px) {
   .nh-wizard--side {
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr) auto;
     column-gap: 0;
     row-gap: var(--space-4);
@@ -288,4 +288,39 @@
 .nh-wizard-side .nh-step-label {
   font-size: 15px;
   font-weight: 600;
+}
+
+/* The step the record's title row names, in one quiet line under the title; a phone's progress says it instead. */
+.nh-wizard-stepline {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+@media (max-width: 760px) {
+  .nh-wizard-stepline {
+    display: none;
+  }
+}
+/* A guided flow's choices are Base line tiles (characters spec 2.2): from 190px, at least 64px tall, the chosen one on
+   a 2px cyan line with its tick. */
+@media (min-width: 761px) {
+  .nh-wizard .nh-choicegrid-items {
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+}
+.nh-wizard .nh-choice {
+  min-height: 64px;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--surface-1) 85%, transparent);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.nh-wizard .nh-choice:hover:not(:disabled):not(.is-selected) {
+  box-shadow: inset 0 -1px 0 var(--line-strong);
+}
+.nh-wizard .nh-choice.is-selected,
+.nh-wizard .nh-choice.is-selected:hover {
+  background: color-mix(in srgb, var(--cyan) 8%, var(--surface-1));
+  box-shadow: inset 0 -2px 0 var(--cyan);
 }

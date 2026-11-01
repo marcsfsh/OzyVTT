@@ -215,7 +215,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
   }, [offersReply, offersCurrent]);
 
   // Park the draft as it changes, once a burst of picks settles, except while an unanswered resume offer is on
-  // screen: saving then would overwrite the draft the banner offers. Only Resume, Discard or Save & close answer it.
+  // screen: saving then would overwrite the draft the banner offers. Only Resume, Discard or Done answer it.
   // Leaving the page sends what the pause was still holding.
   const unsaved = useRef<BuilderDraft | null>(null);
   useEffect(() => {
@@ -294,13 +294,40 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
    *   clickable(i)  ⟺  i <= furthest AND i !== current      (via `maxSelectable`)
    * Beyond `furthest` `Steps` falls back to its position rule, so those read as upcoming and stay locked.
    */
-  const stepsForShell: StepItem[] = steps.map((id, index) => ({
-    label: id === "level" ? `Level ${draft.level}` : STEP_LABELS[id],
-    shortLabel: id === "level" ? `Level ${draft.level}` : STEP_SHORT[id],
-    ...(index <= furthest && index !== stepIndex
-      ? { state: stepReasons[index] === null ? ("done" as const) : ("incomplete" as const) }
-      : {})
-  }));
+  // A done step shows its answer under its name in the rail (characters spec 2.2).
+  const answerOf = (id: (typeof steps)[number]): string | null => {
+    if (id === "species") return catalogs.choice.species.find((entry) => entry.id === draft.speciesId)?.name ?? null;
+    if (id === "background") return catalogs.backgrounds.find((entry) => entry.id === draft.backgroundId)?.name ?? null;
+    if (id === "class")
+      return draft.classId
+        ? draftClassesOf(draft)
+            .map(
+              ({ id: classId, levels }) =>
+                `${catalogs.choice.classes.find((entry) => entry.id === classId)?.name ?? titleize(classId)} ${levels}`
+            )
+            .join(" / ")
+        : null;
+    if (id === "abilities")
+      return draft.abilityMethod === "standard-array"
+        ? "Standard array"
+        : draft.abilityMethod === "point-buy"
+          ? "Point buy"
+          : null;
+    if (id === "review") return draft.name.trim() || null;
+    return null;
+  };
+  const stepsForShell: StepItem[] = steps.map((id, index) => {
+    const done = index <= furthest && index !== stepIndex && stepReasons[index] === null;
+    const answer = done ? answerOf(id) : null;
+    return {
+      label: id === "level" ? `Level ${draft.level}` : STEP_LABELS[id],
+      shortLabel: id === "level" ? `Level ${draft.level}` : STEP_SHORT[id],
+      ...(answer ? { detail: answer } : {}),
+      ...(index <= furthest && index !== stepIndex
+        ? { state: stepReasons[index] === null ? ("done" as const) : ("incomplete" as const) }
+        : {})
+    };
+  });
 
   /**
    * One commandId per attempt. It is also the created actor's id and the server's idempotency key,
@@ -861,7 +888,7 @@ export function CharacterBuilder({ state, connection = "online", onClose, onCrea
         /* The one way out: the draft is already parked, so no "leave without saving" exit. Discarding
          lives on the resume banner. */
         onSaveAndClose={saveAndClose}
-        {...(rebuild ? { saveLabel: "Close" } : {})}
+        saveLabel={rebuild ? "Close" : "Done"}
         resume={
           resumable ? (
             <Alert tone="info" title="Unfinished character found">
