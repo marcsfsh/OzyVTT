@@ -114,7 +114,8 @@ export function DoorMenu({
     <div ref={ref} className="token-context-menu anim-popover scroll-y" role="menu" style={style} aria-label="Door">
       <MenuHead
         name="Door"
-        line={role === "gm" ? doorSummary(wall) : undefined}
+        // The door's state beside its title (C2 spec 2.4): the GM's whole summary, a player's what they can see.
+        line={role === "gm" ? doorSummary(wall) : open ? "Open" : "Closed"}
         end={
           <IconButton label="Close menu" size="sm" onClick={onClose}>
             <IconX />
@@ -144,9 +145,9 @@ export function DoorMenu({
           </button>
         ))}
       {actorName !== null && !open && (
-        <p className="token-context-feedback">{`${actorName} does it. Each takes an action in an encounter.`}</p>
+        <p className="token-context-note">{`${actorName} does it. Each takes an action in an encounter.`}</p>
       )}
-      <p className="token-context-feedback">
+      <p className="token-context-note">
         To attack the door or cast a spell on it, choose the attack or the spell, then tap the door.
       </p>
       {role === "gm" &&

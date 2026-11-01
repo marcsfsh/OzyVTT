@@ -147,3 +147,10 @@
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
 }
+/* Who does it and how to attack the door, under its ways, in the muted ink. */
+.token-context-note {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
