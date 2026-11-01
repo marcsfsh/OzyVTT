@@ -12,7 +12,7 @@ import {
 import { useCompendium } from "./context";
 import { refreshCompendium, useHomebrewList, usePacks } from "./data";
 import { KindIcon, kindLabel, type Kind } from "./kinds";
-import { PackSwitch, PhoneHead, creditWords, packName } from "./pieces";
+import { PackSwitch, creditWords, packName } from "./pieces";
 
 type Decision = HomebrewImportDecision["decision"];
 
@@ -168,15 +168,13 @@ export function SourcesView() {
           event.target.value = "";
         }}
       />
-      {phone ? (
-        <PhoneHead title="Sources" actions={importButton} />
-      ) : (
-        <div className="cp-section-head">
-          <h3 className="cp-h cp-grow">Sources</h3>
-          {importButton}
-          {exportButton}
-        </div>
-      )}
+      {/* The section bar's strip names the page on a phone too (compendium rule 3.1), so one head serves both. */}
+      <div className="cp-section-head">
+        <h3 className="cp-h cp-grow">Sources</h3>
+        {importButton}
+        {/* A phone's list ends with its own Export. */}
+        {!phone && exportButton}
+      </div>
       <div className={phone ? "cp-phone-body" : "cp-pad"}>
         {!list ? (
           <p className="cp-hint">{packs.error ?? "Reading the sources."}</p>

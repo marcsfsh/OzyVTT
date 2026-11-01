@@ -32,8 +32,9 @@ import { BarPrimary } from "../shell/SectionBar";
 
 /* Browse is the tables and Homebrew the overview of what you made; the addresses stay as they were. */
 const SECTIONS: ReadonlyArray<Readonly<{ id: CompendiumSection; label: string; path: string }>> = [
+  // Home first (compendium rule 3.1); its id stays `overview` so the addresses don't change.
+  { id: "overview", label: "Home", path: COMPENDIUM_PATHS.overview },
   { id: "tables", label: "Browse", path: COMPENDIUM_PATHS.tables },
-  { id: "overview", label: "Homebrew", path: COMPENDIUM_PATHS.overview },
   { id: "sources", label: "Sources", path: COMPENDIUM_PATHS.sources },
   { id: "sharing", label: "Sharing", path: COMPENDIUM_PATHS.sharing }
 ];
@@ -41,7 +42,7 @@ const SECTIONS: ReadonlyArray<Readonly<{ id: CompendiumSection; label: string; p
 const TABLE_FLYOUT_ID = "cp-table-flyout";
 
 /**
- * The GM's Compendium: SRD 5.2.1 and the table's homebrew in one set of tables, with Browse, Homebrew, Sources and
+ * The GM's Compendium: SRD 5.2.1 and the table's homebrew in one set of tables, with Home, Browse, Sources and
  * Sharing, the search (Ctrl K) and New homebrew. A record opens at its own address, docked beside its table on a wide
  * laptop; while it is edited, or on a narrower screen, it takes the width and the table folds into a flyout that
  * keeps its kind and filters. A phone gets the section's screen under a row of its sections and New.
