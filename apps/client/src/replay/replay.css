@@ -77,14 +77,96 @@
   gap: var(--space-2);
   flex-wrap: wrap;
 }
-.replay-transport input[type="range"] {
-  flex: 1;
+.replay-transport-buttons {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+/* The line of rounds: labels on top, the rail with its ticks and knob, the marks under it. */
+.replay-line {
+  position: relative;
+  flex: 1 1 12rem;
+  margin-inline: var(--space-2);
   min-width: 8rem;
+  min-height: var(--tap-min);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  cursor: pointer;
+  touch-action: none;
+}
+.replay-line:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.replay-line-rounds {
+  display: flex;
+  min-width: 0;
+}
+.replay-line-round {
+  flex-basis: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 4px;
+  border-left: 1px solid var(--line-raised);
+  font: 600 10px/1.4 var(--font-label);
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.replay-line-rail {
+  position: relative;
+  align-self: center;
+  height: 3px;
+  background: var(--line-raised);
+}
+.replay-line-watched {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--cyan);
+}
+.replay-line-tick {
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 11px;
+  background: var(--line-raised);
+}
+.replay-line-tick.is-round {
+  top: -7px;
+  height: 17px;
+}
+.replay-line-knob {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  background: var(--text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cyan) 35%, transparent);
+}
+.replay-line-marks {
+  position: relative;
+  height: 10px;
+}
+.replay-line-mark {
+  position: absolute;
+  top: 1px;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%);
+}
+.replay-line-mark.is-damage {
+  background: var(--caution);
+}
+.replay-line-mark.is-heal {
+  background: var(--cyan);
+}
+.replay-line-mark.is-down {
+  background: var(--danger-text);
 }
 .replay-position {
   font-family: var(--font-numeric);
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
-  opacity: 0.8;
+  color: var(--text-dim);
   white-space: nowrap;
 }
 .replay-step-label {
@@ -446,4 +528,12 @@
 .replay-turn small {
   color: var(--text-muted);
   font-size: 12px;
+}
+
+/* A phone wraps the transport: the buttons, then the line at full width, then the count. */
+@media (max-width: 760px) {
+  .replay-line {
+    order: 3;
+    flex-basis: 100%;
+  }
 }

@@ -53,6 +53,14 @@ function GmViewer({
   const { toast } = useToast();
 
   const steps = useMemo(() => (document ? stepsOf(document) : []), [document]);
+  const line = useMemo(
+    () =>
+      steps.map((entry) => ({
+        round: entry.state.combat.round,
+        health: new Map(entry.state.actors.map((actor) => [actor.id, { current: actor.hp.current }] as const))
+      })),
+    [steps]
+  );
   const playback = usePlayback(steps.length);
   const { index } = playback;
   const step = steps[index];
@@ -154,6 +162,7 @@ function GmViewer({
         index={index}
         count={steps.length}
         playing={playback.playing}
+        line={line}
         onMove={playback.move}
         onPlay={playback.toggle}
         onSeek={playback.seek}
@@ -241,7 +250,20 @@ function PlayerViewer({
 }: Readonly<{ token: string; archiveId: number; onBack: () => void }>) {
   const { document, error } = useArchiveDocument<PlayerReplayDocument>(archiveId, token);
   const name = useReplayName(archiveId, token);
-  const turns = document?.turns ?? [];
+  const turns = useMemo(() => document?.turns ?? [], [document]);
+  const line = useMemo(
+    () =>
+      turns.map((entry) => ({
+        round: entry.combat.round,
+        health: new Map(
+          entry.actors.map(
+            (actor) =>
+              [actor.id, actor.hp.kind === "band" ? { band: actor.hp.band } : { current: actor.hp.current }] as const
+          )
+        )
+      })),
+    [turns]
+  );
   const playback = usePlayback(turns.length);
   const turn = turns[playback.index];
 
@@ -293,6 +315,7 @@ function PlayerViewer({
         index={playback.index}
         count={turns.length}
         playing={playback.playing}
+        line={line}
         onMove={playback.move}
         onPlay={playback.toggle}
         onSeek={playback.seek}

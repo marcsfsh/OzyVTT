@@ -25,6 +25,7 @@ import { touchMoveCancelled } from "../test/drag-surface";
 import { AtlasMap } from "./codex/atlas/AtlasMap";
 import { TemplateEditor } from "./codex/templates/TemplateEditor";
 import { useCalibration } from "./maps/useCalibration";
+import { Transport } from "./replay/ReplayStage";
 import { MapTokenTray } from "./scene/MapTokenTray";
 import { ScenesContext, type ScenesContextValue } from "./scenes/context";
 import { SceneList } from "./scenes/SceneList";
@@ -148,6 +149,23 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
     )
   },
   { selector: ".viewer-stage", ui: () => <MapStage presentation={presentation} /> },
+  {
+    selector: ".replay-line",
+    ui: () => (
+      <Transport
+        index={0}
+        count={2}
+        playing={false}
+        line={[
+          { round: 1, health: new Map() },
+          { round: 1, health: new Map() }
+        ]}
+        onMove={() => {}}
+        onPlay={() => {}}
+        onSeek={() => {}}
+      />
+    )
+  },
   {
     selector: ".screen-ladder-resize",
     ui: () => <ScreenLadder presentation={presentation} onResize={() => {}} />

@@ -95,4 +95,30 @@ describe("the replay viewer's header", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Round 2/ }));
     expect(screen.getByRole("button", { name: /^Round 2/ })).toHaveAttribute("aria-current", "step");
   });
+
+  it("goes to a turn pressed on the line, and counts it", async () => {
+    const turns = [0, 1, 2].map((index) => ({
+      ...gmDocument.turns[0],
+      index,
+      label: `Turn ${index + 1}`,
+      revision: index + 1
+    }));
+    serve([summary()], { ...gmDocument, turnCount: 3, turns });
+    render(<ReplayViewer role="gm" token="gm" archiveId={7} onBack={() => {}} />, { wrapper: ToastProvider });
+    const line = await screen.findByRole("slider", { name: "Turn position" });
+    expect(line).toHaveAttribute("aria-valuetext", "Turn 01 of 3");
+    line.getBoundingClientRect = () => ({
+      left: 0,
+      width: 200,
+      top: 0,
+      height: 44,
+      right: 200,
+      bottom: 44,
+      x: 0,
+      y: 0,
+      toJSON: () => ({})
+    });
+    fireEvent.pointerDown(line, { clientX: 190, pointerId: 1 });
+    expect(line).toHaveAttribute("aria-valuetext", "Turn 03 of 3");
+  });
 });

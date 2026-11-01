@@ -1,19 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import {
-  Button,
   IconChevronLeft,
+  IconButton,
   IconChevronRight,
+  IconPause,
   IconPlay,
   Roll,
   SegmentedControl,
   burst,
   canMove,
   comet,
+  useDragSurface,
   useOnChange
 } from "@vtt/ui";
 import { useAuthorizedMapImage } from "../scene/mapImage";
 import { TokenStatusBadges } from "../scene/tokenGlyph";
 import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
+import { lineMarks, lineRounds, turnAt, turnCount, type LineTurn } from "./line";
 import { readArchive } from "./replays";
 import "./replay.css";
 
@@ -160,11 +163,16 @@ export function Stage({
   );
 }
 
-/** Prev / play / next / scrubber: one control group, shared by both viewers. */
+/**
+ * Previous, Play and Next as icon buttons, then the line of rounds, then the count. The line is a section a round with a
+ * tick a turn, the watched part lit up to the knob, and marks under it for damage, healing and a creature at 0.
+ * Pressing or dragging on it goes to the nearest turn; the frame's arrow keys step through it as before.
+ */
 export function Transport({
   index,
   count,
   playing,
+  line,
   onMove,
   onPlay,
   onSeek
@@ -172,54 +180,101 @@ export function Transport({
   index: number;
   count: number;
   playing: boolean;
+  /** Each turn's round and health, for the line's sections and marks. */
+  line: readonly LineTurn[];
   onMove: (delta: number) => void;
   onPlay: () => void;
   onSeek: (index: number) => void;
 }>) {
-  // Moving to another turn runs a comet along the scrubber to it, with a burst where it lands (ADR-0045).
   const transport = useRef<HTMLDivElement>(null);
+  const rail = useRef<HTMLDivElement>(null);
+  // Dragging on the line seeks, so a finger's movement there never becomes a scroll or a fling.
+  const lineSurface = useDragSurface<HTMLDivElement>();
+  const rounds = useMemo(() => lineRounds(line), [line]);
+  const marks = useMemo(() => lineMarks(line), [line]);
+  const at = (turn: number) => (count < 2 ? 0 : (turn / (count - 1)) * 100);
+  // Moving to another turn runs a comet along the line to it, with a burst where it lands (ADR-0045).
   useOnChange(index, (before, now) => {
     const el = transport.current;
-    const scrubber = el?.querySelector<HTMLInputElement>("input[type='range']");
-    if (!el || !scrubber || count < 2 || !canMove()) return;
-    const at = (turn: number) => scrubber.offsetLeft + (scrubber.offsetWidth * turn) / (count - 1);
-    const line = scrubber.offsetTop + scrubber.offsetHeight / 2;
-    comet(el, { from: at(before), to: at(now), line, thick: 3, delay: 0, dur: 240 });
-    burst(el, { at: at(now), line, delay: 220, w: 60, h: 8 });
+    const bar = rail.current;
+    if (!el || !bar || count < 2 || !canMove()) return;
+    const x = (turn: number) => bar.offsetLeft + (bar.offsetWidth * turn) / (count - 1);
+    const y = bar.offsetTop + bar.offsetHeight / 2;
+    comet(el, { from: x(before), to: x(now), line: y, thick: 3, delay: 0, dur: 240 });
+    burst(el, { at: x(now), line: y, delay: 220, w: 60, h: 8 });
   });
+  const seekFrom = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (box.width <= 0) return;
+    const turn = turnAt((event.clientX - box.left) / box.width, count);
+    if (turn !== index) onSeek(turn);
+  };
   return (
     <div ref={transport} className="replay-transport" role="group" aria-label="Replay controls">
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => onMove(-1)}
-        disabled={index === 0}
-        aria-label="Previous turn"
-      >
-        <IconChevronLeft />
-      </Button>
-      <Button variant="secondary" size="sm" onClick={onPlay} aria-label={playing ? "Pause" : "Play"}>
-        {playing ? "Pause" : <IconPlay />}
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => onMove(1)}
-        disabled={index >= count - 1}
-        aria-label="Next turn"
-      >
-        <IconChevronRight />
-      </Button>
-      <input
-        type="range"
-        min={0}
-        max={Math.max(0, count - 1)}
-        value={index}
-        onChange={(event) => onSeek(Number(event.target.value))}
+      <span className="replay-transport-buttons">
+        <IconButton label="Previous turn" onClick={() => onMove(-1)} disabled={index === 0}>
+          <IconChevronLeft />
+        </IconButton>
+        <IconButton label={playing ? "Pause" : "Play"} onClick={onPlay}>
+          {playing ? <IconPause /> : <IconPlay />}
+        </IconButton>
+        <IconButton label="Next turn" onClick={() => onMove(1)} disabled={index >= count - 1}>
+          <IconChevronRight />
+        </IconButton>
+      </span>
+      <div
+        ref={lineSurface}
+        className="replay-line tap-target"
+        role="slider"
+        tabIndex={0}
         aria-label="Turn position"
-      />
+        aria-valuemin={1}
+        aria-valuemax={count}
+        aria-valuenow={index + 1}
+        aria-valuetext={turnCount(index, count)}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          seekFrom(event);
+        }}
+        onPointerMove={(event) => {
+          if (event.currentTarget.hasPointerCapture?.(event.pointerId)) seekFrom(event);
+        }}
+      >
+        <div className="replay-line-rounds" aria-hidden="true">
+          {rounds.map((round) => (
+            <span key={round.start} className="replay-line-round" style={{ flexGrow: round.length }}>
+              R{round.round}
+            </span>
+          ))}
+        </div>
+        <div ref={rail} className="replay-line-rail" aria-hidden="true">
+          <span className="replay-line-watched" style={{ width: `${at(index)}%` }} />
+          {line.map((_, turn) => (
+            <span
+              key={turn}
+              className={
+                rounds.some((round) => round.start === turn) ? "replay-line-tick is-round" : "replay-line-tick"
+              }
+              style={{ left: `${at(turn)}%` }}
+            />
+          ))}
+          <span className="replay-line-knob" style={{ left: `${at(index)}%` }} />
+        </div>
+        <div className="replay-line-marks" aria-hidden="true">
+          {marks.map((mark, turn) =>
+            mark ? (
+              <span
+                key={turn}
+                className={`replay-line-mark is-${mark}`}
+                data-mark={mark}
+                style={{ left: `${at(turn)}%` }}
+              />
+            ) : null
+          )}
+        </div>
+      </div>
       <span className="replay-position tabular">
-        <Roll value={`${index + 1} / ${count}`} />
+        <Roll value={turnCount(index, count)} />
       </span>
     </div>
   );
