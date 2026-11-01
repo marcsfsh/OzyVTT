@@ -1,13 +1,13 @@
 import { useMemo, useRef } from "react";
 import type { GmView } from "@vtt/domain";
-import { Button, Combobox, IconButton, IconMap, IconPlus, IconScene, Kbd, Tabs, cx } from "@vtt/ui";
+import { Button, Combobox, IconButton, IconMap, IconPlus, IconScene, Kbd, cx } from "@vtt/ui";
 import { currentDevice, shortcutLabel } from "../lib/shortcut";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { useMapLibrary, type MapAsset } from "../maps/map-catalog";
 import { navigate, useRoute } from "../router";
 import { PrepBarSlot } from "../shell/AppBar";
 import { ScenesContext, useSceneLinks, type ScenesContextValue } from "./context";
-import { SCENES_PATHS, pathForMap, pathForScene, scenesViewOf, sectionOf, type ScenesSection } from "./routes";
+import { SCENES_PATHS, pathForMap, pathForScene, scenesViewOf, sectionOf } from "./routes";
 import { SceneList } from "./SceneList";
 import { SceneDocument } from "./SceneDocument";
 import { SceneEditor } from "./SceneEditor";
@@ -16,30 +16,6 @@ import { MapDocument } from "../maps/MapDocument";
 import { MapEditor } from "../maps/MapEditor";
 import "./scenes.css";
 import { BarPrimary } from "../shell/SectionBar";
-
-/** The front page's two views, in the order they are drawn. */
-const LIST_TABS: ReadonlyArray<{ id: ScenesSection; label: string; path: string }> = [
-  { id: "maps", label: "Maps", path: SCENES_PATHS.maps },
-  { id: "scenes", label: "Encounters", path: SCENES_PATHS.list }
-];
-
-/**
- * Prep's front page above its lists: the Maps and Encounters views. New map and New encounter sit in Prep's bar, the
- * one primary in a fixed place (theme spec rule 2). The lists under it keep their own filters and sort.
- */
-function ListHead({ section }: Readonly<{ section: ScenesSection }>) {
-  return (
-    <div className="sc-front-head">
-      <Tabs
-        ariaLabel="Maps and encounters"
-        className="sc-front-tabs"
-        activeId={section}
-        onChange={(id) => void navigate(LIST_TABS.find((tab) => tab.id === id)!.path)}
-        tabs={LIST_TABS.map((tab) => ({ id: tab.id, label: tab.label }))}
-      />
-    </div>
-  );
-}
 
 const PHONE_QUERY = "(max-width: 760px)";
 const NARROW_QUERY = "(max-width: 979px)";
@@ -76,9 +52,9 @@ function FindBox({ state, maps }: Readonly<{ state: GmView; maps: readonly MapAs
 }
 
 /**
- * Prep's Scenes and Maps pages: the view the address names under Prep's section bar, whose right end holds the
- * find box (and a secondary New while a record is open). The lists open under New map, New scene and their tabs. A scene or map that is open takes the pane
- * as one document; on a phone its workbench fills the pane and Back returns to the list.
+ * Prep's Encounters and Maps pages: the view the address names under Prep's section bar, whose right end holds the
+ * find box and New encounter, the Cup on the lists and a Base line control on a record. An encounter or map that is
+ * open takes the pane as one document; on a phone its workbench fills the pane and Back returns to the list.
  */
 export function ScenesShell({
   state,
@@ -141,12 +117,7 @@ export function ScenesShell({
   const content = (() => {
     switch (view.view) {
       case "scenes":
-        return (
-          <>
-            <ListHead section="scenes" />
-            <SceneList />
-          </>
-        );
+        return <SceneList />;
       case "scene":
         return view.step === null && view.encounterId ? (
           <SceneDocument key={view.encounterId} encounterId={view.encounterId} />
@@ -154,12 +125,7 @@ export function ScenesShell({
           <SceneEditor key={view.encounterId ?? "new"} encounterId={view.encounterId} step={view.step ?? "map"} />
         );
       case "maps":
-        return (
-          <>
-            <ListHead section="maps" />
-            <MapList />
-          </>
-        );
+        return <MapList />;
       case "map":
         return view.step === null && view.mapId ? (
           <MapDocument key={view.mapId} mapId={view.mapId} />
@@ -175,31 +141,34 @@ export function ScenesShell({
         {/* Prep's section bar names the page; its right end holds this page's views, the find box and the primary. */}
         <PrepBarSlot>
           {!phone && <FindBox state={state} maps={library.maps} />}
-          {listing ? (
-            phone ? (
-              // A phone's header has room for two icons: New map, then the primary as its icon.
-              <>
+          {/* One Cup in Prep's bar (Prep rule 3.1): New encounter on the lists, stepping down on a record. Maps and
+              Encounters are pages in the bar (rule 3.6); New map sits in the shelf's toolbar, and in the bar on Maps. */}
+          {phone ? (
+            <>
+              {section === "maps" && (
                 <IconButton label="New map" onClick={() => void navigate(SCENES_PATHS.newMap)}>
                   <IconMap />
                 </IconButton>
-                <IconButton label="New encounter" onClick={() => void navigate(SCENES_PATHS.newScene)}>
-                  <IconPlus />
-                </IconButton>
-              </>
-            ) : (
-              <>
+              )}
+              <IconButton label="New encounter" onClick={() => void navigate(SCENES_PATHS.newScene)}>
+                <IconPlus />
+              </IconButton>
+            </>
+          ) : (
+            <>
+              {view.view === "maps" && (
                 <Button variant="secondary" size="sm" onClick={() => void navigate(SCENES_PATHS.newMap)}>
                   <IconPlus /> New map
                 </Button>
+              )}
+              {listing ? (
                 <BarPrimary label="New encounter" onClick={() => void navigate(SCENES_PATHS.newScene)} />
-              </>
-            )
-          ) : phone ? (
-            <IconButton label={primary.label} onClick={() => void navigate(primary.path)}>
-              <IconPlus />
-            </IconButton>
-          ) : (
-            <BarPrimary label={primary.label} onClick={() => void navigate(primary.path)} />
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => void navigate(primary.path)}>
+                  <IconPlus /> {primary.label}
+                </Button>
+              )}
+            </>
           )}
         </PrepBarSlot>
         <div className="sc-content">{content}</div>

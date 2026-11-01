@@ -171,38 +171,57 @@
   width: 6rem;
   height: 4.25rem;
 }
-/* A scene's state is a chip: a tinted strip with a 3px bar in its tone. Live carries the sun's glyph and the magenta
-   that means "this is now". */
+/* An encounter's one state tag (Prep rule 3.3): VT323 in a 22px box; only Live is lit, and Draft has a dashed edge. */
 .sc-state {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: 1.5rem;
-  padding: 0 0.45rem;
-  border-left: 3px solid var(--line-strong);
-  background: var(--surface-2);
-  color: var(--text-muted);
-  font: 600 var(--fs-2xs) / 1 var(--font-label);
-  letter-spacing: 0.04em;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--text);
+  font: 400 15px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
 }
-.sc-state svg {
-  width: 0.9em;
-  height: 0.9em;
-}
 .sc-state.is-live {
-  border-left-color: var(--magenta);
-  background: color-mix(in srgb, var(--magenta) 14%, var(--surface-2));
+  border-color: var(--magenta);
+  background: color-mix(in srgb, var(--magenta) 24%, var(--bg));
   color: var(--magenta-text);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--magenta) 45%, transparent);
 }
-.sc-state.is-parked {
-  border-left-color: var(--caution);
+.sc-state.is-draft {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+.sc-state.is-ended {
+  color: var(--text-dim);
+}
+/* Ready in one set of words (Prep rule 3.2): a cyan lamp and Ready to go, or what is missing in amber. */
+.sc-ready-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+}
+.sc-ready-lamp {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--cyan);
+  box-shadow: var(--glow-on);
+}
+.sc-ready-line.is-ready {
+  color: var(--text-dim);
+}
+.sc-ready-line.is-missing {
   color: var(--caution-text);
 }
-.sc-state.is-replay {
-  border-left-color: var(--info);
-  color: var(--indigo-text);
+.sc-ready-line.is-missing .sc-ready-lamp {
+  background: var(--caution);
+  box-shadow: none;
 }
 .sc-who {
   display: inline-flex;
@@ -400,5 +419,153 @@
   .sc-list-body,
   .sc-sub {
     padding-inline: var(--space-3);
+  }
+}
+
+/* ----- The shelf (Prep frame 2.1) ----- */
+.sc-statechips {
+  display: inline-flex;
+  gap: 2px;
+}
+.sc-statechip {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  box-shadow: var(--base-line);
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1 var(--font-label);
+  cursor: pointer;
+}
+.sc-statechip:hover,
+.sc-statechip:active {
+  color: var(--text);
+  box-shadow: var(--base-line-hover);
+}
+.sc-statechip.is-on {
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+}
+/* Cards from 270px, 16px apart, four to a row at 1280px; two on a phone, 10px apart. */
+.sc-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: var(--space-4);
+  list-style: none;
+}
+.sc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--surface-1), var(--bg));
+}
+.sc-card:hover,
+.sc-card:focus-within {
+  border-color: var(--rim-color-hi);
+}
+.sc-card.is-dragging {
+  opacity: 0.6;
+}
+/* The whole card opens its encounter; the tools sit over it. */
+.sc-card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.sc-card-pic {
+  position: relative;
+  display: block;
+}
+/* The map leads (Prep rule 3.4): 16 by 10, never stretched. */
+.sc-card-pic .sc-thumb {
+  display: grid;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+.sc-card-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+.sc-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  min-width: 0;
+}
+.sc-card-name {
+  overflow: hidden;
+  color: var(--text);
+  font: 600 15px / 1.25 var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-card-map {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.sc-card-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sc-card-faces {
+  display: inline-flex;
+}
+.sc-card-face {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: -1px;
+  border: 1px solid color-mix(in srgb, var(--cyan) 60%, transparent);
+  color: var(--text);
+  font: 600 11px / 1 var(--font-label);
+}
+.sc-card-monster {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--text);
+  font: 600 12px / 1 var(--font-label);
+}
+.sc-card-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+.sc-card:hover .sc-card-tools,
+.sc-card:focus-within .sc-card-tools {
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .sc-card-tools {
+    opacity: 1;
+  }
+}
+@media (max-width: 760px) {
+  .sc-shelf {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: var(--space-3);
   }
 }

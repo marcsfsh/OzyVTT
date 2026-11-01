@@ -78,8 +78,7 @@
 
 /* ---- Card gallery (scene library, map library: any browse-and-pick grid of thumbnail cards) ----
    Cards carry explicit actions in a trailing `.nh-card-actions` row; the status badge and ⋯ tools menu layer
-   over the thumb. For a whole-card picker, add a stretched `.nh-card-open` button and `.is-interactive`. Only
-   the live card glows (magenta); a privately staged card gets a quiet cyan edge. */
+   over the thumb. Only the live card glows (magenta); a privately staged card gets a quiet cyan edge. */
 .nh-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
@@ -89,8 +88,8 @@
   list-style: none;
 }
 /* The card's plate and edge are painted on a backing layer, so a state repaints one knob (`--card-edge`) and
-   glows through a filter on the layer without reflowing the card's hit areas (`.nh-card-open`, `.nh-card-tools`,
-   the `.nh-card--new` button). A 1px transparent border avoids reflow and the layer covers the border box
+   glows through a filter on the layer without reflowing the card's hit areas (`.nh-card-tools`, the
+   `.nh-card--new` button). A 1px transparent border avoids reflow and the layer covers the border box
    (`inset: -1px`). */
 .nh-card {
   position: relative;

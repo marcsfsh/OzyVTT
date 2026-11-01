@@ -64,23 +64,21 @@ afterEach(() => {
   act(() => armPlacement(null));
 });
 
-describe("the Encounters front page", () => {
-  it("leads with New map and New encounter, then the Maps and Encounters views", async () => {
+const card = (name: string) => screen.getByRole("listitem", { name });
+const cardNames = async () =>
+  within(await screen.findByRole("list", { name: "Encounters" }))
+    .getAllByRole("listitem")
+    .map((item) => item.getAttribute("aria-label"));
+
+describe("the Encounters shelf", () => {
+  it("has no Maps and Encounters toggle: they are Prep's pages, with New encounter as the bar's Cup", async () => {
     const user = userEvent.setup();
     renderTab("/encounters");
-    const views = await screen.findByRole("tablist", { name: "Maps and encounters" });
-    expect(
-      within(views)
-        .getAllByRole("tab")
-        .map((tab) => tab.textContent)
-    ).toEqual(["Maps", "Encounters"]);
-    expect(within(views).getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
-    expect(await screen.findByRole("table")).toBeInTheDocument();
-    // Nothing of the old front page is left.
-    expect(screen.queryByRole("region", { name: /^Needs you/ })).toBeNull();
-    expect(screen.queryByRole("region", { name: "Recent changes" })).toBeNull();
-    await user.click(within(views).getByRole("tab", { name: "Maps" }));
-    expect(here()).toBe("/encounters/maps");
+    expect(await screen.findByRole("list", { name: "Encounters" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Maps and encounters" })).toBeNull();
+    const pages = within(screen.getByRole("tablist", { name: "Prep pages" }));
+    expect(pages.getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
+    expect(pages.getByRole("tab", { name: "Maps" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "New map" }));
     expect(here()).toBe("/encounters/maps/new");
     cleanup();
@@ -96,44 +94,36 @@ describe("the Encounters front page", () => {
       combat: { ...CHASE.combat, active: true, round: 1, turnActorId: CHASE.combat.initiative[0]!.actorId }
     };
     const campDone = { ...CAMP, endedAt: Date.parse("2026-10-18T12:00:00.000Z") };
-    const names = async () =>
-      within(await screen.findByRole("table"))
-        .getAllByRole("row")
-        .slice(1)
-        .map((row) => row.querySelector("b")?.textContent);
     const first = renderTab("/encounters?sort=attention:asc");
     // The chase has no grid and two tokens in the tray: the most to do.
-    expect((await names())[0]).toBe("Tunnel chase");
+    expect((await cardNames())[0]).toBe("Tunnel chase");
     first.unmount();
     renderTab("/encounters?sort=progress:asc", gmView([AMBUSH, chaseRunning, campDone]));
-    expect(await names()).toEqual(["Crypt ambush", "Tunnel chase", "Camp at the ford"]);
-    const table = await screen.findByRole("table");
-    expect(within(table).getAllByText("Not started").length).toBeGreaterThan(0);
-    expect(within(table).getByText("In progress")).toBeInTheDocument();
-    expect(within(table).getByText("Completed")).toBeInTheDocument();
+    expect(await cardNames()).toEqual(["Crypt ambush", "Tunnel chase", "Camp at the ford"]);
+    expect(card("Tunnel chase")).toHaveTextContent("Encounter parked");
+    expect(card("Camp at the ford")).toHaveTextContent("Ended");
   });
-});
 
-describe("the encounters table", () => {
-  it("lists every encounter with its state, map, tokens, light and Codex session", async () => {
+  it("shows each encounter as a card: its state tag, map, who is in it and whether it is ready", async () => {
     renderTab("/encounters/list");
-    const table = await screen.findByRole("table");
-    await waitFor(() => expect(within(table).getByText("Session 6")).toBeInTheDocument());
-    const ambush = within(table).getByRole("button", { name: "Crypt ambush" }).closest("tr")!;
-    expect(ambush).toHaveTextContent("Prepared");
+    await screen.findByRole("list", { name: "Encounters" });
+    const ambush = card("Crypt ambush");
     expect(ambush).toHaveTextContent("Sunken crypt");
-    expect(ambush).toHaveTextContent("4 tokens · 1 in the tray");
-    expect(ambush).toHaveTextContent("Vision on · dim · 1 wall · 1 door");
+    // One token waits in the tray, so the ambush is a Draft until it is placed.
+    expect(ambush).toHaveTextContent("Draft");
+    expect(ambush).toHaveTextContent("1 token waits in the tray");
+    expect(card("Tunnel chase")).toHaveTextContent("No grid yet");
   });
 
   it("filters from the flyout and keeps the filters in the address", async () => {
     const user = userEvent.setup();
     renderTab("/encounters/list");
-    await screen.findByText("Session 6");
+    await screen.findByRole("list", { name: "Encounters" });
+    await waitFor(() => expect(read).toHaveBeenCalled());
     await user.click(screen.getByRole("button", { name: "Filters" }));
     const flyout = screen.getByRole("complementary", { name: "Filter encounters" });
     await user.click(within(flyout).getByRole("button", { name: "Staged in the Codex" }));
-    expect(screen.getByText("1 of 3 encounters")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("1 of 3 encounters")).toBeInTheDocument());
     expect(new URLSearchParams(window.location.search).get("codex")).toBe("linked");
     expect(screen.getByRole("button", { name: "Filters · 1" })).toBeInTheDocument();
 
@@ -145,17 +135,26 @@ describe("the encounters table", () => {
   it("reads its filters back from a link", async () => {
     renderTab("/encounters/list?tray=1");
     expect(await screen.findByText("2 of 3 encounters")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Camp at the ford" })).toBeNull();
+    expect(screen.queryByRole("listitem", { name: "Camp at the ford" })).toBeNull();
   });
 
-  it("shows only the states ticked in the State dropdown", async () => {
+  it("shows only the state its chip picks, and adds Live while an encounter is live", async () => {
     const user = userEvent.setup();
     renderTab("/encounters/list", gmView(undefined, IDS.ambush));
-    await user.click(await screen.findByRole("button", { name: "State: all 4" }));
-    await user.click(screen.getByRole("checkbox", { name: "Prepared" }));
-    expect(screen.getByRole("button", { name: "State: Live, Encounter parked, Replay" })).toBeInTheDocument();
+    const chips = within(await screen.findByRole("group", { name: "State" }));
+    expect(chips.getAllByRole("button").map((chip) => chip.textContent)).toEqual([
+      "All",
+      "Draft",
+      "Prepared",
+      "Ended",
+      "Live"
+    ]);
+    await user.click(chips.getByRole("button", { name: "Live" }));
+    expect(new URLSearchParams(window.location.search).get("tag")).toBe("live");
     expect(screen.getByText("1 of 3 encounters")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Crypt ambush" })).toBeInTheDocument();
+    expect(await cardNames()).toEqual(["Crypt ambush"]);
+    await user.click(chips.getByRole("button", { name: "All" }));
+    expect(screen.getByText("3 encounters")).toBeInTheDocument();
   });
 
   it("sorts by several columns from the Sort dialog", async () => {
@@ -168,18 +167,42 @@ describe("the encounters table", () => {
     await user.click(dialog.getByRole("button", { name: "Sort" }));
     expect(screen.getByRole("button", { name: "Sort: Name, then Your order" })).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("sort")).toBe("name:asc,order:asc");
-    const names = within(screen.getByRole("table"))
-      .getAllByRole("button")
-      .map((button) => button.textContent)
-      .filter((text) => ["Crypt ambush", "Tunnel chase", "Camp at the ford"].includes(text ?? ""));
-    expect(names).toEqual(["Camp at the ford", "Crypt ambush", "Tunnel chase"]);
+    expect(await cardNames()).toEqual(["Camp at the ford", "Crypt ambush", "Tunnel chase"]);
   });
 
-  it("opens an encounter from its row", async () => {
+  it("opens an encounter from its card, and keeps the rest in the card's menu", async () => {
     const user = userEvent.setup();
     renderTab("/encounters/list");
-    await user.click(await screen.findByRole("button", { name: "Tunnel chase" }));
+    await screen.findByRole("list", { name: "Encounters" });
+    await user.click(within(card("Tunnel chase")).getByLabelText("Tunnel chase actions"));
+    const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(items).toEqual(expect.arrayContaining(["Make live", "Rename", "Duplicate", "Delete encounter"]));
+    expect(items).not.toContain("Edit its steps");
+    await user.keyboard("{Escape}");
+    await user.click(within(card("Tunnel chase")).getByRole("button", { name: "Open Tunnel chase" }));
     expect(here()).toBe(`/encounters/${IDS.chase}`);
+  });
+
+  it("drags a card to reorder in Your order, sending the new order", async () => {
+    renderTab("/encounters/list");
+    await screen.findByRole("list", { name: "Encounters" });
+    const rects: Record<string, DOMRect> = {
+      [IDS.ambush]: new DOMRect(0, 0, 270, 200),
+      [IDS.chase]: new DOMRect(290, 0, 270, 200),
+      [IDS.camp]: new DOMRect(580, 0, 270, 200)
+    };
+    for (const item of document.querySelectorAll<HTMLElement>("[data-scene-id]"))
+      item.getBoundingClientRect = () => rects[item.dataset.sceneId!]!;
+    const grip = screen.getByRole("button", { name: "Drag to reorder Camp at the ford" });
+    act(() => {
+      grip.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+    });
+    act(() => {
+      window.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 10 }));
+      window.dispatchEvent(new PointerEvent("pointerup", { clientX: 10, clientY: 10 }));
+    });
+    await waitFor(() => expect(commands("encounter:reorder")).toHaveLength(1));
+    expect(commands("encounter:reorder")[0]).toEqual({ order: [IDS.camp, IDS.ambush, IDS.chase] });
   });
 });
 
@@ -354,7 +377,7 @@ describe("making an encounter as steps", () => {
 });
 
 describe("on a phone", () => {
-  it("lists Prep's pages as the strip under the header, with New map and New encounter on the page", async () => {
+  it("lists Prep's pages as the strip under the header, with New encounter as its plus and two cards to a row", async () => {
     setViewport(390);
     renderTab("/encounters/list");
     const pages = await screen.findByRole("tablist", { name: "Prep pages" });
@@ -364,10 +387,9 @@ describe("on a phone", () => {
         .map((tab) => tab.textContent)
     ).toEqual(["Encounters", "Party", "Maps", "Tokens", "Sound", "Replays"]);
     expect(within(pages).getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
-    const views = screen.getByRole("tablist", { name: "Maps and encounters" });
-    expect(within(views).getByRole("tab", { name: "Encounters" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tablist", { name: "Maps and encounters" })).toBeNull();
     expect(screen.getByRole("button", { name: "New encounter" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New map" })).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Encounters" })).toBeInTheDocument();
   });
 
   it("runs the steps as a strip and keeps the map in a bar that opens it full screen", async () => {

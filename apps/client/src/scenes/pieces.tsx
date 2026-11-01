@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Badge, Button, Drawer, IconEye, IconEyeOff, IconPlay, IconScene, cx } from "@vtt/ui";
+import { Badge, Button, Drawer, IconEye, IconEyeOff, IconScene, cx } from "@vtt/ui";
 import { useCachedMapThumbnail } from "../scene/mapImage";
 import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS } from "./routes";
-import { tokensLine, factsOf, STATE_LABEL, type SceneFacts } from "./sceneFacts";
+import { tokensLine, factsOf, STATE_LABEL } from "./sceneFacts";
+import { STATE_TAG_LABEL, type StateTag } from "./stateTag";
 
 /** A scene's map art, cover-cropped; a glyph while it loads or when it cannot be drawn. */
 export function MapThumb({ mapAssetId, className }: Readonly<{ mapAssetId: string; className?: string }>) {
@@ -18,12 +19,17 @@ export function MapThumb({ mapAssetId, className }: Readonly<{ mapAssetId: strin
   );
 }
 
-/** The scene's state as a chip: Live in the sun's tone, the rest quiet. */
-export function StateChip({ facts }: Readonly<{ facts: SceneFacts }>) {
+/** The encounter's one state tag (Prep rule 3.3): VT323 in a 22px box; only Live is lit, and Draft has a dashed edge. */
+export function StateChip({ tag, className }: Readonly<{ tag: StateTag; className?: string }>) {
+  return <span className={cx("sc-state", `is-${tag}`, className)}>{STATE_TAG_LABEL[tag]}</span>;
+}
+
+/** Ready in one set of words (Prep rule 3.2): a cyan lamp and Ready to go, or what is missing in amber. */
+export function ReadyLine({ ready, text }: Readonly<{ ready: boolean; text: string }>) {
   return (
-    <span className={cx("sc-state", `is-${facts.state}`)}>
-      {facts.live && <IconPlay />}
-      {STATE_LABEL[facts.state]}
+    <span className={cx("sc-ready-line", ready ? "is-ready" : "is-missing")}>
+      <span className="sc-ready-lamp" aria-hidden="true" />
+      {text}
     </span>
   );
 }

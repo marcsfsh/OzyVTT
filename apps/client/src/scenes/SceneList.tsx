@@ -5,12 +5,12 @@ import {
   IconChevronRight,
   IconCopy,
   IconDrag,
+  IconMore,
   IconPencil,
   IconPlay,
   IconTrash,
   Menu,
   MenuItem,
-  cx,
   useDragSurface,
   EmptyState
 } from "@vtt/ui";
@@ -19,16 +19,9 @@ import { useSoundBoard } from "../sound/sound-data";
 import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS } from "./routes";
 import { useSceneActions } from "./sceneActions";
-import {
-  tokensLine,
-  factsOf,
-  lightLine,
-  modifiedAt,
-  PROGRESS_LABEL,
-  STATE_LABEL,
-  whenLabel,
-  type SceneFacts
-} from "./sceneFacts";
+import { factsOf, readinessOf, type SceneFacts } from "./sceneFacts";
+import { readyLineOf, SHELF_CHIPS, STATE_TAG_LABEL, stateTagOf, type StateTag } from "./stateTag";
+import { ShelfCard, whoIsIn } from "./SceneShelf";
 import {
   DEFAULT_SCENE_SORT,
   filterScenes,
@@ -41,12 +34,12 @@ import {
   setOrDelete
 } from "./scene-lists";
 import { SceneFiltersFlyout, SceneListToolbar } from "./SceneListToolbar";
-import { MapThumb, StateChip } from "./pieces";
 
 /**
- * Every scene as a table: the State dropdown, Filters as a flyout, and Sort over several columns, with the GM's own
- * order as the default. A row opens its scene; its menu holds the rest. On a phone each row keeps the two facts that
- * matter most, its state and its map.
+ * Prep's encounters as a shelf (Prep frame 2.1, ADR-0053): the toolbar with the state chips, Filters as a flyout, the
+ * sort with the GM's own order as the default and New map; then a card an encounter with its map as the picture, its
+ * state tag, who is in it and whether it is ready. A card opens its encounter; its menu holds the rest, and in Your
+ * order the cards drag to reorder.
  */
 export function SceneList() {
   const { state, maps, links, go, phone } = useScenes();
@@ -74,6 +67,15 @@ export function SceneList() {
     scenes.map((scene) => scene.id)
   );
   const inOrder = sort.length === 1 && sort[0]!.key === "order" && sort[0]!.direction === "asc";
+  // The state chips (Prep rule 3.3) filter by the tag each card shows, from the address's `tag`.
+  const tagOf = (row: SceneFacts) => stateTagOf(row, readinessOf(row, maps));
+  const chip = (query.get("tag") as StateTag | null) ?? null;
+  const present = new Set(all.map(tagOf));
+  const chips: readonly StateTag[] = [
+    ...SHELF_CHIPS,
+    ...(["live", "parked"] as const).filter((tag) => present.has(tag) || chip === tag)
+  ];
+  const tagged = chip ? shown.filter((row) => tagOf(row) === chip) : shown;
 
   // Reorder by dragging a row's grip (pointer and touch); the menu's Move earlier and later are the keyboard's way.
   const listRef = useRef<HTMLElement | null>(null);
@@ -86,10 +88,16 @@ export function SceneList() {
     if (!dragId) return;
     const onMove = (event: PointerEvent) => {
       const state = drag.current;
-      const over = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-scene-id]") ?? [])].find((row) => {
-        const rect = row.getBoundingClientRect();
-        return event.clientY >= rect.top && event.clientY <= rect.bottom;
-      })?.dataset.encounterId;
+      // The cards carry `data-scene-id`, read back as `dataset.sceneId` (the drag once read a name they never carried).
+      const over = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-scene-id]") ?? [])].find((card) => {
+        const rect = card.getBoundingClientRect();
+        return (
+          event.clientY >= rect.top &&
+          event.clientY <= rect.bottom &&
+          event.clientX >= rect.left &&
+          event.clientX <= rect.right
+        );
+      })?.dataset.sceneId;
       if (!state || !over || over === state.id) return;
       const next = state.order.filter((id) => id !== state.id);
       next.splice(next.indexOf(over), 0, state.id);
@@ -120,20 +128,17 @@ export function SceneList() {
     setDragId(encounterId);
     setDragOrder(order);
   };
-  const rows = dragOrder ? dragOrder.flatMap((id) => shown.filter((row) => row.scene.id === id)) : shown;
+  const rows = dragOrder ? dragOrder.flatMap((id) => tagged.filter((row) => row.scene.id === id)) : tagged;
 
   const rowMenu = (row: SceneFacts) => {
     const index = scenes.findIndex((scene) => scene.id === row.scene.id);
     return (
-      <Menu trigger="⋯" label={`${row.scene.name} actions`} align="end" hideCaret>
+      <Menu trigger={<IconMore />} icon label={`${row.scene.name} actions`} align="end">
         {!row.live && (
           <MenuItem icon={<IconPlay />} onClick={() => void actions.makeLive(row.scene)}>
             Make live
           </MenuItem>
         )}
-        <MenuItem icon={<IconPencil />} onClick={() => go(pathForScene(row.scene.id, "map"))}>
-          Edit its steps
-        </MenuItem>
         <MenuItem icon={<IconPencil />} onClick={() => void actions.rename(row.scene)}>
           Rename
         </MenuItem>
@@ -174,30 +179,21 @@ export function SceneList() {
         <IconDrag />
       </button>
     ) : null;
-  const sessionLine = (encounterId: string) => {
-    const link = links.get(encounterId);
-    if (!link || link.sessions.length + link.pins.length === 0) return "None";
-    const sessions = link.sessions.map((session) =>
-      session.sessionNumber === null ? "A session" : `Session ${session.sessionNumber}`
-    );
-    return [
-      ...sessions,
-      ...(link.pins.length > 0 ? [`${link.pins.length} pin${link.pins.length === 1 ? "" : "s"}`] : [])
-    ].join(" · ");
-  };
-
   return (
     <div className="sc-list frame-col">
-      {phone && <h2 className="sc-phone-title">Encounters</h2>}
       <SceneListToolbar
         filters={filters}
-        onFilters={(next) => replaceQuery((params) => writeSceneFilters(params, next))}
         sort={sort}
         onSort={(next) => replaceQuery((params) => setOrDelete(params, "sort", sortParam(next, DEFAULT_SCENE_SORT)))}
-        shown={shown.length}
+        shown={tagged.length}
         total={scenes.length}
         flyoutOpen={flyoutOpen}
         onFlyout={setFlyoutOpen}
+        chips={chips}
+        chip={chip}
+        onChip={(next) => replaceQuery((params) => setOrDelete(params, "tag", next))}
+        onNewMap={() => go(SCENES_PATHS.newMap)}
+        phone={phone}
       />
       <div className="sc-list-main">
         <SceneFiltersFlyout
@@ -215,76 +211,25 @@ export function SceneList() {
             </EmptyState>
           ) : shown.length === 0 ? (
             <p className="sc-hint sc-list-none">No encounter matches. Change the filters to see more.</p>
-          ) : phone ? (
-            <ul className="sc-rows" ref={(element) => void (listRef.current = element)}>
+          ) : rows.length === 0 ? (
+            <p className="sc-hint sc-list-none">No encounter is {STATE_TAG_LABEL[chip!].toLowerCase()} right now.</p>
+          ) : (
+            <ul className="sc-shelf" aria-label="Encounters" ref={(element) => void (listRef.current = element)}>
               {rows.map((row) => (
-                <li
+                <ShelfCard
                   key={row.scene.id}
-                  data-scene-id={row.scene.id}
-                  className={cx(dragId === row.scene.id && "is-dragging")}
-                >
-                  <button type="button" className="sc-row" onClick={() => go(pathForScene(row.scene.id))}>
-                    <MapThumb mapAssetId={row.scene.mapAssetId} />
-                    <span className="sc-row-main">
-                      <strong>{row.scene.name}</strong>
-                      <small>
-                        {STATE_LABEL[row.state]} · {PROGRESS_LABEL[row.progress]} ·{" "}
-                        {row.map?.name ?? "Map not in the library"}
-                      </small>
-                    </span>
-                  </button>
-                  {grip(row)}
-                  {rowMenu(row)}
-                </li>
+                  row={row}
+                  tag={tagOf(row)}
+                  ready={readyLineOf(row, maps)}
+                  who={whoIsIn(row, state.actors)}
+                  phone={phone}
+                  dragging={dragId === row.scene.id}
+                  grip={grip(row)}
+                  menu={rowMenu(row)}
+                  onOpen={() => go(pathForScene(row.scene.id))}
+                />
               ))}
             </ul>
-          ) : (
-            <table className="sc-table sc-scenes-table" ref={(element) => void (listRef.current = element)}>
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">State</th>
-                  <th scope="col">Progress</th>
-                  <th scope="col">Map</th>
-                  <th scope="col">Tokens</th>
-                  <th scope="col">Light</th>
-                  <th scope="col">Codex</th>
-                  <th scope="col">Modified</th>
-                  <th scope="col">
-                    <span className="nh-sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr
-                    key={row.scene.id}
-                    data-scene-id={row.scene.id}
-                    className={cx("sc-tr", row.live && "is-live", dragId === row.scene.id && "is-dragging")}
-                  >
-                    <td>
-                      <span className="sc-name-cell">
-                        {grip(row)}
-                        <button type="button" className="sc-rowlink" onClick={() => go(pathForScene(row.scene.id))}>
-                          <MapThumb mapAssetId={row.scene.mapAssetId} />
-                          <b>{row.scene.name}</b>
-                        </button>
-                      </span>
-                    </td>
-                    <td>
-                      <StateChip facts={row} />
-                    </td>
-                    <td>{PROGRESS_LABEL[row.progress]}</td>
-                    <td>{row.map?.name ?? "Not in the library"}</td>
-                    <td>{tokensLine(row)}</td>
-                    <td>{lightLine(row)}</td>
-                    <td>{sessionLine(row.scene.id)}</td>
-                    <td className="sc-col-date">{whenLabel(modifiedAt(row.scene))}</td>
-                    <td className="sc-col-menu">{rowMenu(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           )}
         </div>
       </div>

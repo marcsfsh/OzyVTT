@@ -24,8 +24,9 @@ import { pathForGmTab } from "../router";
 import { useScenes } from "./context";
 import { pathForScene, SCENES_PATHS, type SceneStep } from "./routes";
 import { useSceneActions } from "./sceneActions";
-import { factsOf, needsOf, type SceneFacts } from "./sceneFacts";
+import { factsOf, needsOf, type SceneFacts, readinessOf } from "./sceneFacts";
 import { StateChip } from "./pieces";
+import { stateTagOf } from "./stateTag";
 import { SceneEncounterTab } from "./SceneEncounterTab";
 import { SceneListColumn } from "./SceneListColumn";
 import { ScenePreview, type SeeAs } from "./ScenePreview";
@@ -100,7 +101,7 @@ export function SceneDocument({ encounterId }: Readonly<{ encounterId: string }>
       <IconButton label={`Rename ${scene.name}`} size="sm" onClick={() => void actions.rename(scene)}>
         <IconPencil />
       </IconButton>
-      <StateChip facts={facts} />
+      <StateChip tag={stateTagOf(facts, readinessOf(facts, maps))} />
       <span className="sc-grow" />
       {/* A phone has no room for the choice beside the name, so its views are in the menu. */}
       {!phone && (

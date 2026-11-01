@@ -1,13 +1,12 @@
-import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton, ListToolbar } from "@vtt/ui";
+import { Button, Eyebrow, FilterChips, FilterFlyout, FiltersButton, IconMap, ListToolbar, cx } from "@vtt/ui";
+import { STATE_TAG_LABEL, type StateTag } from "./stateTag";
 import type { MapAsset } from "../maps/map-catalog";
-import { ModifiedDropdown, OneChoice, SortButton, TickDropdown } from "./listTools";
-import { STATE_LABEL } from "./sceneFacts";
+import { ModifiedDropdown, OneChoice, SortButton } from "./listTools";
 import {
   activeFilterCount,
   NO_SCENE_FILTERS,
   SCENE_SORT_KEYS,
   SCENE_SORT_LABEL,
-  SCENE_STATES,
   type SceneFilters,
   type SceneSortKey,
   type SortLevel
@@ -16,28 +15,48 @@ import {
 export const SCENE_FILTERS_ID = "sc-scene-filters";
 
 /**
- * The Scenes table's toolbar: Filters, the State dropdown, the Modified range, how many rows show and Sort. The
- * dropdowns, the flyout and the Sort dialog come from `@vtt/ui`.
+ * The shelf's toolbar (Prep frame 2.1, theme rule 17): Filters and the state chips, then how many show, the sort and
+ * New map on a Base line. The flyout and the Sort dialog come from `@vtt/ui`.
  */
 export function SceneListToolbar({
   filters,
-  onFilters,
   sort,
   onSort,
   shown,
   total,
   flyoutOpen,
-  onFlyout
+  onFlyout,
+  chips,
+  chip,
+  onChip,
+  onNewMap,
+  phone
 }: Readonly<{
   filters: SceneFilters;
-  onFilters: (filters: SceneFilters) => void;
   sort: readonly SortLevel<SceneSortKey>[];
   onSort: (sort: readonly SortLevel<SceneSortKey>[]) => void;
   shown: number;
   total: number;
   flyoutOpen: boolean;
   onFlyout: (open: boolean) => void;
+  /** The state chips after All (Prep rule 3.3), and the one chosen; null is All. */
+  chips: readonly StateTag[];
+  chip: StateTag | null;
+  onChip: (chip: StateTag | null) => void;
+  onNewMap: () => void;
+  phone: boolean;
 }>) {
+  const chipButton = (value: StateTag | null, label: string) => (
+    <button
+      key={value ?? "all"}
+      type="button"
+      className={cx("sc-statechip", chip === value && "is-on")}
+      aria-pressed={chip === value}
+      onClick={() => onChip(value)}
+    >
+      {label}
+    </button>
+  );
   return (
     <ListToolbar
       className="sc-sub"
@@ -49,23 +68,25 @@ export function SceneListToolbar({
             controls={SCENE_FILTERS_ID}
             count={activeFilterCount(filters)}
           />
-          <TickDropdown
-            name="State"
-            options={SCENE_STATES.map((state) => ({ value: state, label: STATE_LABEL[state] }))}
-            selected={filters.states}
-            onChange={(states) => onFilters({ ...filters, states })}
-          />
-          <ModifiedDropdown
-            from={filters.from}
-            to={filters.to}
-            onChange={(from, to) => onFilters({ ...filters, from, to })}
-          />
+          {!phone && (
+            <span className="sc-statechips" role="group" aria-label="State">
+              {chipButton(null, "All")}
+              {chips.map((value) => chipButton(value, value === "parked" ? "Parked" : STATE_TAG_LABEL[value]))}
+            </span>
+          )}
         </>
       }
       count={
         shown === total ? `${total} ${total === 1 ? "encounter" : "encounters"}` : `${shown} of ${total} encounters`
       }
       sort={<SortButton sort={sort} keys={SCENE_SORT_KEYS} labels={SCENE_SORT_LABEL} onSort={onSort} />}
+      action={
+        !phone && (
+          <Button size="sm" onClick={onNewMap}>
+            <IconMap /> New map
+          </Button>
+        )
+      }
     />
   );
 }
@@ -94,6 +115,9 @@ export function SceneFiltersFlyout({
   }));
   return (
     <FilterFlyout id={SCENE_FILTERS_ID} open={open} title="Filter encounters" onClose={onClose}>
+      {/* The shelf's state chips took the State dropdown's place; the Modified range moved in here. */}
+      <Eyebrow>Modified</Eyebrow>
+      <ModifiedDropdown from={filters.from} to={filters.to} onChange={(from, to) => set({ from, to })} />
       {mapOptions.length > 1 && (
         <>
           <Eyebrow>Map</Eyebrow>
@@ -151,7 +175,7 @@ export function SceneFiltersFlyout({
         size="sm"
 
         disabled={activeFilterCount(filters) === 0}
-        onClick={() => onFilters({ ...NO_SCENE_FILTERS, states: filters.states, from: filters.from, to: filters.to })}
+        onClick={() => onFilters({ ...NO_SCENE_FILTERS, states: filters.states })}
       >
         Clear the filters
       </Button>
