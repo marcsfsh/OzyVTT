@@ -477,10 +477,14 @@ describe("The Downtime card", () => {
       proposedDate: { year: 1492, month: 0, day: 10 }
     });
   const card = () => within(screen.getByRole("region", { name: "Downtime" }));
+  /** The story's Downtime tab (F story spec 2.5), where the card's parts live now. */
+  const renderTab = (records: readonly CodexChronicleRecord[], over: GmStoryFeeds = {}) =>
+    renderGmStory(GmStorySection, "/codex/story?tab=downtime", { records, calendar: CALENDAR, ...over });
+  const side = () => within(screen.getByRole("group", { name: "Characters" }));
 
-  it("totals a person once, whatever the spelling, and opens a linked one's page", async () => {
+  it("totals a person once at the side, whatever the spelling, and shows the chosen one's downtime", async () => {
     const user = userEvent.setup();
-    renderStory(
+    renderTab(
       [
         downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: true, characterPageId: "c1" }),
         downtime("d2", { who: "vex the bold", activity: "Carousing", days: 3, applied: true, characterPageId: "c1" }),
@@ -489,26 +493,27 @@ describe("The Downtime card", () => {
       { pages: PAGES }
     );
 
-    const rows = card().getAllByRole("row").slice(1);
-    expect(rows).toHaveLength(2);
-    expect(within(rows[0]).getByRole("rowheader")).toHaveTextContent("Vex");
-    expect(within(rows[0]).getAllByRole("cell")[0]).toHaveTextContent("10");
-    expect(within(rows[1]).getByRole("rowheader")).toHaveTextContent("Ireena");
-    // An unlinked name is plain text; a linked one opens its page.
-    expect(within(rows[1]).getByRole("rowheader").querySelector("button")).toBeNull();
-    await user.click(within(rows[0]).getByRole("button", { name: "Vex" }));
-    expect(window.location.pathname).toBe("/codex/pages/c1");
+    const rows = side().getAllByRole("button");
+    expect(rows.map((row) => row.textContent)).toEqual(["Vex10", "Ireena2"]);
+    expect(rows[0]).toHaveAttribute("aria-current", "true");
+    const theirs = within(screen.getByRole("list", { name: "Their downtime" }));
+    expect(
+      theirs.getAllByRole("listitem").map((row) => row.querySelector(".story-downtime-what")?.textContent)
+    ).toEqual(["Carousing", "Forging"]);
+    await user.click(rows[1]!);
+    expect(new URLSearchParams(window.location.search).get("who")).toBe("ireena");
+    expect(within(screen.getByRole("list", { name: "Their downtime" })).getByText("Praying")).toBeInTheDocument();
   });
 
-  it("says the log is empty and shows no table", () => {
-    renderStory([]);
-    expect(card().getByText("No downtime logged yet.")).toBeInTheDocument();
-    expect(card().queryByRole("table")).toBeNull();
+  it("says the log is empty and lists no one", () => {
+    renderTab([]);
+    expect(screen.getByText("No downtime logged yet.")).toBeInTheDocument();
+    expect(side().queryAllByRole("button")).toHaveLength(0);
   });
 
   it("lists what waits to be confirmed, names the landing date on the button and warns of a deadline", async () => {
     const user = userEvent.setup();
-    renderStory([
+    renderTab([
       downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }),
       downtime("d2", { who: "Ireena", activity: "Praying", days: 2, applied: true }),
       gmRecord({
@@ -529,7 +534,7 @@ describe("The Downtime card", () => {
 
   it("with no date to start from, says why beside the control and sends nothing", async () => {
     const user = userEvent.setup();
-    renderStory(
+    renderTab(
       [
         gmRecord({
           ...downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }),
@@ -549,9 +554,10 @@ describe("The Downtime card", () => {
 
   it("shows a stale-list conflict on the row that was pressed, and reads the chronicle again", async () => {
     const user = userEvent.setup();
-    const view = renderStory([
+    // Two waiting rows for the chosen character: the tab lists what waits for them.
+    const view = renderTab([
       downtime("d1", { who: "Vex", activity: "Forging", days: 7, applied: false }),
-      downtime("d2", { who: "Ireena", activity: "Praying", days: 3, applied: false })
+      downtime("d2", { who: "Vex", activity: "Praying", days: 3, applied: false })
     ]);
     api.applyDowntime.mockRejectedValueOnce(new Error("That downtime has already moved the date."));
     const rows = within(card().getByRole("list", { name: "Waiting to be confirmed" })).getAllByRole("listitem");
@@ -565,7 +571,7 @@ describe("The Downtime card", () => {
   it("links an old free-text row to a character page, and never offers to edit the days", async () => {
     const user = userEvent.setup();
     const names = ["Ana", "Bo", "Cass", "Dain", "Eda", "Finn", "Gale", "Hex", "Ivy"];
-    renderStory([downtime("d1", { who: "ivy", activity: "Scouting", days: 4, applied: true })], {
+    renderTab([downtime("d1", { who: "ivy", activity: "Scouting", days: 4, applied: true })], {
       // Nine characters: one past the Combobox's default page, plus a location that must be left out.
       pages: [...names.map((name, index) => page(`c${index + 1}`, name)), page("l1", "Vallaki", "location")]
     });
@@ -594,8 +600,8 @@ describe("The Downtime card", () => {
 
   it("opens the composer on Downtime from Log downtime", async () => {
     const user = userEvent.setup();
-    renderStory([]);
-    await user.click(card().getByRole("button", { name: "Log downtime" }));
+    renderTab([]);
+    await user.click(screen.getByRole("button", { name: "Log downtime" }));
     const composer = within(await screen.findByRole("region", { name: "Add to the chronicle" }));
     expect(composer.getByRole("button", { name: "Downtime", pressed: true })).toBeInTheDocument();
   });

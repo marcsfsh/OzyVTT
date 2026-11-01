@@ -102,9 +102,9 @@ const closeDetails = (user: ReturnType<typeof userEvent.setup>) =>
   user.click(screen.getByRole("button", { name: "Done" }));
 
 /** The chronicle's composer on Downtime, where downtime's Who lives. */
-const renderDowntime = async (records: readonly CodexChronicleRecord[] = []) => {
+const renderDowntime = async (records: readonly CodexChronicleRecord[] = [], path = "/codex/story") => {
   createDowntime.mockResolvedValue({});
-  renderGmStory(GmStorySection, "/codex/story", { records, calendar: CALENDAR, pages: PAGES, actors: ACTORS });
+  renderGmStory(GmStorySection, path, { records, calendar: CALENDAR, pages: PAGES, actors: ACTORS });
   return userEvent.setup();
 };
 const openDowntimeComposer = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -218,14 +218,17 @@ describe("`5e.3`: downtime's Who", () => {
   });
 
   it("marks the archived option on the edit row's link picker too", async () => {
-    const user = await renderDowntime([
-      gmRecord({
-        id: "d1",
-        kind: "downtime",
-        text: "",
-        payload: { who: "ireena", activity: "Resting", days: 3, applied: true, characterPageId: null }
-      })
-    ]);
+    const user = await renderDowntime(
+      [
+        gmRecord({
+          id: "d1",
+          kind: "downtime",
+          text: "",
+          payload: { who: "ireena", activity: "Resting", days: 3, applied: true, characterPageId: null }
+        })
+      ],
+      "/codex/story?tab=downtime"
+    );
     const card = within(screen.getByRole("region", { name: "Downtime" }));
     await user.click(card.getByText("Link a row to a character"));
     await user.click(card.getByRole("button", { name: "Link" }));

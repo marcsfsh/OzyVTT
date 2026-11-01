@@ -106,7 +106,7 @@ export function retiredTarget(section: RetiredCodexSection, query: URLSearchPara
     case "calendar":
       return withQuery(pathForSection("story"), keep(query, ["y", "m"]));
     case "downtime":
-      return withQuery(pathForSection("story"), { kind: "downtime" });
+      return withQuery(pathForSection("story"), { tab: "downtime" });
     case "audit":
       return searchPath({ visibility: "hidden" });
   }

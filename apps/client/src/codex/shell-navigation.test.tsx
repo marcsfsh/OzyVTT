@@ -159,7 +159,7 @@ describe("Addresses from before the remaster", () => {
     ["/codex/graph?focus=p1", "/codex/relationships", "?focus=p1"],
     ["/codex/journal?entry=e1", "/codex/story", "?entry=e1"],
     ["/codex/calendar?y=1492&m=3", "/codex/story", "?y=1492&m=3"],
-    ["/codex/downtime", "/codex/story", "?kind=downtime"],
+    ["/codex/downtime", "/codex/story", "?tab=downtime"],
     ["/codex/audit", "/codex/search", "?visibility=hidden"]
   ])("%s lands at %s%s, replacing itself", async (from, path, search) => {
     const depth = window.history.length;

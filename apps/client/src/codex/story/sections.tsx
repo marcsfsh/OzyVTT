@@ -26,7 +26,7 @@ import { useCodexShell, useGmCodex, usePlayerCodex } from "../shell/context";
 import { useCodexQuery } from "../useCodexQuery";
 import { GmChronicle, PlayerChronicle, recordLine } from "./Chronicle";
 import { DateBar } from "../shared/DateBar";
-import { GmDowntime, PlayerDowntime } from "./Downtime";
+import { GmDowntime, GmDowntimeTab, PlayerDowntime } from "./Downtime";
 import { EntryCard } from "./EntryCard";
 import { EntryComposer, type ComposerKind } from "./EntryComposer";
 import { realDateLabel, sessionDays, type StoryRecord } from "./model";
@@ -58,11 +58,14 @@ const VIEW_PATH: Readonly<Record<StoryView, string>> = {
   chronicle: pathForSection("story"),
   timeline: pathForSection("timeline"),
   sessions: pathForSection("sessions"),
-  downtime: withQuery(pathForSection("story"), { kind: "downtime" })
+  downtime: withQuery(pathForSection("story"), { tab: "downtime" })
 };
 const FLYOUT_ID = "story-filters";
 
 const kindsOf = (query: URLSearchParams) => (query.get("kind") ?? "").split(",").filter(Boolean);
+/** The Downtime tab (F story spec 2.5): `?tab=downtime`, or an older address filtered to downtime alone. */
+const onDowntimeTab = (query: URLSearchParams) =>
+  query.get("tab") === "downtime" || (kindsOf(query).length === 1 && kindsOf(query)[0] === "downtime");
 const zoomOf = (query: URLSearchParams, fallback: TimelineZoom): TimelineZoom => {
   const raw = query.get("zoom");
   return raw === "ages" || raw === "year" || raw === "month" ? raw : fallback;
@@ -320,8 +323,8 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
   const next = useNextSession(feeds.sessions);
   const shown = filterRecords(records, shell.query);
   const openedRecord = records.find((record) => record.id === opened) ?? null;
-  // An old Downtime address lands here filtered to downtime, so its card leads.
-  const downtimeFirst = kindsOf(shell.query).length === 1 && kindsOf(shell.query)[0] === "downtime";
+  // The Downtime tab's address shows the tab; otherwise its card follows the timeline.
+  const downtimeFirst = onDowntimeTab(shell.query);
   // No phone bar of its own: the frame's default bar titles Story and keeps Search in reach.
   if (story.loading)
     return (
@@ -345,7 +348,21 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
       </Button>
       <StoryComposer story={story} inline />
       {(error ?? feeds.campaignFeed.error) && <Alert tone="danger">{error ?? feeds.campaignFeed.error}</Alert>}
-      {downtimeFirst && <StoryDowntime story={story} />}
+      {downtimeFirst && (
+        <GmDowntimeTab
+          gmToken={shell.token}
+          records={records}
+          calendar={calendar}
+          pages={feeds.pages}
+          phone
+          chosenKey={shell.query.get("who")}
+          onChoose={(key) => shell.setFilter({ who: key })}
+          actors={gm.actors}
+          onChanged={reload}
+          onOpenPage={(pageId) => shell.go(pagePath(pageId))}
+          onLog={() => setComposer({ editing: null, kind: "downtime" })}
+        />
+      )}
       <Timeline
         lineOf={lineOf}
         audience="gm"
@@ -394,12 +411,38 @@ export function GmStorySection() {
     );
   };
   const shown = filterRecords(records, shell.query);
-  const downtimeFirst = kindsOf(shell.query).length === 1 && kindsOf(shell.query)[0] === "downtime";
-  const downtime = <StoryDowntime story={story} />;
+  if (onDowntimeTab(shell.query))
+    return (
+      <div className="story">
+        <StoryBar view="downtime" downtime onView={(view) => shell.go(VIEW_PATH[view])} />
+        {(error ?? feeds.campaignFeed.error) && <Alert tone="danger">{error ?? feeds.campaignFeed.error}</Alert>}
+        {/* Log downtime opens the composer at the head of the tab. */}
+        <div className="story-downtime-composer">
+          <StoryComposer story={story} inline />
+        </div>
+        {story.loading ? (
+          <StoryLoading />
+        ) : (
+          <GmDowntimeTab
+            gmToken={shell.token}
+            records={records}
+            calendar={calendar}
+            pages={feeds.pages}
+            chosenKey={shell.query.get("who")}
+            onChoose={(key) => shell.setFilter({ who: key })}
+            actors={gm.actors}
+            onChanged={reload}
+            onOpenPage={(pageId) => shell.go(pagePath(pageId))}
+            onLog={() => setComposer({ editing: null, kind: "downtime" })}
+          />
+        )}
+        <StoryComposer story={story} />
+      </div>
+    );
   return (
     <div className="story">
       <StoryBar
-        view={downtimeFirst ? "downtime" : "chronicle"}
+        view="chronicle"
         downtime
         onView={(view) => shell.go(VIEW_PATH[view])}
         end={
@@ -432,7 +475,6 @@ export function GmStorySection() {
             onFollow={followLink}
             dateBar={
               <>
-                {downtimeFirst && downtime}
                 <DateBar
                   role="gm"
                   token={shell.token}
@@ -448,7 +490,7 @@ export function GmStorySection() {
                 )}
               </>
             }
-            downtime={downtimeFirst ? null : downtime}
+            downtime={null}
             onAdd={() => setComposer({ editing: null, kind: "entry" })}
             composer={composing ? <StoryComposer story={story} inline fileUnder={fileUnder} /> : null}
             onAddHere={addHere}

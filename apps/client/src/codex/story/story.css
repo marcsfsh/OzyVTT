@@ -1688,3 +1688,116 @@ button.story-hline-card:hover,
 .story-timeline > .story-hint {
   padding: var(--space-4);
 }
+
+/* ----- The Downtime tab (F3 atlas spec 2.5): characters and deadlines at the side, the chosen one at the right ----- */
+.story-downtime-tab {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.story-downtime-side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--line-strong);
+}
+.story-downtime-main {
+  min-height: 0;
+  padding: var(--space-4);
+}
+.story-downtime-person {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 680px;
+}
+.story-downtime-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.story-downtime-face {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 1px solid var(--line-raised);
+  background: var(--surface-2);
+}
+.story-downtime-who {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.story-downtime-who b {
+  font: 600 20px / 1.2 var(--font-display);
+  text-transform: uppercase;
+}
+.story-downtime-who small {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.story-downtime-row.is-waiting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: start;
+}
+.story-downtime-row.is-waiting > span:not(.story-downtime-lamp) {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.story-downtime-lamp {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: var(--caution);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--caution) 60%, transparent);
+}
+.story-downtime-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-downtime-entry {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.story-downtime-when {
+  flex: none;
+  width: 9rem;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.story-downtime-days {
+  flex: none;
+  font: 400 18px / 1 var(--font-numeric);
+}
+.story-downtime-what {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.story-downtime-deadlines .is-close .nh-sidelist-count,
+.story-downtime-deadlines .is-close {
+  color: var(--caution-text, var(--caution));
+}
+.story-downtime-composer:empty {
+  display: none;
+}
+.story-downtime-composer {
+  padding: var(--space-3) var(--space-4) 0;
+}
+.story-downtime-tab.is-phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
