@@ -12,6 +12,7 @@ import { DeviceSection } from "./DeviceSection";
 import { FightsSection } from "./FightsSection";
 import { PlayersSection } from "./PlayersSection";
 import {
+  entryPath,
   homeSection,
   isSettingsSection,
   pathForSection,
@@ -29,6 +30,8 @@ import { usePinchZoom } from "./preferences";
 import { useRollPreference } from "../dice/roll-preference";
 import { useActiveCredentialCount } from "../integrations/credentialCount";
 import { SettingsSearch } from "./SettingsSearch";
+import { CODEX_TOOLS, codexToolPath, isCodexTool, type CodexToolId } from "./codexTools";
+import { CodexToolSection } from "./CodexToolSection";
 import "../codex/shell/shell.css";
 import "./settings.css";
 
@@ -86,6 +89,9 @@ export function SettingsPage({
   const gm = role === "gm" && gmToken ? gmViewOrNull(state) : null;
   const sections = sectionsFor(role);
   const requested = route.segments[1];
+  // The Codex's tools are a group of their own at `/settings/codex/<tool>` (F time spec 2.6), the GM's alone.
+  const tool: CodexToolId | null =
+    role === "gm" && requested === "codex" ? (isCodexTool(route.segments[2]) ? route.segments[2] : "backup") : null;
   const section: SettingsSectionId =
     isSettingsSection(requested) && sections.some((candidate) => candidate.id === requested)
       ? requested
@@ -117,10 +123,16 @@ export function SettingsPage({
     return () => window.clearTimeout(timer);
   }, [focus, section]);
   const pick = (entry: SettingEntry) => {
-    if (entry.section !== section) void navigate(pathForSection(entry.section));
+    if (entry.section === "codex") {
+      void navigate(entryPath(entry));
+      return;
+    }
+    if (entry.section !== section || tool) void navigate(pathForSection(entry.section));
     setFocus(entry.id);
   };
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
+  const goTool = (id: CodexToolId) => void navigate(codexToolPath(id));
+  const toolsGroup = role === "gm" ? { tools: CODEX_TOOLS, current: tool, onGo: goTool } : undefined;
 
   const listSearch = <SettingsSearch entries={settingsFor(role)} onPick={pick} onQueryChange={setListQuery} />;
   const counts = gm
@@ -139,8 +151,10 @@ export function SettingsPage({
   // A section's content fades in as the bar's light lands on it.
   const content = useRef<HTMLDivElement>(null);
   let body: ReactNode = null;
-  const line = role === "gm" ? lineOf(section) : undefined;
-  if (section === "device") body = <DeviceSection role={role} onLeave={onLeave ? () => void leave() : undefined} />;
+  const line = role === "gm" && !tool ? lineOf(section) : undefined;
+  if (tool && gmToken) body = <CodexToolSection tool={tool} gmToken={gmToken} />;
+  else if (section === "device")
+    body = <DeviceSection role={role} onLeave={onLeave ? () => void leave() : undefined} />;
   else if (gm && gmToken) {
     if (section === "players")
       body = <PlayersSection state={gm} gmToken={gmToken} onPreviewScreen={onPreviewPlayers ?? (() => {})} />;
@@ -200,7 +214,8 @@ export function SettingsPage({
               <div className="settings-split">
                 <SettingsList
                   sections={sections}
-                  current={section}
+                  current={tool ? null : section}
+                  codex={toolsGroup}
                   counts={counts}
                   search={listSearch}
                   searching={listQuery.trim() !== ""}
@@ -210,8 +225,8 @@ export function SettingsPage({
                     spans what is on screen. Every other section scrolls as one page. */}
                 <div
                   ref={content}
-                  className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
-                  key={section}
+                  className={section === "api" && !tool ? "settings-content is-frame" : "settings-content scroll-y"}
+                  key={tool ?? section}
                 >
                   <SavedFlashProvider>{body}</SavedFlashProvider>
                 </div>
@@ -226,7 +241,9 @@ export function SettingsPage({
   // A phone (settings spec 2.1): `/settings` is the list of sections under the header, its search a field over it; a
   // section opens full screen under a header with Back and its name, Access's New credential as the header's icon.
   const listShown = requested === undefined;
-  const sectionName = sections.find((item) => item.id === section)?.label ?? "Settings";
+  const sectionName = tool
+    ? (CODEX_TOOLS.find((item) => item.id === tool)?.label ?? "Settings")
+    : (sections.find((item) => item.id === section)?.label ?? "Settings");
   return (
     <PrimarySlot.Provider value={slot}>
       <SectionLine.Provider value={line}>
@@ -269,6 +286,7 @@ export function SettingsPage({
               <SettingsList
                 sections={sections}
                 current={null}
+                codex={toolsGroup && { ...toolsGroup, current: null }}
                 counts={counts}
                 search={listSearch}
                 searching={listQuery.trim() !== ""}
@@ -277,8 +295,8 @@ export function SettingsPage({
             ) : (
               <div
                 ref={content}
-                className={section === "api" ? "settings-content is-frame" : "settings-content scroll-y"}
-                key={section}
+                className={section === "api" && !tool ? "settings-content is-frame" : "settings-content scroll-y"}
+                key={tool ?? section}
               >
                 <SavedFlashProvider>{body}</SavedFlashProvider>
               </div>

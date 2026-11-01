@@ -11,7 +11,17 @@ import { newId } from "../lib/ids";
  * and a confirm listing every section's count, zeros included. Server 400s name the bad row, so
  * `error.message` is shown verbatim.
  */
-export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; onChanged: () => void }>) {
+export function BackupView({
+  gmToken,
+  onChanged,
+  part = null
+}: Readonly<{
+  gmToken: string;
+  onChanged: () => void;
+  /** One tool alone, as Settings' Codex group shows it; null shows all three, as the Codex's own page does. */
+  part?: "backup" | "restore" | "notes" | null;
+}>) {
+  const shows = (each: "backup" | "restore" | "notes") => part === null || part === each;
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,89 +166,95 @@ export function BackupView({ gmToken, onChanged }: Readonly<{ gmToken: string; o
         </Alert>
       )}
 
-      <Group title="Download backup" headingLevel={2}>
-        <p>
-          One file with everything: pages, maps, pins, journal, sessions, quests, calendar, settings and version
-          history.
-        </p>
-        <Button variant="primary" onClick={() => void download()}>
-          Download backup
-        </Button>
-      </Group>
+      {shows("backup") && (
+        <Group title="Download backup" headingLevel={2}>
+          <p>
+            One file with everything: pages, maps, pins, journal, sessions, quests, calendar, settings and version
+            history.
+          </p>
+          <Button variant="primary" onClick={() => void download()}>
+            Download backup
+          </Button>
+        </Group>
+      )}
 
-      <Group title="Restore backup" headingLevel={2}>
-        <p className="codex-composer-hint">Download a backup first. Restoring replaces everything in the Codex.</p>
-        <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>
-          Choose a backup file
-        </Button>
-        <input
-          ref={restoreInputRef}
-          type="file"
-          accept="application/json,.json"
-          hidden
-          onChange={(event) => {
-            void pickRestore(event.target.files?.[0]);
-            event.target.value = "";
-          }}
-        />
-        {/* `Modal` (focus trap, Escape, scrim), because `useConfirm`'s single-string body can't hold the inventory. */}
-        <Modal
-          open={!!pending}
-          onClose={() => setPending(null)}
-          size="sm"
-          title="Restore this backup?"
-          ariaLabel="Restore this backup?"
-          footer={
-            <>
-              <Button variant="secondary" onClick={() => setPending(null)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" disabled={busy} onClick={() => void restore()}>
-                Replace everything
-              </Button>
-            </>
-          }
-        >
-          {pending && (
-            <>
-              <p>
-                It replaces your entire Codex with the contents of <strong>{pending.name}</strong>. This cannot be
-                undone.
-              </p>
-              {/* A list, so a zero stands out. */}
-              <p className="codex-backup-inventory">That file contains {countLine(pending.counts)}.</p>
-            </>
-          )}
-        </Modal>
-      </Group>
-
-      <Group title="Bring in notes" headingLevel={2}>
-        <p>Turns Markdown or text files into pages, one page per file. This adds pages and replaces nothing.</p>
-        {/* Can't use `TwoLayerBodyTabs`: it chooses an import destination (GM first, the default) inside a
-            `Field`. It shares `BODY_LAYER`'s words instead. */}
-        <Field label="Import into" htmlFor="codex-notes-side" help="New pages start hidden from players either way.">
-          <SegmentedControl
-            ariaLabel="Which layer to import into"
-            value={notesSide}
-            onChange={(value) => setNotesSide(value as BodyLayer)}
-            options={[BODY_LAYER.gm, BODY_LAYER.player]}
+      {shows("restore") && (
+        <Group title="Restore backup" headingLevel={2}>
+          <p className="codex-composer-hint">Download a backup first. Restoring replaces everything in the Codex.</p>
+          <Button variant="secondary" onClick={() => restoreInputRef.current?.click()}>
+            Choose a backup file
+          </Button>
+          <input
+            ref={restoreInputRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(event) => {
+              void pickRestore(event.target.files?.[0]);
+              event.target.value = "";
+            }}
           />
-        </Field>
-        <Button variant="secondary" onClick={() => notesInputRef.current?.click()}>
-          Choose files
-        </Button>
-        <input
-          ref={notesInputRef}
-          type="file"
-          accept=".md,.markdown,.txt"
-          multiple
-          hidden
-          onChange={(event) => {
-            void importNotes(event.target.files);
-            event.target.value = "";
-          }}
-        />
-      </Group>
+          {/* `Modal` (focus trap, Escape, scrim), because `useConfirm`'s single-string body can't hold the inventory. */}
+          <Modal
+            open={!!pending}
+            onClose={() => setPending(null)}
+            size="sm"
+            title="Restore this backup?"
+            ariaLabel="Restore this backup?"
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setPending(null)}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" disabled={busy} onClick={() => void restore()}>
+                  Replace everything
+                </Button>
+              </>
+            }
+          >
+            {pending && (
+              <>
+                <p>
+                  It replaces your entire Codex with the contents of <strong>{pending.name}</strong>. This cannot be
+                  undone.
+                </p>
+                {/* A list, so a zero stands out. */}
+                <p className="codex-backup-inventory">That file contains {countLine(pending.counts)}.</p>
+              </>
+            )}
+          </Modal>
+        </Group>
+      )}
+
+      {shows("notes") && (
+        <Group title="Bring in notes" headingLevel={2}>
+          <p>Turns Markdown or text files into pages, one page per file. This adds pages and replaces nothing.</p>
+          {/* Can't use `TwoLayerBodyTabs`: it chooses an import destination (GM first, the default) inside a
+            `Field`. It shares `BODY_LAYER`'s words instead. */}
+          <Field label="Import into" htmlFor="codex-notes-side" help="New pages start hidden from players either way.">
+            <SegmentedControl
+              ariaLabel="Which layer to import into"
+              value={notesSide}
+              onChange={(value) => setNotesSide(value as BodyLayer)}
+              options={[BODY_LAYER.gm, BODY_LAYER.player]}
+            />
+          </Field>
+          <Button variant="secondary" onClick={() => notesInputRef.current?.click()}>
+            Choose files
+          </Button>
+          <input
+            ref={notesInputRef}
+            type="file"
+            accept=".md,.markdown,.txt"
+            multiple
+            hidden
+            onChange={(event) => {
+              void importNotes(event.target.files);
+              event.target.value = "";
+            }}
+          />
+        </Group>
+      )}
     </div>
   );
 }

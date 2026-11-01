@@ -6,6 +6,7 @@
  */
 
 import { HEALTH_DISPLAY_LABEL, PLAYER_HITS, PLAYER_INITIATIVE } from "./table-words";
+import { CODEX_TOOL_ENTRIES } from "./codexTools";
 
 export type SettingsSectionId = "players" | "fights" | "characters" | "device" | "access" | "api";
 
@@ -52,7 +53,10 @@ export const pathForSection = (id: SettingsSectionId) => `/settings/${id}`;
 /** One setting: its label and a sentence of hint as the page shows them, and other words a GM might search for. */
 export type SettingEntry = Readonly<{
   id: string;
-  section: SettingsSectionId;
+  /** "codex" is the Codex's group of tools (`codexTools.ts`), which is no section of its own. */
+  section: SettingsSectionId | "codex";
+  /** The Codex tool a "codex" entry opens. */
+  tool?: "backup" | "restore" | "notes" | "autosave" | "history";
   label: string;
   hint: string;
   /** Who sees this one, when it differs from its section (a GM row in Device). */
@@ -241,9 +245,10 @@ export const SETTING = entries({
 /** Every setting a role can reach, for the search. */
 export function settingsFor(role: "gm" | "player"): readonly SettingEntry[] {
   const sections = new Set(sectionsFor(role).map((section) => section.id));
-  return Object.values(SETTING).filter(
+  const tools = role === "gm" ? CODEX_TOOL_ENTRIES : [];
+  return [...Object.values(SETTING), ...tools].filter(
     (entry) =>
-      sections.has(entry.section) &&
+      (entry.section === "codex" ? role === "gm" : sections.has(entry.section)) &&
       (role === "gm" || entry.audience !== "gm") &&
       // Leaving is a player's door; the GM signs out in Access.
       !(role === "gm" && entry.id === "leaveTable")
@@ -262,6 +267,10 @@ export function searchSettings(entries: readonly SettingEntry[], query: string):
       (a, b) => Number(words.every((w) => label(b).includes(w))) - Number(words.every((w) => label(a).includes(w)))
     );
 }
+
+/** Where a search pick goes: its section, or the Codex tool's own page. */
+export const entryPath = (entry: SettingEntry) =>
+  entry.section === "codex" ? `/settings/codex/${entry.tool ?? "backup"}` : pathForSection(entry.section);
 
 /** The element id a setting's row carries, so the search can bring it into view. */
 export const settingAnchor = (id: string) => `setting-${id}`;

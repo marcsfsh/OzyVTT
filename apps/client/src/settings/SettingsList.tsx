@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { IconCode, IconCog, IconDie, IconKey, IconLevelUp, IconUser, SideListGroup, SideListRow } from "@vtt/ui";
 import { pathForSection, type SettingsSection, type SettingsSectionId } from "./sections";
+import { codexToolPath, type CodexTool, type CodexToolId } from "./codexTools";
+import { CodexIcon } from "../codex/icons";
 
 export const SECTION_ICONS: Readonly<Record<SettingsSectionId, ReactNode>> = {
   players: <IconUser />,
@@ -22,7 +24,8 @@ export function SettingsList({
   counts,
   search,
   searching,
-  onGo
+  onGo,
+  codex
 }: Readonly<{
   sections: readonly SettingsSection[];
   current: SettingsSectionId | null;
@@ -32,6 +35,12 @@ export function SettingsList({
   /** The search holds words, so its matches show in place of the sections. */
   searching: boolean;
   onGo: (id: SettingsSectionId) => void;
+  /** The GM's Codex tools as a group under the sections (F time spec 2.6). */
+  codex?: Readonly<{
+    tools: readonly CodexTool[];
+    current: CodexToolId | null;
+    onGo: (id: CodexToolId) => void;
+  }>;
 }>) {
   return (
     <aside className="settings-index">
@@ -51,6 +60,26 @@ export function SettingsList({
           ))}
         </SideListGroup>
       </nav>
+      {codex && (
+        <nav
+          className="nh-sidelist settings-index-nav settings-index-codexnav"
+          aria-label="Codex tools"
+          hidden={searching}
+        >
+          <SideListGroup eyebrow="Codex">
+            {codex.tools.map((tool) => (
+              <SideListRow
+                key={tool.id}
+                label={tool.label}
+                leading={<CodexIcon iconId={tool.iconId} />}
+                current={tool.id === codex.current}
+                href={codexToolPath(tool.id)}
+                onSelect={() => codex.onGo(tool.id)}
+              />
+            ))}
+          </SideListGroup>
+        </nav>
+      )}
     </aside>
   );
 }

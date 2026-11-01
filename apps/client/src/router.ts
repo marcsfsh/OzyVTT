@@ -10,6 +10,7 @@ import { useSyncExternalStore } from "react";
 import { codexSectionOf, GM_ONLY_SECTIONS, type CodexAddress } from "./codex/routes";
 import { compendiumViewOf } from "./compendium/routes";
 import { isSettingsSection } from "./settings/sections";
+import { isCodexTool } from "./settings/codexTools";
 import { redirectForOldMapAddress, scenesViewOf, type ScenesView } from "./scenes/routes";
 
 export type Route = Readonly<{
@@ -320,12 +321,14 @@ export function isKnownPath(path: string): boolean {
   if (segments[0] === "compendium") return compendiumViewOf(segments, new URLSearchParams()) !== null;
   // The player's own tab: one segment, nothing under it.
   if (segments[0] === "me") return segments.length === 1;
-  // A section of Settings, or one operation of the API reference by its operation id.
+  // A section of Settings, one operation of the API reference by its operation id, or one of the Codex's tools.
   if (segments[0] === "settings")
     return (
       segments.length === 1 ||
       (segments.length === 2 && isSettingsSection(segments[1])) ||
-      (segments.length === 3 && segments[1] === "api" && /^[A-Za-z][\w.-]{0,100}$/.test(segments[2]))
+      (segments.length === 3 && segments[1] === "api" && /^[A-Za-z][\w.-]{0,100}$/.test(segments[2])) ||
+      // The Codex's tools, each its own page (F time spec 2.6).
+      (segments[1] === "codex" && (segments.length === 2 || (segments.length === 3 && isCodexTool(segments[2]))))
     );
   // The Table screen tab is the screens, a screen as a remote at `/screens/<id>`, or at `/sound` the sound board.
   if (segments[0] === "viewer-controls")

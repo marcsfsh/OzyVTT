@@ -3,7 +3,9 @@ import { IconSearch, Input, cx } from "@vtt/ui";
 import { SETTINGS_SECTIONS, searchSettings, type SettingEntry } from "./sections";
 
 const sectionLabel = (entry: SettingEntry) =>
-  SETTINGS_SECTIONS.find((section) => section.id === entry.section)?.label ?? entry.section;
+  entry.section === "codex"
+    ? "Codex"
+    : (SETTINGS_SECTIONS.find((section) => section.id === entry.section)?.label ?? entry.section);
 
 /** The label with the words searched for marked, as the list's results show them. */
 function marked(label: string, query: string) {

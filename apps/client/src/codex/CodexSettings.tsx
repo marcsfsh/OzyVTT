@@ -18,8 +18,14 @@ import { useCodexQuery } from "./useCodexQuery";
  */
 export function CodexSettingsView({
   gmToken,
-  onSettingsChanged
-}: Readonly<{ gmToken: string; onSettingsChanged?: (settings: CodexSettings) => void }>) {
+  onSettingsChanged,
+  part = null
+}: Readonly<{
+  gmToken: string;
+  onSettingsChanged?: (settings: CodexSettings) => void;
+  /** One tool alone, as Settings' Codex group shows it; null shows both, as the Codex's own page does. */
+  part?: "autosave" | "history" | null;
+}>) {
   const { confirm, dialog: confirmDialog } = useConfirm();
   // Until the first read settles, don't show a guessed state.
   const {
@@ -109,10 +115,12 @@ export function CodexSettingsView({
   return (
     <>
       <div className="codex-settings">
-        <header className="codex-audit-head">
-          <h3 className="codex-audit-title">Settings</h3>
-          <p className="codex-audit-scope">These apply to the whole Codex, for every page.</p>
-        </header>
+        {part === null && (
+          <header className="codex-audit-head">
+            <h3 className="codex-audit-title">Settings</h3>
+            <p className="codex-audit-scope">These apply to the whole Codex, for every page.</p>
+          </header>
+        )}
 
         {error && (
           <Alert tone="danger" title="Codex settings">
@@ -133,7 +141,7 @@ export function CodexSettingsView({
         )}
 
         {/* Autosave first: it governs what a GM notices first. */}
-        {!loading && autosave && (
+        {!loading && autosave && part !== "history" && (
           <section className="codex-settings-section">
             <h4 className="codex-audit-h">Autosave</h4>
             <p className="codex-settings-lede">
@@ -181,7 +189,7 @@ export function CodexSettingsView({
           </section>
         )}
 
-        {!loading && history && (
+        {!loading && history && part !== "autosave" && (
           <section className="codex-settings-section">
             <h4 className="codex-audit-h">Version history</h4>
             <p className="codex-settings-lede">

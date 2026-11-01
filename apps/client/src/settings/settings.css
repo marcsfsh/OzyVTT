@@ -368,6 +368,13 @@
 .settings-index-nav[hidden] {
   display: none;
 }
+/* The Codex's tools follow the sections straight on, as a second group of the one list (F time spec 2.6). */
+.settings-index-nav:has(+ .settings-index-codexnav:not([hidden])) {
+  flex: 0 1 auto;
+}
+.settings-index-codexnav {
+  flex: none;
+}
 .settings-index-nav .nh-sidelist-leading svg {
   width: 18px;
   height: 18px;

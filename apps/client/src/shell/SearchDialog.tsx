@@ -11,7 +11,7 @@ import { kindLabel, type Kind } from "../compendium/kinds";
 import { recordPath } from "../compendium/routes";
 import { loadGlossary, RulesReference } from "../reference/RulesReference";
 import { navigate, prepPageFor, useRoute, type Route } from "../router";
-import { pathForSection as settingsPath, searchSettings, settingsFor } from "../settings/sections";
+import { entryPath, searchSettings, settingsFor } from "../settings/sections";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { closeSearch, openSearch, requestNow, useSearchRequest, type SearchPlace } from "./search-store";
 import "./search-dialog.css";
@@ -188,7 +188,7 @@ export function useGoToRows(
         key: `setting:${entry.id}`,
         name: entry.label,
         line: "Setting",
-        open: () => navigate(settingsPath(entry.section))
+        open: () => navigate(entryPath(entry))
       }))
     ];
   }, [needle, role, sections]);
