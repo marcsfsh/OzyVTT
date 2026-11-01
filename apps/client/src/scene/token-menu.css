@@ -130,3 +130,12 @@
   padding-top: var(--space-2);
   border-top: 1px solid var(--line);
 }
+/* A's menu at the thing (C2 spec 2.1): the horizon edge along its top. */
+.token-context-menu::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto;
+  height: 2px;
+  background: var(--grad-horizon);
+  pointer-events: none;
+}
