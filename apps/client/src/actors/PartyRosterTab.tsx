@@ -1,8 +1,21 @@
 import { useRef, useState } from "react";
 import { rosterActors, type ActorDefinition, type GmActor, type GmView, type PendingImport } from "@vtt/domain";
-import { Badge, Button, Eyebrow, Modal, useToast } from "@vtt/ui";
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Eyebrow,
+  IconButton,
+  IconDie,
+  IconPage,
+  IconPlus,
+  Menu,
+  MenuItem,
+  Modal,
+  useToast
+} from "@vtt/ui";
+import { useMediaQuery } from "../lib/useMediaQuery";
 import { useConfirm } from "../components/feedback";
-import { JoinAddress } from "../components/JoinAddress";
 import { navigate } from "../router";
 import { PrepBarSlot } from "../shell/AppBar";
 import { CharacterSheet } from "../sheet/CharacterSheet";
@@ -36,6 +49,7 @@ export function PartyRosterTab({
   const [pdfImportOpen, setPdfImportOpen] = useState(false);
   const [randomOpen, setRandomOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const phone = useMediaQuery("(max-width: 760px)");
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const { confirm, dialog } = useConfirm();
   const forceRelease = useForceRelease();
@@ -207,58 +221,83 @@ export function PartyRosterTab({
   return (
     <section className="party-roster pane-frame pane-scene frame-col anim-view">
       {/* A list has no title row: Prep's bar names the page and holds its primary (theme spec 2.2). */}
+      {/* One Cup in Prep's bar (characters rule 1): New character. */}
       {onCreateCharacter && (
         <PrepBarSlot>
-          <BarPrimary label="Create a character" onClick={onCreateCharacter} />
+          {phone ? (
+            <IconButton label="New character" onClick={onCreateCharacter}>
+              <IconPlus />
+            </IconButton>
+          ) : (
+            <BarPrimary label="New character" onClick={onCreateCharacter} />
+          )}
         </PrepBarSlot>
       )}
-      <div className="party-heading">
-        <div className="party-heading-actions">
-          <Button onClick={() => setRandomOpen(true)}>Roll a random character</Button>
-          <Button onClick={() => setPdfImportOpen(true)}>Import from D&amp;D Beyond (PDF)</Button>
-          <input
-            ref={importFileRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void importSheet(file);
-              event.target.value = "";
-            }}
-          />
-          <Button variant="secondary" onClick={() => importFileRef.current?.click()}>
-            Import JSON
-          </Button>
-        </div>
-      </div>
 
       <div className="party-roster-body scroll-y frame-fill">
-        <JoinAddress token={token} />
+        {/* Samples are a line (characters rule 3), with Remove sample characters on a Base line. */}
         {samples.some((actor) => !actor.archived) && (
           <div className="party-samples" role="note">
             <p>
-              {samples.map((actor) => actor.name).join(", ")} are sample characters to try the table with. Remove them
-              once your own party is ready.
+              {namesList(
+                samples.filter((actor) => !actor.archived).map((actor) => actor.name.split(" ")[0] ?? actor.name)
+              )}{" "}
+              are sample characters to try the table with.
             </p>
-            <Button variant="secondary" disabled={busy} onClick={() => void removeSamples()}>
+            <Button disabled={busy} onClick={() => void removeSamples()}>
               Remove sample characters
             </Button>
           </div>
         )}
+        {pcs.length > 0 && (
+          <div className="party-toolbar">
+            <span className="party-count" role="status">
+              {active.length} {active.length === 1 ? "character" : "characters"}
+            </span>
+            <span className="party-toolbar-actions">
+              <Button onClick={() => setRandomOpen(true)}>
+                <IconDie /> Roll a random character
+              </Button>
+              <Menu
+                trigger={
+                  <>
+                    <IconPage /> Import
+                  </>
+                }
+                align="end"
+              >
+                <MenuItem onClick={() => setPdfImportOpen(true)}>From a D&amp;D Beyond PDF</MenuItem>
+                <MenuItem onClick={() => importFileRef.current?.click()}>From a JSON file</MenuItem>
+              </Menu>
+            </span>
+          </div>
+        )}
+        <input
+          ref={importFileRef}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void importSheet(file);
+            event.target.value = "";
+          }}
+        />
         {pendingImports.length > 0 && (
-          <div className="party-queue">
-            <h3 className="party-section-head">Waiting for approval</h3>
+          <section className="party-queue" aria-labelledby="party-queue-title">
+            <h3 id="party-queue-title" className="party-section-head">
+              Waiting for approval · {pendingImports.length}
+            </h3>
             <ul className="party-queue-list">
               {pendingImports.map((pending) => (
                 <li key={pending.id} className="party-queue-row">
                   <span className="party-queue-name">{pending.name}</span>
                   <Badge tone="info">from a player</Badge>
                   <span className="party-queue-actions">
-                    <Button variant="secondary" disabled={busy} onClick={() => setPreviewImportId(pending.id)}>
+                    <Button disabled={busy} onClick={() => setPreviewImportId(pending.id)}>
                       Preview
                     </Button>
-                    <Button variant="primary" disabled={busy} onClick={() => resolveImport(pending, true)}>
+                    <Button disabled={busy} onClick={() => resolveImport(pending, true)}>
                       Approve
                     </Button>
                     <Button disabled={busy} onClick={() => resolveImport(pending, false)}>
@@ -268,27 +307,19 @@ export function PartyRosterTab({
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
         )}
 
         {pcs.length === 0 ? (
-          <div className="scene-empty">
-            <p>Nobody is on the table yet.</p>
-            {onCreateCharacter && (
-              <Button variant="primary" arrow onClick={onCreateCharacter}>
-                Create a character
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => setRandomOpen(true)}>
-              Roll a random character
-            </Button>
-          </div>
+          <EmptyState action={<Button onClick={() => setRandomOpen(true)}>Roll a random character</Button>}>
+            Nobody is on the table yet. Make one with New character, or roll one.
+          </EmptyState>
         ) : (
           <>
             <ul className="roster-bands">{active.map((actor) => band(actor, false))}</ul>
             {archived.length > 0 && (
               <details className="party-archived">
-                <summary>Archived ({archived.length})</summary>
+                <summary>Archived · {archived.length}</summary>
                 <p className="party-archived-note">
                   Archived characters are hidden from players and never appear in encounter prep.
                 </p>
@@ -399,4 +430,10 @@ function ImportPreview({ definition }: Readonly<{ definition: ActorDefinition }>
       </div>
     </dl>
   );
+}
+
+/** "Borin, Mirena and Lyra": names in a sentence. */
+function namesList(names: readonly string[]): string {
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }

@@ -87,6 +87,17 @@ describe("the Roster", () => {
     expect(within(card("Veteran")).queryByRole("menuitem", { name: "Delete", hidden: true })).toBeNull();
   });
 
+  it("has a toolbar with the count, Roll a random character and Import, and no join address", async () => {
+    const user = userEvent.setup();
+    roster([pc({ id: "a", name: "Lyra" }), pc({ id: "b", name: "Borin" })]);
+    expect(screen.getByRole("status")).toHaveTextContent("2 characters");
+    expect(screen.getByRole("button", { name: "Roll a random character" })).toBeInTheDocument();
+    await user.click(screen.getByText("Import"));
+    expect(screen.getByRole("menuitem", { name: "From a D&D Beyond PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "From a JSON file" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Join address" })).toBeNull();
+  });
+
   it("shows each band's AC, hit points and Speed", () => {
     roster([pc({ id: "a", name: "Lyra" })]);
     const plate = within(card("Lyra"));
@@ -104,7 +115,7 @@ describe("the Roster", () => {
     ]);
     expect(within(card("Borin")).getByText("Sample")).toBeInTheDocument();
     expect(within(card("Mine")).queryByText("Sample")).toBeNull();
-    expect(screen.getByRole("note")).toHaveTextContent("Borin, Lyra are sample characters");
+    expect(screen.getByRole("note")).toHaveTextContent("Borin and Lyra are sample characters");
 
     await user.click(screen.getByRole("button", { name: "Remove sample characters" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Remove samples" }));
