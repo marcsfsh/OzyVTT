@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { GmView, PartyVisibility } from "@vtt/domain";
-import { Button, Menu, MenuItem, Select } from "@vtt/ui";
+import { Button, IconButton, IconUser, IconX, Select } from "@vtt/ui";
 import { useForceRelease } from "../actors/useForceRelease";
 import { JoinAddress } from "../components/JoinAddress";
 import { useMediaQuery } from "../lib/useMediaQuery";
@@ -9,6 +9,7 @@ import { SETTING } from "./sections";
 import { SettingRow, SettingsSection } from "./SettingRow";
 import { useTableWrites } from "./table-writes";
 import { ActorAvatar } from "../actors/ActorAvatar";
+import { classLine } from "../actors/actor-display";
 
 /**
  * How much a player sees of another player's character. The wire values are
@@ -58,6 +59,8 @@ export function PlayersSection({
   );
   const presence = (actor: (typeof claimed)[number]) =>
     actor.presence === "online" ? "online" : actor.presence === "reconnecting" ? "reconnecting" : "offline";
+  const classOf = (actor: (typeof claimed)[number]) =>
+    classLine((state.definitions ?? []).find((entry) => entry.id === actor.definitionId)?.definition);
   const chooseToken = (actor: (typeof claimed)[number]) =>
     setTokenFor({
       id: actor.id,
@@ -112,12 +115,20 @@ export function PlayersSection({
                 />
                 <span className="settings-list-text">
                   <b>{actor.name}</b>
-                  <span>{PRESENCE_WORDS[presence(actor)]}</span>
+                  <span>{[classOf(actor), PRESENCE_WORDS[presence(actor)]].filter(Boolean).join(" · ")}</span>
                 </span>
-                <Menu align="end" trigger="Actions" label={`Actions for ${actor.name}`}>
-                  <MenuItem onClick={() => void forceRelease.release(actor)}>Force release</MenuItem>
-                  <MenuItem onClick={() => chooseToken(actor)}>Set token image…</MenuItem>
-                </Menu>
+                {/* Token image and Release as icons of 44px, their names for screen readers (I leftovers spec 2.4). */}
+                <IconButton base label={`Set token image… for ${actor.name}`} onClick={() => chooseToken(actor)}>
+                  <IconUser />
+                </IconButton>
+                <IconButton
+                  base
+                  label={`Force release ${actor.name}`}
+                  className="settings-release-icon"
+                  onClick={() => void forceRelease.release(actor)}
+                >
+                  <IconX />
+                </IconButton>
               </li>
             ))}
           </ul>
@@ -151,16 +162,19 @@ export function PlayersSection({
                               : "offline"
                         }
                       />
-                      <b>{actor.name}</b>
+                      <span className="settings-cell-who">
+                        <b>{actor.name}</b>
+                        {classOf(actor) && <span className="settings-cell-class">{classOf(actor)}</span>}
+                      </span>
                     </span>
                   </td>
                   <td>{PRESENCE_WORDS[presence(actor)]}</td>
                   <td className="settings-cell-actions">
-                    <Button variant="destructive" size="sm" onClick={() => void forceRelease.release(actor)}>
-                      Force release
-                    </Button>
                     <Button variant="secondary" size="sm" onClick={() => chooseToken(actor)}>
                       Set token image…
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => void forceRelease.release(actor)}>
+                      Force release
                     </Button>
                   </td>
                 </tr>

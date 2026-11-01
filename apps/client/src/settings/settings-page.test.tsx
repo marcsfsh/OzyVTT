@@ -235,6 +235,34 @@ describe("the GM's Settings", () => {
     expect(onPreviewPlayers).toHaveBeenCalled();
   });
 
+  it("puts Set token image and Force release on each row at the table, as icons with their names on a phone", async () => {
+    const user = userEvent.setup();
+    setViewport(390);
+    const state = gmView((view) => {
+      view.actors = [
+        {
+          id: "a1",
+          name: "Lyra Emberwise",
+          kind: "player-character",
+          archived: false,
+          ownerSessionId: "s1",
+          presence: "online"
+        }
+      ] as unknown as GmView["actors"];
+    });
+    renderAt("/settings/players", { state });
+    const row = within(screen.getByRole("list", { name: "Characters at the table" })).getByRole("listitem");
+    expect(within(row).queryByRole("button", { name: /^Actions/ })).toBeNull();
+    const buttons = within(row).getAllByRole("button");
+    expect(buttons.map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Set token image… for Lyra Emberwise",
+      "Force release Lyra Emberwise"
+    ]);
+    // Force release keeps its confirm before anything is sent.
+    await user.click(within(row).getByRole("button", { name: "Force release Lyra Emberwise" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/Force release|release/i);
+  });
+
   it("sends the character settings, and keeps one ability score method on", async () => {
     const user = userEvent.setup();
     renderAt("/settings/characters", {

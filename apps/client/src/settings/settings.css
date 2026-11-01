@@ -251,9 +251,21 @@
   align-items: center;
   gap: var(--space-2);
 }
+.settings-cell-who {
+  display: flex;
+  flex-direction: column;
+}
+.settings-cell-class {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
 .settings-cell-actions {
   text-align: end;
   white-space: nowrap;
+}
+/* Release keeps --danger-text on its Base line as an icon too (T 2.5). */
+.settings-list-row .settings-release-icon {
+  color: var(--danger-text);
 }
 .settings-cell-actions .nh-btn + .nh-btn {
   margin-left: var(--space-2);
