@@ -210,7 +210,7 @@ describe("`5e.3`: downtime's Who", () => {
     await user.click(within(await screen.findByRole("listbox")).getAllByRole("option")[2]);
     await user.type(screen.getByLabelText("Activity"), "Resting");
     await user.click(
-      within(screen.getByRole("dialog", { name: "Add to the chronicle" })).getByRole("button", { name: "Log downtime" })
+      within(screen.getByRole("region", { name: "Add to the chronicle" })).getByRole("button", { name: "Log downtime" })
     );
 
     await waitFor(() => expect(createDowntime).toHaveBeenCalled());

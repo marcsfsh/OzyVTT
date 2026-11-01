@@ -240,12 +240,25 @@ function StoryLoading() {
   );
 }
 
-function StoryComposer({ story }: Readonly<{ story: ReturnType<typeof useGmStory> }>) {
+function StoryComposer({
+  story,
+  inline = false,
+  fileUnder = null
+}: Readonly<{
+  story: ReturnType<typeof useGmStory>;
+  /** A new record at the head of the line; an edit stays a dialog. */
+  inline?: boolean;
+  fileUnder?: Readonly<{ sessionId: string | null; nonce: number }> | null;
+}>) {
   const { shell, gm, feeds, calendar, reload, composer, setComposer, tagSuggestions } = story;
+  // The inline form takes the new record; the dialog takes an edit.
+  const mine = inline ? composer !== null && composer.editing === null : composer !== null && composer.editing !== null;
   return (
     <EntryComposer
       gmToken={shell.token}
-      open={composer !== null}
+      inline={inline}
+      fileUnder={fileUnder}
+      open={mine}
       editing={composer?.editing ?? null}
       initialKind={composer?.kind ?? "entry"}
       calendar={calendar}
@@ -330,6 +343,7 @@ function GmPhoneStory({ story }: Readonly<{ story: ReturnType<typeof useGmStory>
       <Button variant="secondary" block onClick={() => setComposer({ editing: null, kind: "entry" })}>
         <IconPlus /> Add to the chronicle
       </Button>
+      <StoryComposer story={story} inline />
       {(error ?? feeds.campaignFeed.error) && <Alert tone="danger">{error ?? feeds.campaignFeed.error}</Alert>}
       {downtimeFirst && <StoryDowntime story={story} />}
       <Timeline
@@ -368,8 +382,17 @@ export function GmStorySection() {
   const { shell, gm, feeds, records, calendar, reload, error, setComposer, followLink } = story;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dialogRecord, setDialogRecord] = useState<CodexChronicleRecord | null>(null);
+  const [fileUnder, setFileUnder] = useState<Readonly<{ sessionId: string | null; nonce: number }> | null>(null);
   const card = useRecordCard(story, () => setDialogRecord(null));
   if (shell.phone) return <GmPhoneStory story={story} />;
+  const composing = story.composer !== null && story.composer.editing === null;
+  // Add here files the draft under that session and brings the composer back into view.
+  const addHere = (sessionId: string | null) => {
+    setFileUnder({ sessionId, nonce: Date.now() });
+    requestAnimationFrame(() =>
+      document.querySelector(".story-composer.is-inline")?.scrollIntoView({ block: "start", behavior: "smooth" })
+    );
+  };
   const shown = filterRecords(records, shell.query);
   const downtimeFirst = kindsOf(shell.query).length === 1 && kindsOf(shell.query)[0] === "downtime";
   const downtime = <StoryDowntime story={story} />;
@@ -427,6 +450,8 @@ export function GmStorySection() {
             }
             downtime={downtimeFirst ? null : downtime}
             onAdd={() => setComposer({ editing: null, kind: "entry" })}
+            composer={composing ? <StoryComposer story={story} inline fileUnder={fileUnder} /> : null}
+            onAddHere={addHere}
             renderRecord={(record) => card.render(record, record.id === shell.query.get("entry"))}
             onOpenRecord={(record) =>
               record.kind === "event" || record.kind === "deadline"

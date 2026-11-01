@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Badge, IconEyeOff, IconPlus } from "@vtt/ui";
+import { Badge, Button, IconEyeOff, IconPlus } from "@vtt/ui";
 import {
   dateToInstant,
   formatWorldDate,
@@ -126,7 +126,8 @@ function Spine<R extends StoryRecord>({
   knownTitles,
   lineOf,
   onOpenSession,
-  renderOpen
+  renderOpen,
+  onAddHere
 }: Readonly<{
   sessions: readonly SpineSession[];
   records: readonly R[];
@@ -140,6 +141,8 @@ function Spine<R extends StoryRecord>({
   onOpenSession: (sessionId: string) => void;
   /** What a GM's row shows when opened; players' rows read whole already. */
   renderOpen?: (record: R) => ReactNode;
+  /** While the GM composes, each session offers Add here, which files the entry under it (null: no session). */
+  onAddHere?: (sessionId: string | null) => void;
 }>) {
   const [openId, setOpenId] = useState<string | null>(focusedId);
   // A link to one record opens it and brings it into view once.
@@ -179,6 +182,11 @@ function Spine<R extends StoryRecord>({
               )}
               <span className="story-grow" />
               {days && <span className="story-spinedays">{days}</span>}
+              {onAddHere && (
+                <Button size="sm" variant="ghost" onClick={() => onAddHere(session?.id ?? null)}>
+                  <IconPlus /> Add here
+                </Button>
+              )}
             </div>
             {session &&
               (session.recap.trim() ? (
@@ -387,6 +395,8 @@ export function GmChronicle({
   dateBar,
   downtime,
   onAdd,
+  composer = null,
+  onAddHere,
   renderRecord,
   onOpenRecord
 }: Readonly<{
@@ -405,6 +415,9 @@ export function GmChronicle({
   dateBar: ReactNode;
   downtime: ReactNode;
   onAdd: () => void;
+  /** The open composer, at the head of the line above the first session (F story spec 2.4). */
+  composer?: ReactNode;
+  onAddHere?: (sessionId: string | null) => void;
   /** The full record, with its actions, inside an opened row. */
   renderRecord: (record: CodexChronicleRecord) => ReactNode;
   /** Opens one record from the calendar or the clocks. */
@@ -426,12 +439,14 @@ export function GmChronicle({
   return (
     <div className="story-chronicle">
       <div className="story-spinecol scroll-y">
+        {composer}
         <Spine
           sessions={spineSessions}
           records={records}
           calendar={calendar}
           token={gmToken}
           audience="gm"
+          onAddHere={composer ? onAddHere : undefined}
           lineOf={lineOf}
           focusedId={focusedId}
           onFollow={onFollow}

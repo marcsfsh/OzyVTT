@@ -82,6 +82,8 @@ export function EntryComposer({
   actors = [],
   tagSuggestions,
   initialKind = "entry",
+  inline = false,
+  fileUnder = null,
   onClose,
   onSaved,
   onFollow
@@ -97,6 +99,10 @@ export function EntryComposer({
   actors?: readonly ArchivableActor[];
   tagSuggestions: readonly string[];
   initialKind?: ComposerKind;
+  /** A new record is written at the head of the chronicle's line rather than in a dialog (F story spec 2.4). */
+  inline?: boolean;
+  /** A session's Add here: files the draft under that session (null for none); `nonce` makes each press count. */
+  fileUnder?: Readonly<{ sessionId: string | null; nonce: number }> | null;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
   /** Follows a `[[link]]` in the text: to the page of that title, or to create it. */
@@ -143,6 +149,23 @@ export function EntryComposer({
     }
   }
   const set = (patch: Partial<Draft>) => setDraft((prev) => ({ ...prev, ...patch }));
+  // Add here on a session files the draft under it, each press once.
+  const [filedNonce, setFiledNonce] = useState<number | null>(null);
+  if (fileUnder && fileUnder.nonce !== filedNonce) {
+    setFiledNonce(fileUnder.nonce);
+    setDraft((prev) => ({ ...prev, sessionId: fileUnder.sessionId ?? "" }));
+  }
+  const [showHidden, setShowHidden] = useState(false);
+  const [showLink, setShowLink] = useState(false);
+  // Newest first, then Not in a session; the planned one says it is next (F story spec 2.4).
+  const sessionOptions = useMemo(
+    () => [...sessions].sort((a, b) => (b.sessionNumber ?? 0) - (a.sessionNumber ?? 0)),
+    [sessions]
+  );
+  const nextPlannedId =
+    [...sessions]
+      .filter((session) => session.status === "planned")
+      .sort((a, b) => (a.sessionNumber ?? 0) - (b.sessionNumber ?? 0))[0]?.id ?? null;
 
   const characterOptions = useMemo(
     () =>
@@ -225,6 +248,235 @@ export function EntryComposer({
     }
   };
 
+  // The parts both forms share: the hidden note, the kind's own fields and the page it is about.
+  const hiddenField = (
+    <Field label="Hidden note" htmlFor="story-hidden">
+      <CodexEditor
+        id="story-hidden"
+        token={gmToken}
+        value={draft.hidden}
+        onChange={(hidden) => set({ hidden })}
+        ariaLabel="Hidden note"
+        placeholder="What only you see"
+        pages={pages}
+        onNavigate={onFollow}
+        onCreatePage={onFollow}
+        gmLayer
+        rows={3}
+      />
+    </Field>
+  );
+  const kindFields = (
+    <>
+      {!editing && kind === "downtime" && (
+        <div className="story-composer-row">
+          <Field label="Who" htmlFor="story-who">
+            <Combobox
+              id="story-who"
+              options={characterOptions}
+              value={draft.whoValue}
+              onChange={(whoValue) => set({ whoValue })}
+              allowFreeText
+              limit={Math.max(characterOptions.length, 1)}
+              ariaLabel="Who spent the time"
+              placeholder="Search characters, or type a name"
+            />
+          </Field>
+          <Field label="Activity" htmlFor="story-activity">
+            <Input
+              id="story-activity"
+              maxLength={DOWNTIME_TEXT_MAX}
+              value={draft.activity}
+              placeholder="Forging a blade"
+              onChange={(event) => set({ activity: event.target.value })}
+            />
+          </Field>
+          <Field label="Days" htmlFor="story-days">
+            <Input
+              id="story-days"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={DOWNTIME_DAYS_MAX}
+              value={draft.days}
+              placeholder="7"
+              onChange={(event) => set({ days: event.target.value })}
+            />
+          </Field>
+        </div>
+      )}
+      {proposal && calendar && (
+        <p className="story-hint">
+          Logging this proposes moving your date to {formatWorldDate(calendar, proposal)}. Nothing moves until you
+          confirm it on the record.
+        </p>
+      )}
+      {!editing && kind === "milestone" && (
+        <>
+          <div className="story-composer-row">
+            <Field label="Level reached" htmlFor="story-level">
+              <Input
+                id="story-level"
+                type="number"
+                inputMode="numeric"
+                min={LEVEL_MIN}
+                max={LEVEL_MAX}
+                value={draft.level}
+                placeholder="5"
+                onChange={(event) => set({ level: event.target.value })}
+              />
+            </Field>
+            <Field label="Why" htmlFor="story-reason">
+              <Input
+                id="story-reason"
+                maxLength={REASON_MAX}
+                value={draft.reason}
+                placeholder="Cleared the Sunken Crypt"
+                onChange={(event) => set({ reason: event.target.value })}
+              />
+            </Field>
+          </div>
+          <p className="story-hint">
+            A milestone records the level the party reached and when. It changes no character sheet and counts no XP.
+          </p>
+        </>
+      )}
+    </>
+  );
+  const pageField = (
+    <Field label="About a page" htmlFor="story-page">
+      <Combobox
+        id="story-page"
+        options={pages.map((page) => ({
+          id: page.id,
+          label: page.title,
+          icon: <EntityIcon type={page.entityType} />
+        }))}
+        value={draft.attachPageId || null}
+        onChange={(id) => set({ attachPageId: id ?? "" })}
+        ariaLabel="About a page"
+        placeholder="None"
+      />
+    </Field>
+  );
+
+  if (inline && !editing) {
+    if (!open) return null;
+    return (
+      <section className="story-composer is-inline" aria-label="Add to the chronicle">
+        <SegmentedControl
+          ariaLabel="What to add"
+          value={draft.kind}
+          onChange={(next) => {
+            const nextKind = next as ComposerKind;
+            set({
+              kind: nextKind,
+              ...(draft.dateYear.trim() === "" || nextKind === "deadline"
+                ? dateDraftOf(nextKind === "entry" ? (calendar?.currentDate ?? null) : null)
+                : {})
+            });
+          }}
+          options={COMPOSER_KINDS.map((id) => ({ value: id, label: CHRONICLE_KIND_META[id].label }))}
+        />
+        <div className="story-composer-filed">
+          <span className="story-eyebrow">Filed under</span>
+          <Field label="Session" htmlFor="story-session">
+            <Select
+              id="story-session"
+              value={draft.sessionId}
+              onChange={(event) => set({ sessionId: event.target.value })}
+            >
+              {sessionOptions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {[
+                    sessionTitle(session),
+                    session.id === nextPlannedId ? "Planned · next" : null,
+                    session.id === activeSessionId ? "active" : null
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </option>
+              ))}
+              <option value="">Not in a session</option>
+            </Select>
+          </Field>
+          <InWorldDateFields
+            idPrefix="story"
+            draft={draft}
+            months={calendar?.months ?? []}
+            onChange={set}
+            yearHelp={needsDate ? "A deadline fires when your date passes it." : undefined}
+          />
+        </div>
+        {error && <Alert tone="danger">{error}</Alert>}
+        <Field label="What players read" htmlFor="story-text">
+          <CodexEditor
+            id="story-text"
+            token={gmToken}
+            value={draft.text}
+            onChange={(text) => set({ text })}
+            ariaLabel="What players read"
+            placeholder={PLACEHOLDER[kind]}
+            pages={pages}
+            onNavigate={onFollow}
+            onCreatePage={onFollow}
+            rows={3}
+          />
+        </Field>
+        {kindFields}
+        <div className="story-composer-options">
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={showHidden || draft.hidden.trim() !== ""}
+            onClick={() => setShowHidden((on) => !on)}
+          >
+            Hidden note
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={showLink || draft.attachPageId !== ""}
+            onClick={() => setShowLink((on) => !on)}
+          >
+            Link a page
+          </Button>
+          <span className="story-grow" />
+          <FieldAudienceToggle
+            field="this record"
+            hidden={!draft.revealed}
+            onChange={(hidden) => set({ revealed: !hidden })}
+          />
+        </div>
+        {(showHidden || draft.hidden.trim() !== "") && hiddenField}
+        {(showLink || draft.attachPageId !== "") && pageField}
+        <Field label="Tags" htmlFor="story-tags">
+          <TagInput
+            id="story-tags"
+            ariaLabel="Tags"
+            placeholder="harbour, rumour"
+            values={draft.tags}
+            onChange={(tags) => set({ tags })}
+            max={24}
+            maxReachedReason="A record may carry at most 24 tags."
+            suggestions={tagSuggestions}
+          />
+        </Field>
+        {needsDate && !draft.dateYear.trim() && (
+          <p className="story-hint">A deadline needs a date. Set its year, month and day.</p>
+        )}
+        <div className="story-composer-foot">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!canSave} onClick={() => void save()}>
+            {SUBMIT[kind]}
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <Modal
       open={open}
@@ -276,94 +528,8 @@ export function EntryComposer({
             rows={5}
           />
         </Field>
-        <Field label="Hidden note" htmlFor="story-hidden">
-          <CodexEditor
-            id="story-hidden"
-            token={gmToken}
-            value={draft.hidden}
-            onChange={(hidden) => set({ hidden })}
-            ariaLabel="Hidden note"
-            placeholder="What only you see"
-            pages={pages}
-            onNavigate={onFollow}
-            onCreatePage={onFollow}
-            gmLayer
-            rows={3}
-          />
-        </Field>
-        {!editing && kind === "downtime" && (
-          <div className="story-composer-row">
-            <Field label="Who" htmlFor="story-who">
-              <Combobox
-                id="story-who"
-                options={characterOptions}
-                value={draft.whoValue}
-                onChange={(whoValue) => set({ whoValue })}
-                allowFreeText
-                limit={Math.max(characterOptions.length, 1)}
-                ariaLabel="Who spent the time"
-                placeholder="Search characters, or type a name"
-              />
-            </Field>
-            <Field label="Activity" htmlFor="story-activity">
-              <Input
-                id="story-activity"
-                maxLength={DOWNTIME_TEXT_MAX}
-                value={draft.activity}
-                placeholder="Forging a blade"
-                onChange={(event) => set({ activity: event.target.value })}
-              />
-            </Field>
-            <Field label="Days" htmlFor="story-days">
-              <Input
-                id="story-days"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={DOWNTIME_DAYS_MAX}
-                value={draft.days}
-                placeholder="7"
-                onChange={(event) => set({ days: event.target.value })}
-              />
-            </Field>
-          </div>
-        )}
-        {proposal && calendar && (
-          <p className="story-hint">
-            Logging this proposes moving your date to {formatWorldDate(calendar, proposal)}. Nothing moves until you
-            confirm it on the record.
-          </p>
-        )}
-        {!editing && kind === "milestone" && (
-          <>
-            <div className="story-composer-row">
-              <Field label="Level reached" htmlFor="story-level">
-                <Input
-                  id="story-level"
-                  type="number"
-                  inputMode="numeric"
-                  min={LEVEL_MIN}
-                  max={LEVEL_MAX}
-                  value={draft.level}
-                  placeholder="5"
-                  onChange={(event) => set({ level: event.target.value })}
-                />
-              </Field>
-              <Field label="Why" htmlFor="story-reason">
-                <Input
-                  id="story-reason"
-                  maxLength={REASON_MAX}
-                  value={draft.reason}
-                  placeholder="Cleared the Sunken Crypt"
-                  onChange={(event) => set({ reason: event.target.value })}
-                />
-              </Field>
-            </div>
-            <p className="story-hint">
-              A milestone records the level the party reached and when. It changes no character sheet and counts no XP.
-            </p>
-          </>
-        )}
+        {hiddenField}
+        {kindFields}
         <div className="story-composer-row">
           <InWorldDateFields
             idPrefix="story"
@@ -392,20 +558,7 @@ export function EntryComposer({
               ))}
             </Select>
           </Field>
-          <Field label="About a page" htmlFor="story-page">
-            <Combobox
-              id="story-page"
-              options={pages.map((page) => ({
-                id: page.id,
-                label: page.title,
-                icon: <EntityIcon type={page.entityType} />
-              }))}
-              value={draft.attachPageId || null}
-              onChange={(id) => set({ attachPageId: id ?? "" })}
-              ariaLabel="About a page"
-              placeholder="None"
-            />
-          </Field>
+          {pageField}
         </div>
         <Field label="Tags" htmlFor="story-tags">
           <TagInput

@@ -139,7 +139,8 @@ const openRow = async (user: ReturnType<typeof userEvent.setup>, id: string) => 
 };
 const openComposer = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.click(screen.getByRole("button", { name: "Add to the chronicle" }));
-  return within(await screen.findByRole("dialog", { name: "Add to the chronicle" }));
+  // The composer opens at the head of the line (F story spec 2.4).
+  return within(await screen.findByRole("region", { name: "Add to the chronicle" }));
 };
 
 beforeEach(() => {
@@ -595,7 +596,7 @@ describe("The Downtime card", () => {
     const user = userEvent.setup();
     renderStory([]);
     await user.click(card().getByRole("button", { name: "Log downtime" }));
-    const composer = within(await screen.findByRole("dialog", { name: "Add to the chronicle" }));
+    const composer = within(await screen.findByRole("region", { name: "Add to the chronicle" }));
     expect(composer.getByRole("button", { name: "Downtime", pressed: true })).toBeInTheDocument();
   });
 });
@@ -622,6 +623,8 @@ describe("The composer", () => {
       const composer = await openComposer(user);
       await user.click(composer.getByRole("button", { name: kind }));
       expect(composer.getByRole("textbox", { name: "What players read" })).toBeInTheDocument();
+      // The hidden note is an option under the text.
+      await user.click(composer.getByRole("button", { name: "Hidden note" }));
       expect(composer.getByRole("textbox", { name: "Hidden note" })).toBeInTheDocument();
     });
   }
@@ -1066,5 +1069,50 @@ describe("Loading, failure and filters", () => {
     expect(new URLSearchParams(window.location.search).get("kind")).toBe("milestone");
     expect(spine().queryByRole("button", { name: /We reached Vallaki/ })).toBeNull();
     expect(spine().getByRole("button", { name: /Reached level 3/ })).toBeInTheDocument();
+  });
+});
+
+describe("The composer at the head of the line", () => {
+  const SESSIONS = [session("s1", 1, { recapBody: "Barovia." }), session("s2", 2, { recapBody: "The church." })];
+  const fileWith = async (user: ReturnType<typeof userEvent.setup>, composer: ReturnType<typeof within>) => {
+    await user.type(composer.getByRole("textbox", { name: "What players read" }), "The mists parted.");
+    await user.click(composer.getByRole("button", { name: "Add entry" }));
+    await waitFor(() => expect(api.create).toHaveBeenCalled());
+    return api.create.mock.calls[0][1];
+  };
+
+  it("files a new entry under the active session first", async () => {
+    const user = userEvent.setup();
+    renderStory([], { sessions: SESSIONS, activeSessionId: "s2" });
+    const composer = await openComposer(user);
+    expect(composer.getByLabelText("Session")).toHaveValue("s2");
+    expect((await fileWith(user, composer)).sessionId).toBe("s2");
+  });
+
+  it("files it under Session 1 when chosen, and under no session as an explicit null", async () => {
+    const user = userEvent.setup();
+    const view = renderStory([], { sessions: SESSIONS, activeSessionId: "s2" });
+    let composer = await openComposer(user);
+    await user.selectOptions(composer.getByLabelText("Session"), "s1");
+    expect((await fileWith(user, composer)).sessionId).toBe("s1");
+    view.unmount();
+    api.create.mockClear();
+
+    renderStory([], { sessions: SESSIONS, activeSessionId: "s2" });
+    composer = await openComposer(user);
+    await user.selectOptions(composer.getByLabelText("Session"), "Not in a session");
+    expect((await fileWith(user, composer)).sessionId).toBeNull();
+  });
+
+  it("offers Add here on each session while composing, which files the entry there", async () => {
+    const user = userEvent.setup();
+    renderStory([], { sessions: SESSIONS, activeSessionId: "s2" });
+    expect(spine().queryByRole("button", { name: "Add here" })).not.toBeInTheDocument();
+    const composer = await openComposer(user);
+    const addHere = spine().getAllByRole("button", { name: "Add here" });
+    // Newest first: Session 2, then Session 1.
+    await user.click(addHere[1]!);
+    expect(composer.getByLabelText("Session")).toHaveValue("s1");
+    expect((await fileWith(user, composer)).sessionId).toBe("s1");
   });
 });
