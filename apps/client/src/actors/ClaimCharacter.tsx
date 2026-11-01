@@ -96,7 +96,7 @@ export function ClaimCharacter({ state, art = false }: Readonly<{ state: PlayerV
   };
 
   const picker = (
-    <section className={art ? "claim-view is-stage" : "claim-view scroll-y"} aria-labelledby="claim-heading">
+    <section className={art ? "claim-view is-stage" : "claim-view is-panel"} aria-labelledby="claim-heading">
       <div className="claim-heading">
         <h2 id="claim-heading">Pick your character</h2>
         {characters.length > 0 && (
@@ -118,7 +118,13 @@ export function ClaimCharacter({ state, art = false }: Readonly<{ state: PlayerV
           Nothing to claim yet. Your GM is setting up the party. You can send them a character sheet in the meantime.
         </EmptyState>
       ) : (
-        <ul ref={list} className="claim-lineup" role="radiogroup" aria-labelledby="claim-heading">
+        // In the table's panel the cards scroll between the status line and the panel's foot.
+        <ul
+          ref={list}
+          className={art ? "claim-lineup" : "claim-lineup scroll-y"}
+          role="radiogroup"
+          aria-labelledby="claim-heading"
+        >
           {characters.map((actor) => (
             <ClaimCard
               key={actor.id}

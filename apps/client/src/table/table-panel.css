@@ -121,8 +121,7 @@
 /* The staged scene's builder and the claim picker take the whole panel. */
 .table-panel-staging,
 .table-panel-claim {
-  padding: var(--space-3);
-  gap: var(--space-3);
+  padding: 0;
 }
 .table-panel-claim > .claim-view {
   flex: 1 1 0;

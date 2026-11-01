@@ -210,16 +210,47 @@
   flex: none;
 }
 
-/* ----- In the table's panel with a map live: two cards to a row, the portrait smaller ----- */
-.claim-view:not(.is-stage) .claim-lineup {
+/* ----- In the table's panel with a map live: two cards to a row, the portrait smaller, Play as in the foot ----- */
+.claim-view.is-panel {
+  height: 100%;
+  padding: 0;
+  gap: 0;
+}
+.claim-view.is-panel .claim-heading,
+.claim-view.is-panel > .nh-alert {
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+.claim-view.is-panel .claim-heading h2 {
+  font-size: 20px;
+}
+.claim-view.is-panel .claim-lineup {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 12px;
+  min-height: 0;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+/* The panel's foot (C's foot slot): the two controls over Play as, full width. */
+.claim-view.is-panel .claim-foot {
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 12px 16px;
+  backdrop-filter: none;
+  background: var(--surface-1);
+}
+.claim-view.is-panel .claim-foot-tools {
+  margin-right: 0;
+}
+.claim-view.is-panel .claim-play {
+  width: 100%;
 }
 .claim-card.is-compact .claim-card-art {
   height: 96px;
 }
-.claim-view:not(.is-stage) .claim-card.is-chosen {
+.claim-view.is-panel .claim-card.is-chosen {
   transform: none;
 }
 
