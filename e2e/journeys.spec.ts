@@ -150,7 +150,8 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(player.getByRole("heading", { name: "Pick your character" })).toBeVisible();
   // The later journeys play the other two.
   const card = player.getByRole("listitem").filter({ hasText: PARTY[2] });
-  await expect(card.getByText(/^Elf Wizard 7 · HP \d+$/)).toBeVisible();
+  // The card is the radio; what the old row said is its description.
+  await expect(card.getByRole("radio")).toHaveAccessibleDescription(/^Elf Wizard 7 · HP \d+$/);
   await expectPageFits(player);
   // Choose the character, then Play as claims it after the claim is confirmed.
   await press(card.getByRole("radio"));

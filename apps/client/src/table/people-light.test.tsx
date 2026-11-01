@@ -147,7 +147,7 @@ describe("claiming a character", () => {
       </ToastProvider>
     );
     await user.click(screen.getAllByRole("radio")[1]!);
-    expect(container.querySelector(".claim-row-edge")).not.toBeNull();
+    expect(container.querySelector(".claim-card-edge")).not.toBeNull();
     expect(animated).toContain(container.querySelector("[data-actor='a']"));
   });
 });

@@ -1,5 +1,5 @@
 import type { GmView, PlayerView } from "@vtt/domain";
-import { Button, useToast } from "@vtt/ui";
+import { Button, useToast, EmptyState } from "@vtt/ui";
 import { useReleaseCharacter } from "../actors/MyCharacter";
 import { RestPrompt } from "../rest/RestPrompt";
 import { lazySurface } from "../components/lazySurface";
@@ -51,17 +51,12 @@ export function LayerView({
           onCreated={(name) => toast(`${name} joined the roster, ready for a player to claim.`, { tone: "success" })}
         />
       ) : (
-        /* The builder is closed to players at this table: one line and one door back. */
+        /* The builder is closed to players at this table: T rule 3's empty state, one line and one door back. */
         <div className="anim-view builder-gate pane-frame pane-scene frame-col">
-          <div className="scene-empty frame-fill">
-            <p>
-              Your GM builds the characters at this table. Ask them to make you one, or claim one that's already on the
-              table.
-            </p>
-            <Button variant="primary" onClick={() => navigate("/table")}>
-              Back to the table
-            </Button>
-          </div>
+          <EmptyState action={<Button onClick={() => navigate("/table")}>Back to the table</Button>}>
+            Your GM builds the characters at this table. Ask them to make you one, or claim one that's already on the
+            table.
+          </EmptyState>
         </div>
       );
     case "level":
