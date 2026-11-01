@@ -1054,7 +1054,10 @@ fourth part (`codex/page/StandingColumn.tsx`, `?side=standing`, which the Factio
 feed now loads on the pages section so the column has the maps, journal entries and standing it reads. Quests keep
 their group in the address (`?status=`, "none" for every quest, and `?who=`); the story's Downtime tab is
 `/codex/story?tab=downtime` with the chosen character as `?who=` (the retired `downtime` section lands there); and a
-new chronicle record's composer is `EntryComposer`'s inline form at the head of the line (ADR-0066).
+new chronicle record's composer is `EntryComposer`'s inline form at the head of the line (ADR-0066). The Atlas keeps
+the map and the pin in its address (`/codex/atlas/{mapId}?pin={markerId}`); its tree, layers and pins come from
+`codex/atlas/AtlasPanel.tsx` (`MapTree`, `LayerRows`), and `AtlasMap` takes a `pinMenu` for a pin's own menu beside
+the spot menu (ADR-0067).
 
 The Encounters tab asks the Codex which records point at each table encounter: `GET /api/v1/codex/encounter-links` (GM only,
 `codex/scene-links.ts`) lists the sessions that stage it or name it in their prep's Encounters, and the pins on the

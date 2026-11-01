@@ -324,8 +324,10 @@ hidden block, Added since marked in place, and the See as preview's own palette.
 `F-story-people/PLAN.md`, ADR-0066): quests by status at the side, relationships as a ring on glass, a faction's
 standing in its page's side column, the composer at the head of the line, and a Downtime tab. Not built: the quest page
 redrawn with Facts at the side, Add a tie on the ring's panel, and the in-world date as one menu. F3.1 to F3.3 and the
-Downtime tab's contents Designed (`F3-atlas/SPEC.md`, `F3-atlas/PLAN.md`, ADR-0067): the maps as a tree at the side, the
-pins at the right with a pin's page and menu, the pin editor in tabs, and the Downtime tab's characters at the side.
+Downtime tab's contents Built in part (`F3-atlas/SPEC.md`, `F3-atlas/PLAN.md`, ADR-0067): the maps as a tree at the side,
+the pins at the right with a pin's page and menu, the pin editor in tabs, and the Downtime tab's characters at the side.
+Not built: the pins as rows with More, Move pin, a pin page drawn from its linked page's text and facts, and pin counts
+for maps that are not open.
 F4.4, F4.6 and F6.1 to F6.4 Designed (`F-time-tools/SPEC.md`, `F-time-tools/PLAN.md`, ADR-0070): prep templates as one
 page with the kinds at the side, Plan session on the Sessions tab, a calendar page, a record in the side column, and the
 Codex's tools in Settings.

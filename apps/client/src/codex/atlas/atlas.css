@@ -89,16 +89,6 @@
   min-height: 0;
   padding: var(--space-3) var(--space-4) var(--space-4);
 }
-.atlas-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  min-height: var(--tap-min);
-}
-.atlas-grow {
-  flex: 1 1 auto;
-}
 .atlas-mapframe {
   position: relative;
   flex: 1 1 auto;
@@ -378,19 +368,6 @@
   background: var(--surface-1);
   border-left: 1px solid var(--line-strong);
 }
-.atlas-panel-head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4) var(--space-2);
-}
-.atlas-panel-titles {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
 .atlas-panel-title {
   margin: 0;
   font: var(--fw-display) var(--fs-h2) / 1.1 var(--font-display);
@@ -400,17 +377,10 @@
   text-shadow: var(--heading-shadow);
   overflow-wrap: anywhere;
 }
-.atlas-panel-kind {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
 .atlas-visline {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-.atlas-panel-tabs {
-  margin: 0 var(--space-4);
 }
 .atlas-panel-body {
   flex: 1 1 auto;
@@ -512,53 +482,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.atlas-mapsinside {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: stretch;
-}
-.atlas-mapsinside > .nh-btn {
-  align-self: flex-start;
-}
-.atlas-maplist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.atlas-maprow {
-  width: 100%;
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
-  background: none;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  color: var(--text);
-  font: 600 var(--fs-sm) / 1.2 var(--font-body);
-  text-align: left;
-  cursor: pointer;
-}
-.atlas-maprow:hover {
-  background: var(--surface-2);
-}
-.atlas-maprow-icon {
-  width: 1.1em;
-  height: 1.1em;
-  flex: none;
-  color: var(--text-dim);
-}
-.atlas-maprow-name {
-  flex: 1 1 auto;
-}
-.atlas-maprow-chevron {
-  color: var(--text-muted);
 }
 .atlas-hiddenmark,
 .atlas-shownmark {
@@ -672,11 +595,6 @@
 .atlas-pagerow-chevron {
   color: var(--text-muted);
 }
-.atlas-pinview-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
 .atlas-pinview-scenes {
   display: flex;
   flex-direction: column;
@@ -780,14 +698,6 @@
   flex: 1 1 auto;
   min-width: 0;
 }
-.atlas-appearance-summary {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  font: 700 var(--fs-sm) / 1 var(--font-label);
-}
 .atlas-pineditor-foot,
 .atlas-details-danger {
   border-top: 1px solid var(--line);
@@ -805,37 +715,6 @@
   flex-wrap: wrap;
   gap: var(--space-3);
 }
-.atlas-nestrow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: var(--space-3);
-}
-.atlas-upload {
-  margin-bottom: var(--space-3);
-}
-.atlas-assetgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--space-2);
-}
-.atlas-assetcard {
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-.atlas-assetcard:hover,
-.atlas-assetcard:focus-visible {
-  border-color: var(--magenta);
-}
 .atlas-loading,
 /* An atlas with no map yet: the empty line where the map would be. */
 .atlas-firstmap {
@@ -848,16 +727,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-.atlas-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3) 0;
-}
-.atlas-phoneswitch {
-  margin: 0 var(--space-3);
 }
 .atlas-phonemap {
   position: relative;
@@ -884,14 +753,6 @@
 .atlas-sheet.is-tall {
   max-height: 100%;
   top: 0;
-}
-.atlas-phonelist {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 0 var(--space-3) var(--space-4);
 }
 .atlas.is-phone > .nh-alert {
   margin: 0 var(--space-3);

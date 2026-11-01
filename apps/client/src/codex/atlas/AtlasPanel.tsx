@@ -30,7 +30,6 @@ type ListedPin = Readonly<{
   revealedToPlayers?: boolean;
   isParty?: boolean;
 }>;
-type ListedMap = Readonly<{ id: string; name: string; kind: string; revealedToPlayers?: boolean }>;
 
 /** The way up: the open map's chain from its top-level map. */
 export function AtlasCrumbs({
@@ -58,34 +57,6 @@ export function AtlasCrumbs({
         );
       })}
     </nav>
-  );
-}
-
-/** The layer switches as chips, for a laptop's map toolbar. */
-export function LayerChips({
-  layers,
-  onToggle,
-  gm
-}: Readonly<{ layers: AtlasLayers; onToggle: (layer: AtlasLayer) => void; gm: boolean }>) {
-  return (
-    <div className="atlas-layers" role="group" aria-label="Layers">
-      {LAYER_META.filter((layer) => gm || !layer.gmOnly).map((layer) => (
-        <button
-          key={layer.id}
-          type="button"
-          className={`atlas-layer${layer.gmOnly ? " is-gm" : ""}`}
-          aria-pressed={layers[layer.id]}
-          onClick={() => onToggle(layer.id)}
-        >
-          {layer.gmOnly ? (
-            <IconEyeOff className="atlas-layer-icon" />
-          ) : (
-            <CodexIcon iconId={layer.iconId} className="atlas-layer-icon" />
-          )}
-          {layer.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -258,62 +229,6 @@ export function PinTable({
         })}
       </tbody>
     </table>
-  );
-}
-
-/** The maps nested in this one, then the other top-level maps, so every map stays reachable. */
-export function MapsInside({
-  children,
-  roots,
-  currentRootId,
-  gm,
-  onEnter,
-  footer
-}: Readonly<{
-  children: readonly ListedMap[];
-  roots: readonly ListedMap[];
-  currentRootId: string | null;
-  gm: boolean;
-  onEnter: (mapId: string) => void;
-  footer?: ReactNode;
-}>) {
-  const otherRoots = roots.filter((root) => root.id !== currentRootId);
-  const row = (map: ListedMap) => (
-    <li key={map.id}>
-      <button type="button" className="atlas-maprow" onClick={() => onEnter(map.id)}>
-        <CodexIcon
-          iconId={map.kind === "world" ? "compass" : map.kind === "battlemap" ? "battle" : "city"}
-          className="atlas-maprow-icon"
-        />
-        <span className="atlas-ellipsis atlas-maprow-name">{map.name}</span>
-        {gm && map.revealedToPlayers === false && (
-          <span className="atlas-hiddenmark" role="img" aria-label="Hidden" title="Hidden">
-            <IconEyeOff />
-          </span>
-        )}
-        <IconChevronRight className="atlas-maprow-chevron" />
-      </button>
-    </li>
-  );
-  return (
-    <div className="atlas-mapsinside">
-      {children.length === 0 ? (
-        <p className="atlas-empty">No maps inside this one.</p>
-      ) : (
-        <ul className="atlas-maplist" aria-label="Maps inside this one">
-          {children.map(row)}
-        </ul>
-      )}
-      {footer}
-      {otherRoots.length > 0 && (
-        <>
-          <h4 className="atlas-eyebrow">Other top-level maps</h4>
-          <ul className="atlas-maplist" aria-label="Other top-level maps">
-            {otherRoots.map(row)}
-          </ul>
-        </>
-      )}
-    </div>
   );
 }
 

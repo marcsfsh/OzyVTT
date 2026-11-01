@@ -661,6 +661,14 @@ Prep's Party and the level dialog (ADR-0051; `docs/design/polish/D-characters/`)
 - Add to the chronicle opens the composer at the head of the line, above the first session: the kinds, Filed under
   (any session or Not in a session, and the in-world date), the text, Hidden note and Link a page as options, and the
   kind's Cup. While composing each session has Add here. An edit keeps its dialog.
+- The Atlas is three columns (ADR-0067): MAPS as a tree at the left (each map under the one it sits in, the open one lit
+  with its pin count), ON THE MAP with the layers reading On or Off, and Add a map; the map with its crumbs and line on
+  glass; PINS at the right with Add a pin and the map's More (Rename, Map details, who sees it, Add a map inside, Delete
+  map). A pin opens as its page in that column with Edit pin, More, and The party's position and Players see it as
+  switches; a right-click or a long press on a pin opens its own menu headed by its name. Edit pin is four tabs: Look,
+  Links, Encounters and Who sees it, with Done as the Cup. Add a map opens the library's picker, then asks the name,
+  kind and where it sits. A phone has the maps as chips and the pins as a sheet; a player's Atlas has no Edit and its
+  pin menu only opens things.
 - The story's tabs are Chronicle, Timeline, Sessions and Downtime, as words with Filters at the right. Downtime puts the
   characters with their days and the deadlines at the left and the chosen character's downtime at the right, with Log
   downtime as the Cup and what waits to be confirmed above the rows. The chronicle is
