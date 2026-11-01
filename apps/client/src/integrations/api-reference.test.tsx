@@ -151,18 +151,18 @@ function renderReference(openKey: string | null = null) {
   return { onOpen, onClose };
 }
 
-describe("the reference's table", () => {
-  it("lists the operations with their columns and opens one", async () => {
+describe("the reference's groups", () => {
+  it("lists the operations as a group of rows for each tag, and opens one", async () => {
     const user = userEvent.setup();
     const { onOpen } = renderReference();
-    const table = await screen.findByRole("table");
-    expect(
-      within(table)
-        .getAllByRole("columnheader")
-        .map((cell) => cell.textContent)
-    ).toEqual(["Method", "Path", "Summary", "Tag", "Who can call"]);
+    const credentials = within(await screen.findByRole("region", { name: "Credentials" }));
+    expect(credentials.getByRole("heading", { level: 3 })).toHaveTextContent("Credentials1");
+    expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByText("5 of 5 operations")).toBeInTheDocument();
-    await user.click(within(table).getByRole("button", { name: "/api/v1/game/state" }));
+    const row = screen.getByRole("button", { name: /GET \/api\/v1\/game\/state$/ });
+    expect(row).toHaveTextContent("/api/v1/game/state");
+    expect(row).toHaveTextContent("No command");
+    await user.click(row);
     expect(onOpen).toHaveBeenCalledWith("getGameState");
   });
 
@@ -198,12 +198,11 @@ describe("the reference's table", () => {
     expect(within(dialog).getByRole("combobox", { name: "Then by: column" })).toHaveValue("path");
   });
 
-  it("shows the command catalog as a second table", async () => {
-    const user = userEvent.setup();
+  it("has no second table of commands: a row the catalog does not take says No command", async () => {
     renderReference();
-    await user.click(await screen.findByRole("button", { name: "Commands" }));
-    expect(screen.getByRole("table")).toHaveTextContent("token:move");
-    expect(screen.getByRole("table")).toHaveTextContent("encounter:write");
+    await screen.findByRole("region", { name: "Credentials" });
+    expect(screen.queryByRole("button", { name: "Commands" })).toBeNull();
+    expect(screen.getAllByText("No command")).toHaveLength(5);
   });
 });
 

@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useState } from "react";
+import { GAME_COMMANDS } from "@vtt/api-contract";
 import {
   Alert,
   Button,
   Chip,
+  IconChevronRight,
   IconDownload,
-  SegmentedControl,
   Skeleton,
   Dropdown,
   FilterChips,
@@ -20,6 +21,7 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import { SettingsPrimary } from "../settings/SettingRow";
 import {
   CALLER_WORDS,
+  commandsByOperation,
   DEFAULT_SORT,
   NO_FILTERS,
   operationRows,
@@ -28,7 +30,8 @@ import {
   visibleRows,
   type ApiFilters,
   type ApiSortKey,
-  type Caller
+  type Caller,
+  type OperationRow
 } from "./api-rows";
 import { OperationDocument } from "./OperationDocument";
 import { exportSpec, METHOD_ORDER, type CatalogCommand, type OpenApiDocument } from "./openapi-model";
@@ -36,9 +39,10 @@ import "./api-reference.css";
 
 /**
  * The API reference, read live from the running server (the OpenAPI document at /api/v1/openapi.json and the command
- * catalog), so it can't drift from what the server answers. Operations are a table under a Tag dropdown, filters
- * that fly out and a sort by several columns; an operation opens as one document beside its metadata, at its own
- * address. The commands that the live-game tunnel takes are a second table.
+ * catalog), so it can't drift from what the server answers. Each tag is a group of Settings' rows (I leftovers spec
+ * 2.1): the method and summary, the path, the command the live-game tunnel takes for it or No command, and who can
+ * call it. The field finds a path, a summary or a command; Tags, Filters and Sort narrow and order the rows. An
+ * operation opens as one document at its own address.
  */
 
 function MethodMark({ method }: Readonly<{ method: string }>) {
@@ -63,7 +67,6 @@ export function ApiReference({
     commands: readonly CatalogCommand[];
   }>({ status: "loading", document: null, commands: [] });
   const [attempt, setAttempt] = useState(0);
-  const [view, setView] = useState<"operations" | "commands">("operations");
   const [filters, setFilters] = useState<ApiFilters>(NO_FILTERS);
   const [sort, setSort] = useState<readonly SortLevelOf<ApiSortKey>[]>(DEFAULT_SORT);
   const [sorting, setSorting] = useState(false);
@@ -96,7 +99,14 @@ export function ApiReference({
   const rows = useMemo(() => (document ? operationRows(document) : []), [document]);
   const tags = useMemo(() => tagsOf(rows), [rows]);
   const scopes = useMemo(() => [...new Set(rows.flatMap((row) => row.scopes))].sort(), [rows]);
-  const shown = useMemo(() => visibleRows(rows, filters, sort), [rows, filters, sort]);
+  const commands = useMemo(() => commandsByOperation(rows, state.commands, GAME_COMMANDS), [rows, state.commands]);
+  const shown = useMemo(() => visibleRows(rows, filters, sort, commands), [rows, filters, sort, commands]);
+  // Groups in the order the sorted rows first meet them.
+  const groups = useMemo(() => {
+    const byTag = new Map<string, OperationRow[]>();
+    for (const row of shown) byTag.set(row.tag, [...(byTag.get(row.tag) ?? []), row]);
+    return [...byTag.entries()];
+  }, [shown]);
   const open = openKey ? rows.find((row) => row.key === openKey) : undefined;
   const set = (patch: Partial<ApiFilters>) => setFilters((current) => ({ ...current, ...patch }));
   const filterCount = filters.methods.length + filters.callers.length + filters.scopes.length;
@@ -230,45 +240,31 @@ export function ApiReference({
         <p>Example values are made up. Real ids come from the game state.</p>
       </details>
       <div className="cx-sub api-toolbar">
-        <SegmentedControl
-          size="sm"
-          ariaLabel="Show"
-          value={view}
-          onChange={(value) => setView(value as typeof view)}
-          options={[
-            { value: "operations", label: "Operations" },
-            { value: "commands", label: "Commands" }
-          ]}
-        />
         <FindField
           className="api-find"
-          aria-label={view === "operations" ? "Find an operation" : "Find a command"}
-          placeholder={view === "operations" ? "Find a path or summary" : "Find a command"}
+          aria-label="Find an operation"
+          placeholder="Find a path, a summary or a command"
           value={filters.text}
           onChange={(event) => set({ text: event.target.value })}
         />
-        {view === "operations" && (
-          <>
-            {tagMenu}
-            <FiltersButton
-              open={flyout}
-              onToggle={() => setFlyout((current) => !current)}
-              controls={flyoutId}
-              count={filterCount}
-            />
-            <Button
-              size="sm"
-              aria-haspopup="dialog"
-              aria-label={`Sort: ${sort.map((level) => SORT_WORDS[level.key]).join(", then ")}`}
-              onClick={() => setSorting(true)}
-            >
-              <IconSort /> {sort.map((level) => SORT_WORDS[level.key]).join(", then ")}
-            </Button>
-          </>
-        )}
+        {tagMenu}
+        <FiltersButton
+          open={flyout}
+          onToggle={() => setFlyout((current) => !current)}
+          controls={flyoutId}
+          count={filterCount}
+        />
+        <Button
+          size="sm"
+          aria-haspopup="dialog"
+          aria-label={`Sort: ${sort.map((level) => SORT_WORDS[level.key]).join(", then ")}`}
+          onClick={() => setSorting(true)}
+        >
+          <IconSort /> {sort.map((level) => SORT_WORDS[level.key]).join(", then ")}
+        </Button>
         <span className="cx-grow" />
         <span className="api-count" role="status">
-          {view === "operations" ? `${shown.length} of ${rows.length} operations` : `${state.commands.length} commands`}
+          {`${shown.length} of ${rows.length} operations`}
         </span>
         {!phone && (
           <Button
@@ -281,7 +277,7 @@ export function ApiReference({
           </Button>
         )}
       </div>
-      {view === "operations" && chips.length > 0 && (
+      {chips.length > 0 && (
         <div className="api-chips" aria-label="Filters on">
           {chips.map((chip) => (
             <Chip key={chip.key} onRemove={chip.remove} removeLabel={`Remove ${chip.words}`}>
@@ -295,56 +291,22 @@ export function ApiReference({
       )}
 
       <div className="api-results scroll-y">
-        {view === "commands" ? (
-          <CommandsTable commands={state.commands} text={filters.text} phone={phone} />
-        ) : shown.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="settings-empty">No operation matches. Change the words, the tags or the filters.</p>
-        ) : phone ? (
-          <ul className="api-list" aria-label="Operations">
-            {shown.map((row) => (
-              <li key={row.key}>
-                <button type="button" className="api-list-row" onClick={() => onOpen(row.key)}>
-                  <span className="api-list-route">
-                    <MethodMark method={row.method} />
-                    <code className="api-path">{row.path}</code>
-                  </span>
-                  <span className="api-list-summary">{row.summary}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
         ) : (
-          <table className="cx-table api-table">
-            <thead>
-              <tr>
-                <th scope="col">Method</th>
-                <th scope="col">Path</th>
-                <th scope="col">Summary</th>
-                <th scope="col">Tag</th>
-                <th scope="col">Who can call</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((row) => (
-                <tr key={row.key} className="cx-row" onClick={() => onOpen(row.key)}>
-                  <td>
-                    <MethodMark method={row.method} />
-                  </td>
-                  <td>
-                    <button type="button" className="cx-rowlink api-path" onClick={() => onOpen(row.key)}>
-                      {row.path}
-                    </button>
-                  </td>
-                  <td className="api-col-summary">{row.summary}</td>
-                  <td>{row.tag}</td>
-                  <td className="api-col-callers">
-                    {row.callers.map((caller) => CALLER_WORDS[caller]).join(" · ")}
-                    {row.scopes.length > 0 && <span className="api-scopes"> · {row.scopes.join(", ")}</span>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          groups.map(([tag, members]) => (
+            <section key={tag} className="api-group" aria-label={tag}>
+              <h3 className="api-group-head">
+                <span className="api-group-name">{tag}</span>
+                <span className="api-group-count">{members.length}</span>
+              </h3>
+              <ul className="api-rows">
+                {members.map((row) => (
+                  <OperationRowView key={row.key} row={row} command={commands.get(row.key) ?? null} onOpen={onOpen} />
+                ))}
+              </ul>
+            </section>
+          ))
         )}
       </div>
 
@@ -407,54 +369,45 @@ export function ApiReference({
   );
 }
 
-/** The command catalog: the commands the live-game tunnel takes, with the scope each needs. */
-function CommandsTable({
-  commands,
-  text,
-  phone
-}: Readonly<{ commands: readonly CatalogCommand[]; text: string; phone: boolean }>) {
-  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = commands.filter((command) =>
-    words.every((word) => `${command.type} ${command.scope} ${command.summary}`.toLowerCase().includes(word))
-  );
-  if (commands.length === 0)
-    return <p className="settings-empty">The server sent no command catalog, so only the operations are listed.</p>;
-  if (shown.length === 0) return <p className="settings-empty">No command matches those words.</p>;
-  return phone ? (
-    <ul className="api-list" aria-label="Commands">
-      {shown.map((command) => (
-        <li key={command.type} className="api-list-row is-static">
-          <span className="api-list-route">
-            <code className="api-path">{command.type}</code>
+/**
+ * One operation as Settings' row: the method and summary, the path under them, then at the right the command the
+ * live-game tunnel takes for it (or No command), who can call it and the arrow to its page.
+ */
+function OperationRowView({
+  row,
+  command,
+  onOpen
+}: Readonly<{ row: OperationRow; command: string | null; onOpen: (key: string) => void }>) {
+  return (
+    <li>
+      <button
+        type="button"
+        className="api-row"
+        aria-label={`${row.summary}, ${row.method.toUpperCase()} ${row.path}`}
+        onClick={() => onOpen(row.key)}
+      >
+        <span className="api-row-main">
+          <span className="api-row-title">
+            <MethodMark method={row.method} />
+            <span className="api-row-summary">{row.summary}</span>
           </span>
-          <span className="api-list-summary">
-            {command.summary} · <code>{command.scope}</code>
+          <code className="api-path api-row-path">{row.path}</code>
+        </span>
+        <span className="api-row-side">
+          {command ? (
+            <span className="api-row-command">
+              As a command <code>{command}</code>
+            </span>
+          ) : (
+            <span className="api-row-command is-none">No command</span>
+          )}
+          <span className="api-row-callers">
+            {row.callers.map((caller) => CALLER_WORDS[caller]).join(" · ")}
+            {row.scopes.length > 0 && <span className="api-scopes"> · {row.scopes.join(", ")}</span>}
           </span>
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <table className="cx-table api-table">
-      <thead>
-        <tr>
-          <th scope="col">Command</th>
-          <th scope="col">Scope</th>
-          <th scope="col">What it does</th>
-        </tr>
-      </thead>
-      <tbody>
-        {shown.map((command) => (
-          <tr key={command.type}>
-            <td>
-              <code>{command.type}</code>
-            </td>
-            <td>
-              <code>{command.scope}</code>
-            </td>
-            <td>{command.summary}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+        </span>
+        <IconChevronRight className="api-row-arrow" />
+      </button>
+    </li>
   );
 }

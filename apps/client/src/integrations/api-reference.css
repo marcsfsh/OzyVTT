@@ -33,7 +33,7 @@
   background: none;
 }
 .api-find {
-  width: 14rem;
+  width: 17rem;
   margin: 0;
 }
 .api-count {
@@ -325,5 +325,125 @@
   .api-find {
     flex: 1 1 100%;
     width: auto;
+  }
+}
+
+/* Each tag a group of Settings' rows (I leftovers spec 2.1): the eyebrow with its count in VT323, then the rows in a
+   Cradle. A row is the method and summary over the path, with the command and who can call it at the right. */
+.api-group {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.api-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.api-group-count {
+  color: var(--text-dim);
+  font: 400 16px / 1 var(--font-numeric);
+  letter-spacing: 0;
+}
+.api-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--material-plate);
+  border: 1px solid var(--line);
+  box-shadow: var(--material-lip);
+}
+.api-rows > li + li {
+  border-top: 1px solid var(--line);
+}
+.api-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, auto) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+.api-row:hover {
+  background: var(--surface-2);
+}
+.api-row:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--cyan));
+  outline-offset: -2px;
+}
+.api-row-main,
+.api-row-side {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.api-row-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.api-row-summary {
+  font: 600 var(--fs-sm) / 1.3 var(--font-label);
+}
+.api-row-path {
+  color: var(--text-dim);
+  font: 400 15px / 1.2 var(--font-numeric);
+  overflow-wrap: anywhere;
+}
+.api-row-side {
+  justify-items: end;
+  text-align: end;
+}
+.api-row-command {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.api-row-command code {
+  color: var(--text);
+  font: 400 16px / 1 var(--font-numeric);
+}
+.api-row-command.is-none {
+  color: var(--text-muted);
+}
+.api-row-callers {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.api-row-callers .api-scopes {
+  font: inherit;
+}
+.api-row-arrow {
+  color: var(--text-dim);
+}
+
+/* A phone: each row stacked (method and summary, path, command, who can call). */
+@media (max-width: 650px) {
+  .api-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--space-2) var(--space-3);
+  }
+  .api-row-side {
+    grid-column: 1;
+    justify-items: start;
+    text-align: start;
+  }
+  .api-row-arrow {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .api-find {
+    width: 100%;
   }
 }

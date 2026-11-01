@@ -129,7 +129,9 @@ export function tagsOf(rows: readonly OperationRow[]): readonly string[] {
 export function visibleRows(
   rows: readonly OperationRow[],
   filters: ApiFilters,
-  sort: readonly SortLevelOf<ApiSortKey>[]
+  sort: readonly SortLevelOf<ApiSortKey>[],
+  /** Each operation's command, so the field finds an operation by its command's type. */
+  commands?: ReadonlyMap<string, string>
 ): readonly OperationRow[] {
   const words = filters.text.toLowerCase().split(/\s+/).filter(Boolean);
   const kept = rows.filter(
@@ -138,7 +140,9 @@ export function visibleRows(
       (filters.methods.length === 0 || filters.methods.includes(row.method)) &&
       (filters.callers.length === 0 || row.callers.some((caller) => filters.callers.includes(caller))) &&
       (filters.scopes.length === 0 || row.scopes.some((scope) => filters.scopes.includes(scope))) &&
-      words.every((word) => `${row.path} ${row.key} ${row.summary}`.toLowerCase().includes(word))
+      words.every((word) =>
+        `${row.path} ${row.key} ${row.summary} ${commands?.get(row.key) ?? ""}`.toLowerCase().includes(word)
+      )
   );
   const compare = (a: OperationRow, b: OperationRow, key: ApiSortKey): number =>
     key === "tag"
@@ -156,4 +160,27 @@ export function visibleRows(
     }
     return 0;
   });
+}
+
+/**
+ * Which live-game command each operation is (I leftovers spec 2.3): the catalog the server sends names its commands,
+ * and each command's route in the contract (`GAME_COMMANDS`) names the operation's method and path. An operation with
+ * no command in the catalog has none here.
+ */
+export function commandsByOperation(
+  rows: readonly OperationRow[],
+  catalog: readonly Readonly<{ type: string }>[],
+  routes: Readonly<Record<string, Readonly<{ method: string; path: string }>>>
+): ReadonlyMap<string, string> {
+  const byRoute = new Map<string, string>();
+  for (const command of catalog) {
+    const route = routes[command.type];
+    if (route) byRoute.set(`${route.method.toLowerCase()} ${route.path}`, command.type);
+  }
+  const out = new Map<string, string>();
+  for (const row of rows) {
+    const type = byRoute.get(`${row.method} ${row.path}`);
+    if (type) out.set(row.key, type);
+  }
+  return out;
 }
