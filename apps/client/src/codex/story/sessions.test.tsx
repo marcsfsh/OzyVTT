@@ -192,6 +192,54 @@ describe("The Sessions tab", () => {
   });
 });
 
+describe("Plan session on the Sessions tab", () => {
+  const DELVE: CodexPrepTemplate = {
+    ...TEMPLATE,
+    id: "t2",
+    name: "Dungeon delve",
+    isDefault: false,
+    sections: [
+      { id: "d1", title: "The way in", prompt: null, type: "text" },
+      { id: "d2", title: "Rooms", prompt: null, type: "scenes" }
+    ]
+  };
+  const MINE: CodexPrepTemplate = {
+    ...TEMPLATE,
+    sections: [{ id: "m1", title: "Strong start", prompt: null, type: "text" }]
+  };
+
+  it("chooses the default template, copies what the chosen chip holds, and makes and opens the next session", async () => {
+    const user = userEvent.setup();
+    api.templates.mockResolvedValue({ templates: [MINE, DELVE], defaultTemplateId: "t1" });
+    api.createSession.mockResolvedValue(session("s8", 8));
+    renderGmStory(GmSessionsSection, "/codex/sessions", { sessions: [S7], pages: PAGES });
+    const plan = within(await screen.findByRole("region", { name: "Plan session 8" }));
+    const copies = () =>
+      within(plan.getByRole("list", { name: "Sections it copies" }))
+        .getAllByRole("listitem")
+        .map((item) => item.textContent);
+    await waitFor(() =>
+      expect(plan.getByRole("button", { name: "My session prep" })).toHaveAttribute("aria-pressed", "true")
+    );
+    expect(copies()).toEqual(["Strong start"]);
+
+    await user.click(plan.getByRole("button", { name: "Dungeon delve" }));
+    expect(plan.getByRole("button", { name: "Dungeon delve" })).toHaveAttribute("aria-pressed", "true");
+    expect(copies()).toEqual(["The way in", "Rooms"]);
+
+    await user.type(plan.getByLabelText("Played on"), "2026-11-08");
+    await user.click(plan.getByRole("button", { name: "Create session 8" }));
+    await waitFor(() =>
+      expect(api.createSession).toHaveBeenCalledWith("gm", {
+        sessionNumber: 8,
+        realDate: "2026-11-08",
+        templateId: "t2"
+      })
+    );
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/sessions/s8"));
+  });
+});
+
 describe("The session page", () => {
   it("opens a session's page with its date, its players and the template it was made from", async () => {
     renderGmStory(GmSessionsSection, "/codex/sessions/s6", {

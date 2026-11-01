@@ -18,6 +18,7 @@ import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META, chronicleRowSummary } from
 import { CodexMarkdown } from "../CodexMarkdown";
 import { usePageLinks } from "../pageLinks";
 import { prepSessionApi } from "../prep/api";
+import { PlanSession } from "../templates/PlanSession";
 import { atlasPath, pagePath, pathForSection, sessionPath, templatePath } from "../routes";
 import { withQuery } from "../../router";
 import { sessionTitle } from "../sessions";
@@ -789,6 +790,18 @@ export function GmSessionsSection() {
     />
   );
 
+  // PLAN SESSION {n} beside the cards, and above the list on a phone (F time spec 2.3).
+  const plan = (
+    <PlanSession
+      gmToken={shell.token}
+      sessions={sessions}
+      onCreated={async (id) => {
+        await feeds.sessionFeed.reload();
+        shell.go(sessionPath(id));
+      }}
+    />
+  );
+
   if (shell.phone)
     return (
       <div className="story is-phone">
@@ -803,6 +816,7 @@ export function GmSessionsSection() {
               }
             />
             {error && <Alert tone="danger">{error}</Alert>}
+            {plan}
             <SessionRows sessions={sorted} selectedId={null} gm onPick={(id) => shell.go(sessionPath(id))} />
           </div>
         )}
@@ -851,16 +865,23 @@ export function GmSessionsSection() {
               <Skeleton variant="text" />
             </div>
           ) : sessions.length > 0 ? (
-            <div className="story-sessionstage scroll-y">{cards}</div>
+            <div className="story-sessionstage story-sessionplan scroll-y">
+              <div className="story-sessionplan-cards">{cards}</div>
+              {plan}
+            </div>
           ) : (
-            <div className="story-empty">
-              <h3>No sessions yet</h3>
-              <p>
-                A session is made from a prep template. Its page holds the prep, and after play the recap players read.
-              </p>
-              <Button variant="primary" onClick={() => void create()}>
-                New session
-              </Button>
+            <div className="story-sessionstage story-sessionplan scroll-y">
+              <div className="story-empty">
+                <h3>No sessions yet</h3>
+                <p>
+                  A session is made from a prep template. Its page holds the prep, and after play the recap players
+                  read.
+                </p>
+                <Button variant="primary" onClick={() => void create()}>
+                  New session
+                </Button>
+              </div>
+              {plan}
             </div>
           ))}
       </div>

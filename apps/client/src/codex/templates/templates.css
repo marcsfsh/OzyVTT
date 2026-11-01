@@ -392,3 +392,43 @@
   color: var(--text-dim);
   font-size: var(--fs-sm);
 }
+
+/* PLAN SESSION on the story's Sessions tab. */
+.plan-session {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+.plan-session-eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font: 700 var(--fs-xs) / 1.3 var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-eyebrow);
+}
+.plan-session-label,
+.plan-session-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.plan-session-chips,
+.plan-session-copies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.plan-session-copies {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.plan-session-copy {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-strong);
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.4 var(--font-label);
+}

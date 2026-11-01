@@ -1801,3 +1801,17 @@ button.story-hline-card:hover,
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* The Sessions tab with PLAN SESSION at the right (F time spec 2.3). */
+.story-sessionplan {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--space-5);
+  align-items: start;
+}
+.story-sessionplan-cards {
+  min-width: 0;
+}
+.story-sessionplan .story-empty {
+  padding: 0;
+}
