@@ -368,3 +368,36 @@
     padding: 0 10px;
   }
 }
+
+/* A tool's options are A's menu from the tool (C2 spec 2.5): the horizon edge along its top, in glass beside the dock on
+   a laptop, and on a phone under the tools row from the right edge with 10px gutters, over the map rather than pushing
+   it down. The tool stays on after the menu closes. */
+.map-options {
+  position: relative;
+}
+.map-options::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto;
+  height: 2px;
+  background: var(--grad-horizon);
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .map-rail-wrap:not(.map-rail-wrap--grid) {
+    position: relative;
+  }
+  .map-rail-wrap:not(.map-rail-wrap--grid) .map-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 10px;
+    right: 10px;
+    z-index: 30;
+    max-height: 22rem;
+    border: 1px solid var(--line-strong);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    box-shadow: var(--shadow-2);
+  }
+}
