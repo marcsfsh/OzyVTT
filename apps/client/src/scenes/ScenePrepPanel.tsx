@@ -44,6 +44,7 @@ export function ScenePrepPanel({
   emptyNote,
   placementHint,
   hideMap = false,
+  hideTray = false,
   onPlace
 }: Readonly<{
   /** The panel's own title. Omit when the surface already has one. */
@@ -81,6 +82,8 @@ export function ScenePrepPanel({
   hideMap?: boolean;
   /** Arms the map to place a staged token at the next spot pressed. */
   onPlace?: (actorId: string) => void;
+  /** The start form lists who is in the encounter itself, with its own difficulty, so the tray and its budget go. */
+  hideTray?: boolean;
 }>) {
   const [browsing, setBrowsing] = useState(false);
   const [pickingMap, setPickingMap] = useState(false);
@@ -194,18 +197,20 @@ export function ScenePrepPanel({
         />
       )}
 
-      <StagingTray
-        entries={entries}
-        revealNew={revealNew}
-        onRevealNewChange={setTrayReveal}
-        onRevealEntryChange={setEntryReveal}
-        onRemove={(entry) => void removeEntry(entry)}
-        busy={busy}
-        emptyNote={emptyNote}
-        placementHint={placementHint}
-        {...(onPlace ? { onPlace: (entry: StagingEntry) => onPlace(entry.actorId) } : {})}
-      />
-      <EncounterBudgetLine actors={actors} staged={staged} />
+      {!hideTray && (
+        <StagingTray
+          entries={entries}
+          revealNew={revealNew}
+          onRevealNewChange={setTrayReveal}
+          onRevealEntryChange={setEntryReveal}
+          onRemove={(entry) => void removeEntry(entry)}
+          busy={busy}
+          emptyNote={emptyNote}
+          placementHint={placementHint}
+          {...(onPlace ? { onPlace: (entry: StagingEntry) => onPlace(entry.actorId) } : {})}
+        />
+      )}
+      {!hideTray && <EncounterBudgetLine actors={actors} staged={staged} />}
 
       <div className="scene-prep-adds">
         <Button

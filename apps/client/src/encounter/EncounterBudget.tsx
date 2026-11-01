@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ContentMonsterSummary, GmActor } from "@vtt/domain";
 import { encounterBudget, encounterDifficulty, type EncounterDifficulty } from "@vtt/rules-5e";
 import { loadMonsterCatalog } from "./monster-catalog";
+import { Group } from "@vtt/ui";
 
 const DIFFICULTY: Record<EncounterDifficulty, string> = {
   "under-low": "Below Low",
@@ -17,8 +18,29 @@ const DIFFICULTY: Record<EncounterDifficulty, string> = {
  */
 export function EncounterBudgetLine({
   actors,
-  staged
-}: Readonly<{ actors: readonly GmActor[]; staged: readonly string[] }>) {
+  staged,
+  group = false
+}: Readonly<{
+  actors: readonly GmActor[];
+  staged: readonly string[];
+  /** Drawn as the start form's Difficulty, an open group, when it has something to say. */
+  group?: boolean;
+}>) {
+  const line = <BudgetLine actors={actors} staged={staged} />;
+  return group ? <DifficultyGroup actors={actors} staged={staged} /> : line;
+}
+
+function DifficultyGroup({ actors, staged }: Readonly<{ actors: readonly GmActor[]; staged: readonly string[] }>) {
+  const foes = staged.some((id) => actors.some((actor) => actor.id === id && actor.kind !== "player-character"));
+  if (!foes) return null;
+  return (
+    <Group kind="read" title="Difficulty" className="start-fight-difficulty">
+      <BudgetLine actors={actors} staged={staged} />
+    </Group>
+  );
+}
+
+function BudgetLine({ actors, staged }: Readonly<{ actors: readonly GmActor[]; staged: readonly string[] }>) {
   const [monsters, setMonsters] = useState<readonly ContentMonsterSummary[] | null>(null);
   useEffect(() => {
     void loadMonsterCatalog().then(

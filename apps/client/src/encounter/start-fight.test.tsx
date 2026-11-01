@@ -154,6 +154,10 @@ describe("Start an encounter's list", () => {
     expect(screen.getByRole("checkbox", { name: "Goblin is in this encounter" })).toBeChecked();
     expect(screen.queryByRole("checkbox", { name: "Borin is in this encounter" })).toBeNull();
     expect(screen.getByText("Rolls initiative for all 2")).toBeInTheDocument();
+    // One In this encounter names who is in it, each row with its More; the staging tray's second list is gone.
+    expect(screen.getAllByRole("region", { name: "In this encounter" })).toHaveLength(1);
+    expect(screen.getByLabelText("More for Goblin")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "New tokens shown to players" })).toBeInTheDocument();
   });
 });
 

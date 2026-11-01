@@ -29,6 +29,7 @@ import { useWaitingList } from "../settings/preferences";
 import { useUnreadCount } from "../table/unreadTabs";
 import { useCombatLog } from "./CombatLog";
 import { rollsLine, StartFight } from "./StartFight";
+import { EncounterBudgetLine } from "./EncounterBudget";
 
 /** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
 function stillStanding(actors: GmView["actors"], actorId: string) {
@@ -415,18 +416,13 @@ export function GmEncounterPanel({
       stagingRevealed={stagingVisibility !== "gm-only"}
       combatActive={false}
       busy={busy}
+      hideTray
       emptyNote="No one staged yet. The party lands here automatically; add monsters below."
     />
   );
-  // A live scene owns its map, so its staging folds away under the list; a quick start needs the map choice open.
-  const staging = sceneLive ? (
-    <details className="start-fight-staging">
-      <summary>Add characters or monsters</summary>
-      {prep}
-    </details>
-  ) : (
-    prep
-  );
+  // The start form names who is in the encounter once; the staging parts under its list keep the map line and the Add
+  // buttons (C3 running spec 2.1).
+  const staging = prep;
   const setupBody = (
     <StartFight
       state={state}
@@ -460,6 +456,8 @@ export function GmEncounterPanel({
             : "Pick a battle map first."
       }
       phone={phone}
+      onRemove={(actorId) => tick(actorId, false)}
+      difficulty={<EncounterBudgetLine actors={state.actors} staged={stagedIds} group />}
     />
   );
 

@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { effectivePlayerDice, type GmActor, type GmView } from "@vtt/domain";
-import { Chip, IconChevronRight, Modal, SegmentedControl, Switch, cx } from "@vtt/ui";
+import { Chip, Group, IconMore, Menu, MenuItem, SegmentedControl, Switch, cx, useToast } from "@vtt/ui";
+import { command } from "../lib/command";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
 import { DICE_MODE_PHRASE } from "../settings/table-words";
 import "./start-fight.css";
@@ -79,6 +80,10 @@ export type StartFightProps = Readonly<{
   /** Why Start the fight can't run yet, when it can't. */
   blocked: string | null;
   phone: boolean;
+  /** Takes a creature off this list; it stays on the roster. */
+  onRemove: (actorId: string) => void;
+  /** The encounter's difficulty, an open group under the Cradles. */
+  difficulty?: ReactNode;
 }>;
 
 /** What players' dice do in this encounter, from its own modes or the table's (ADR-0043). */
@@ -94,26 +99,23 @@ export function playsOf(party: readonly GmActor[], atTable: (actor: GmActor) => 
 }
 
 /**
- * Start an encounter: In this encounter lists the staged characters and monsters, ticked, with hidden ones marked;
- * who plays each party character; the two initiative switches; Surprised as one chip each, with the rule. On a phone
- * each is a row that opens a sheet.
+ * Start an encounter as one form (C3 running spec 2.1), the same on every size: spell areas when there are any, then In
+ * this encounter (the one list of who is in it, each row with its tick and a More menu, the map line and the Add
+ * buttons from the staging parts), Who plays, Initiative and Surprised as Cradles, the difficulty as an open group, and
+ * what keeps it from starting where it can't yet. On a phone it is the Switch's Encounter view.
  */
 export function StartFight(props: StartFightProps) {
-  return props.phone ? <StartFightCard {...props} /> : <StartFightPanel {...props} />;
-}
-
-function StartFightPanel(props: StartFightProps) {
   return (
     <div className="start-fight" aria-labelledby="gm-encounter-title">
-      <h2 id="gm-encounter-title" className="start-fight-title">
+      <h2 id="gm-encounter-title" className="nh-sr-only">
         Start an encounter
       </h2>
-      <p className="start-fight-lede">Everyone on the map is in. Untick anyone who isn&apos;t.</p>
       {props.spellAreas}
       <InThisFight {...props} />
       <WhoPlays {...props} />
       <Initiative {...props} />
       <Surprised {...props} />
+      {props.difficulty}
       {props.blocked && (
         <p className="encounter-start-blocked" role="status">
           {props.blocked}
@@ -123,99 +125,60 @@ function StartFightPanel(props: StartFightProps) {
   );
 }
 
-type Sheet = "fight" | "plays" | "initiative" | "surprised";
-
-function StartFightCard(props: StartFightProps) {
-  const [sheet, setSheet] = useState<Sheet | null>(null);
-  const staged = props.candidates.filter((actor) => props.ticked.has(actor.id));
-  const surprisedNames = staged.filter((actor) => props.surprised.has(actor.id)).map((actor) => actor.name);
-  const party = staged.filter((actor) => actor.kind === "player-character");
-  const initiativeWords = [
-    props.playersRoll ? "Players roll their own." : "Rolled here for everyone.",
-    props.groupMonsters ? "Groups share a roll." : "Each monster rolls."
-  ].join(" ");
-  const close = () => setSheet(null);
+/** A row's More menu: show it to players or hide it, or take it off this list (it stays on the roster). */
+function RowMore({ actor, busy, onRemove }: Readonly<{ actor: GmActor; busy: boolean; onRemove: () => void }>) {
+  const { toast } = useToast();
+  const shown = actor.visibility !== "gm-only";
+  const reveal = () =>
+    void command("actor:set-visibility", { actorId: actor.id, visibility: shown ? "gm-only" : "public" }).then(
+      (result) => {
+        if (!result.ok) toast(result.message ?? "The token's visibility could not be changed.", { tone: "error" });
+      }
+    );
   return (
-    <div className="start-fight is-card" aria-labelledby="gm-encounter-title">
-      <div className="start-fight-card-head">
-        <h2 id="gm-encounter-title" className="start-fight-title">
-          Start an encounter
-        </h2>
-        <span className="start-fight-card-state">No encounter running</span>
-      </div>
-      {staged.length > 0 && (
-        <div
-          className="start-fight-faces"
-          role="img"
-          aria-label={`In this encounter: ${namesOf(staged.map((a) => a.name))}`}
-        >
-          {staged.map((actor) => (
-            <ActorPortrait
-              key={actor.id}
-              actor={actor}
-              token={props.token}
-              definitions={props.state.definitions}
-              frame={frameOf(actor, "gm")}
-              size="sm"
-            />
-          ))}
-        </div>
-      )}
-      {props.spellAreas}
-      <ul className="start-fight-rows">
-        <CardRow title="In this encounter" value={sidesOf(staged)} onOpen={() => setSheet("fight")} />
-        {party.length > 0 && (
-          <CardRow title="Who plays" value={playsOf(party, props.atTable)} onOpen={() => setSheet("plays")} />
-        )}
-        <CardRow title="Initiative" value={initiativeWords} onOpen={() => setSheet("initiative")} />
-        <CardRow title="Surprised" value={namesOf(surprisedNames)} onOpen={() => setSheet("surprised")} />
-      </ul>
-      {props.blocked && (
-        <p className="encounter-start-blocked" role="status">
-          {props.blocked}
-        </p>
-      )}
-      <Modal open={sheet === "fight"} onClose={close} title="In this encounter" align="bottom">
-        <InThisFight {...props} />
-      </Modal>
-      <Modal open={sheet === "plays"} onClose={close} title="Who plays" align="bottom">
-        <WhoPlays {...props} />
-      </Modal>
-      <Modal open={sheet === "initiative"} onClose={close} title="Initiative" align="bottom">
-        <Initiative {...props} />
-      </Modal>
-      <Modal open={sheet === "surprised"} onClose={close} title="Surprised" align="bottom">
-        <Surprised {...props} />
-      </Modal>
-    </div>
+    <Menu trigger={<IconMore />} icon align="end" label={`More for ${actor.name}`}>
+      <MenuItem disabled={busy} onClick={reveal}>
+        {shown ? "Hide from players" : "Show to players"}
+      </MenuItem>
+      <MenuItem disabled={busy} onClick={onRemove}>
+        Remove from this list
+      </MenuItem>
+    </Menu>
   );
 }
 
-function CardRow({ title, value, onOpen }: Readonly<{ title: string; value: string; onOpen: () => void }>) {
+/** The list's head choice: whether new tokens land shown to players, the table's standing default. */
+function NewTokens({ state }: Readonly<{ state: GmView }>) {
+  const { toast } = useToast();
+  const shown = (state.stagingDefaults?.visibility ?? "public") === "public";
   return (
-    <li>
-      <button type="button" className="start-fight-row interactive" onClick={onOpen}>
-        <span className="start-fight-row-text">
-          <b>{title}</b>
-          <span>{value}</span>
-        </span>
-        <IconChevronRight />
-      </button>
-    </li>
+    <Switch
+      label="New tokens shown to players"
+      checked={shown}
+      onChange={(next) =>
+        void command("table:set-staging-defaults", { visibility: next ? "public" : "gm-only" }).then((result) => {
+          if (!result.ok) toast(result.message ?? "The staging default could not be changed.", { tone: "error" });
+        })
+      }
+    />
   );
 }
 
 function InThisFight(props: StartFightProps) {
   const { candidates, ticked, onTick, busy, state, token } = props;
   return (
-    <section className="start-fight-section" aria-label="In this encounter">
-      {!props.phone && <h3 className="start-fight-label">In this encounter</h3>}
+    <Group
+      title="In this encounter"
+      headingLevel={3}
+      actions={<NewTokens state={state} />}
+      className="start-fight-group"
+    >
       {candidates.length === 0 ? (
         <p className="start-fight-empty">No one staged yet. Add characters or monsters below.</p>
       ) : (
         <ul className="start-fight-list">
           {candidates.map((actor) => (
-            <li key={actor.id}>
+            <li key={actor.id} className="start-fight-item">
               <label className={cx("start-fight-pick", "interactive", !ticked.has(actor.id) && "is-out")}>
                 <ActorPortrait
                   actor={actor}
@@ -238,12 +201,13 @@ function InThisFight(props: StartFightProps) {
                   />
                 </span>
               </label>
+              <RowMore actor={actor} busy={busy} onRemove={() => props.onRemove(actor.id)} />
             </li>
           ))}
         </ul>
       )}
       {props.staging}
-    </section>
+    </Group>
   );
 }
 
@@ -253,8 +217,7 @@ function WhoPlays(props: StartFightProps) {
   const party = props.candidates.filter((actor) => props.ticked.has(actor.id) && actor.kind === "player-character");
   if (party.length === 0) return null;
   return (
-    <section className="start-fight-section" aria-label="Who plays">
-      {!props.phone && <h3 className="start-fight-label">Who plays</h3>}
+    <Group title="Who plays" headingLevel={3} className="start-fight-group">
       <ul className="start-fight-plays">
         {party.map((actor) => (
           <li key={actor.id}>
@@ -277,14 +240,13 @@ function WhoPlays(props: StartFightProps) {
         ))}
       </ul>
       <p className="start-fight-rule">At the table, you answer every prompt for the character and roll its dice.</p>
-    </section>
+    </Group>
   );
 }
 
 function Initiative(props: StartFightProps) {
   return (
-    <section className="start-fight-section" aria-label="Initiative">
-      {!props.phone && <h3 className="start-fight-label">Initiative</h3>}
+    <Group title="Initiative" headingLevel={3} className="start-fight-group">
       <Switch
         label="Players roll their own initiative"
         checked={props.playersRoll}
@@ -298,7 +260,7 @@ function Initiative(props: StartFightProps) {
         onChange={props.onGroupMonsters}
       />
       <p className="start-fight-rule">{diceLine(props.state)}</p>
-    </section>
+    </Group>
   );
 }
 
@@ -306,9 +268,8 @@ function Surprised(props: StartFightProps) {
   const staged = props.candidates.filter((actor) => props.ticked.has(actor.id));
   if (staged.length === 0) return null;
   return (
-    <fieldset className="start-fight-section encounter-surprise">
-      <legend className="start-fight-label">Surprised</legend>
-      <div className="encounter-surprise-chips">
+    <Group title="Surprised" headingLevel={3} className="start-fight-group encounter-surprise">
+      <div className="encounter-surprise-chips" role="group" aria-label="Surprised">
         {staged.map((actor) => (
           <Chip
             key={actor.id}
@@ -321,6 +282,6 @@ function Surprised(props: StartFightProps) {
         ))}
       </div>
       <p className="start-fight-rule">Pick who is Surprised. They roll initiative at Disadvantage.</p>
-    </fieldset>
+    </Group>
   );
 }

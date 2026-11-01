@@ -309,21 +309,16 @@ export async function openGmSection(page: Page, name: string) {
 }
 
 /**
- * Before a fight: unticks `out` from In this fight and adds `monster` from the bestiary. On a phone In this fight is a
- * sheet over the card.
+ * Before a fight: unticks `out` from In this encounter and adds `monster` from the bestiary. The start form is the same
+ * on every size; a phone opens on the map, so it turns the Switch to Encounter first.
  */
 export async function stageFight(page: Page, out: readonly string[], monster: string) {
-  const phone = !(await page.getByRole("region", { name: "In this encounter" }).isVisible());
-  if (phone) await press(page.getByRole("button", { name: /^In this encounter/ }));
-  const list = phone
-    ? page.getByRole("dialog", { name: "In this encounter" })
-    : page.getByRole("region", { name: "In this encounter" });
+  const list = page.getByRole("region", { name: "In this encounter" });
+  if (!(await list.isVisible())) await press(page.getByRole("tab", { name: /^Encounter/ }));
   for (const name of out) {
     await press(list.locator("label").filter({ hasText: name }));
     await expect(list.getByRole("checkbox", { name: `${name} is in this encounter` })).not.toBeChecked();
   }
-  const adds = list.getByText("Add characters or monsters", { exact: true });
-  if (await adds.isVisible()) await press(adds);
   await press(list.getByRole("button", { name: "Add monsters" }));
   const bestiary = page.getByRole("dialog", { name: "Add monsters from the bestiary" });
   await fillIn(bestiary.getByRole("searchbox", { name: "Search monsters" }), monster);
@@ -335,7 +330,6 @@ export async function stageFight(page: Page, out: readonly string[], monster: st
   await expect(
     list.getByRole("checkbox", { name: new RegExp(`^${monster}( \\d+)? is in this encounter$`) }).last()
   ).toBeChecked();
-  if (phone) await press(list.getByRole("button", { name: "Close" }).first());
 }
 
 type Point = { x: number; y: number };
