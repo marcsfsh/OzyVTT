@@ -105,11 +105,11 @@ export function ActionResultCard({
           return (
             <WaitNote
               waiting={waiting}
-              done={<>{prompt?.actionName ?? "The reaction"} answered. The attack finished in Needs you.</>}
+              done={<>{prompt?.actionName ?? "The reaction"} answered. The attack finished in the waiting list.</>}
             >
               Waiting on {prompt?.actorName ?? result.attack.targetName}'s{" "}
-              <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in Needs you, and the attack finishes
-              there.
+              <strong>{prompt?.actionName ?? "reaction"}</strong>. Answer it in the waiting list, and the attack
+              finishes there.
             </WaitNote>
           );
         })()}
@@ -185,10 +185,12 @@ export function ActionResultCard({
             return holding ? (
               <p className="action-save-note">
                 Waiting on {holder ? `${holder}'s ` : ""}
-                <strong>{holding.actionName}</strong>. Answer it in Needs you, and the damage applies there.
+                <strong>{holding.actionName}</strong>. Answer it in the waiting list, and the damage applies there.
               </p>
             ) : (
-              <p className="action-applied">{prompt.actionName} answered. The damage was handled in Needs you.</p>
+              <p className="action-applied">
+                {prompt.actionName} answered. The damage was handled in the waiting list.
+              </p>
             );
           }
           return applied.has(result.attack.targetId) ? (
@@ -271,8 +273,8 @@ export function ActionResultCard({
           ).length;
           return waiting > 0 ? (
             <p className="action-save-note">
-              {waiting === 1 ? "A saving throw waits" : `${waiting} saving throws wait`} in Needs you. Roll or enter
-              each result there, then confirm it.
+              {waiting === 1 ? "A saving throw waits" : `${waiting} saving throws wait`} in the waiting list. Roll or
+              enter each result there, then confirm it.
             </p>
           ) : (
             <p className="action-save-note resolved">All saving throws for {result.actionName} resolved.</p>

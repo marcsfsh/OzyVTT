@@ -17,7 +17,7 @@ export function damageRollLine(roll: Pick<PlayerDamageRoll, "formula" | "mode" |
 
 /**
  * A player's damage waiting for their dice (ADR-0043): one field for the total, or one per die. The server checks the
- * numbers against the dice; the GM may type it instead from the Needs you queue.
+ * numbers against the dice; the GM may type it instead from the waiting list.
  */
 export function DamageRollPrompt({
   roll,

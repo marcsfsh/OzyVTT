@@ -17,7 +17,7 @@ import { EncounterMap } from "../scene/EncounterMap";
 import { navigate, pathForGmTab } from "../router";
 import { PartyRest } from "../rest/PartyRest";
 import { RestPrompt } from "../rest/RestPrompt";
-import { needsItems } from "../table/needs";
+import { owedItems } from "../table/needs";
 import { NeedsYou } from "../table/NeedsYou";
 import { PromptSlot } from "../table/PromptSlot";
 import { StripEndContext } from "../table/stripSlot";
@@ -159,7 +159,7 @@ export function TableView(props: TableViewProps) {
           ),
           needs: <NeedsYou state={props.state} token={token} />,
           waiting: <NeedsYou state={props.state} token={token} alone />,
-          needsCount: needsItems(props.state).length,
+          needsCount: owedItems(props.state).length,
           dice,
           log,
           token: <TokenTab state={props.state} token={token} />,

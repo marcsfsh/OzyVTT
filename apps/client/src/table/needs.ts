@@ -86,6 +86,38 @@ export function needsItems(state: GmView): NeedsItem[] {
   return items;
 }
 
+/** Items a player answers on their own device come after what the GM owes; within each, today's order holds. */
+export function waitsOnPlayer(item: NeedsItem): boolean {
+  return (item.kind === "order" || item.kind === "reaction" || item.kind === "save") && item.waiting;
+}
+
+/** The creature an item is about: who must answer, who was hit, who asks or acts; the first to roll for initiative. */
+export function itemActorId(item: NeedsItem): string | null {
+  switch (item.kind) {
+    case "order":
+    case "reaction":
+    case "save":
+    case "dying":
+    case "rest":
+      return item.actor.id;
+    case "ask":
+      return item.actor?.id ?? item.ask.actorId;
+    case "target":
+      return item.ask.actorId;
+    case "damage":
+      return item.proposal.targetActorId;
+    case "damage-roll":
+      return item.roll.sourceActorId;
+    case "initiative":
+      return item.actors[0]?.id ?? null;
+  }
+}
+
+/** What the GM owes: the bell's count, leaving out what waits on a player (ADR-0058). */
+export function owedItems(state: GmView): NeedsItem[] {
+  return needsItems(state).filter((item) => !waitsOnPlayer(item));
+}
+
 const ABILITIES: Readonly<Record<string, string>> = {
   str: "Strength",
   dex: "Dexterity",

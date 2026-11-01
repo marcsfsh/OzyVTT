@@ -160,11 +160,11 @@ export const restingCommands = [
         actorIds: [actorId],
         gmOnly: kit.actorHidden(actorId)
       });
-      // The ask waits under Needs you on the GM's table; the toast reaches the GM on whatever page they are on.
+      // The ask waits in the GM's waiting list on the Table; the toast reaches the GM on whatever page they are on.
       if (!withdraw)
         kit.context.broadcastTableEvent({
           kind: "heal",
-          text: `${kit.actorName(actorId)} asks for a Long Rest. Answer it under Needs you on the Table.`,
+          text: `${kit.actorName(actorId)} asks for a Long Rest. Answer it in the waiting list on the Table.`,
           actorIds: [actorId],
           gmOnly: true,
           logged: false

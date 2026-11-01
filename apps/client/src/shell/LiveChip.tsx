@@ -1,5 +1,6 @@
 import type { GmView, PlayerView } from "@vtt/domain";
-import { StatusLamp, cx } from "@vtt/ui";
+import { AttentionBell, StatusLamp, cx } from "@vtt/ui";
+import { owedItems } from "../table/needs";
 import { navigate } from "../router";
 import "./live-chip.css";
 
@@ -52,8 +53,10 @@ export function LiveFace({
  */
 export function LiveChip(view: Readonly<{ role: "gm"; state: GmView } | { role: "player"; state: PlayerView }>) {
   const live = liveOf(view);
+  // While the GM is on another section, the bell says what waits on them at the table (ADR-0058).
+  const owed = view.role === "gm" ? owedItems(view.state).length : 0;
   if (!live) return null;
-  const words = `${live.name}${live.round !== null ? `, round ${live.round}` : ", not started"}${live.mine ? ", your turn" : ""}`;
+  const words = `${live.name}${live.round !== null ? `, round ${live.round}` : ", not started"}${live.mine ? ", your turn" : ""}${owed > 0 ? `, ${owed} waiting` : ""}`;
   return (
     <button
       type="button"
@@ -62,6 +65,7 @@ export function LiveChip(view: Readonly<{ role: "gm"; state: GmView } | { role: 
       onClick={() => void navigate("/table")}
     >
       <LiveFace {...live} />
+      <AttentionBell count={owed} className="live-chip-bell" />
     </button>
   );
 }

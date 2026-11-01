@@ -55,3 +55,13 @@
 .app-bottom-tab-lamp.is-mine.is-lit {
   background: var(--caution);
 }
+/* The bell after the round, its badge kept inside the chip's room. */
+.live-chip-bell {
+  margin: 0 10px 0 4px;
+}
+/* A phone's Play tab: the bell over the icon's corner, where the live lamp would sit. */
+.app-bottom-tab-bell.nh-bell {
+  position: absolute;
+  top: -6px;
+  right: -12px;
+}

@@ -364,7 +364,7 @@ describe("the Compendium's home", () => {
     const records = await within(spells).findAllByRole("button", { name: /Brine Burst|Counterspell|Fireball/ });
     expect(records.map((record) => record.textContent)).toEqual(["Brine Burst", "Counterspell", "Fireball"]);
     // Nothing needs the GM, so the strip is one quiet line.
-    expect(screen.getByText("Nothing needs you. Every record is published as written.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing waits on you. Every record is published as written.")).toBeInTheDocument();
     await user.click(within(spells).getByRole("button", { name: "Open Spells" }));
     expect(window.location.pathname).toBe("/compendium/tables/spells");
   });

@@ -59,7 +59,7 @@ export const TARGETING_OPTIONS = [
 ] as const;
 export const TARGETING_HELP = {
   player: "Players tap an action and pick its target on the map.",
-  gm: "Players tap an action and it waits in Needs you. You pick the target, then it resolves."
+  gm: "Players tap an action and it waits for you in the list over the turn. You pick the target, then it resolves."
 } as const;
 
 /** The health display's name, and who sees it. */

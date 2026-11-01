@@ -38,7 +38,10 @@ const gm = (active = true) =>
       initiative: [
         { actorId: "a", score: 19 },
         { actorId: "b", score: 12 }
-      ]
+      ],
+      // Nothing waits on the GM, so the acting row carries no bell.
+      pendingReactions: [],
+      pendingSaves: []
     }
   }) as unknown as GmView;
 

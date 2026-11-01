@@ -149,7 +149,7 @@ export function ActingConsole({
         <p className="acting-down-note" role="status">
           {actor.deathSaves ? (
             <>
-              <strong>{actor.name} is dying.</strong> The death save waits in Needs you, and actions are disabled.
+              <strong>{actor.name} is dying.</strong> The death save is in the waiting list, and actions are disabled.
             </>
           ) : (
             <>

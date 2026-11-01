@@ -27,16 +27,16 @@
 .needs-you-head {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 14px;
   margin: 0 auto 0 0;
-  color: var(--magenta-text);
-  font: 700 var(--fs-2xs) / 1.3 var(--font-label);
+  padding-top: 4px;
+}
+/* What waits on players, in 11px capitals beside the bell. */
+.needs-you-players {
+  color: var(--text-muted);
+  font: 600 11px / 1.3 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
-  text-shadow: none;
-}
-.needs-you-head svg {
-  font-size: 1rem;
 }
 .needs-you-place {
   font-size: 12.5px;

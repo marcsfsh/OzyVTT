@@ -13,10 +13,12 @@ import {
   cx,
   useOnChange,
   StatusLamp,
+  AttentionBell,
   IconButton,
   IconSearch,
   MenuItem
 } from "@vtt/ui";
+import { owedItems } from "../table/needs";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import {
   GM_SECTIONS,
@@ -76,7 +78,7 @@ function SectionTabs({
   bottom
 }: Readonly<{
   ariaLabel: string;
-  tabs: ReadonlyArray<Readonly<{ id: string; label: string; icon?: ReactNode; live?: "live" | "mine" }>>;
+  tabs: ReadonlyArray<Readonly<{ id: string; label: string; icon?: ReactNode; live?: "live" | "mine"; bell?: number }>>;
   activeId: string | null;
   onChange: (id: string) => void;
   bottom: boolean;
@@ -98,9 +100,11 @@ function SectionTabs({
             <span className="app-bottom-tab-icon" aria-hidden="true">
               {tab.icon}
               {tab.live && <StatusLamp lit className={cx("app-bottom-tab-lamp", tab.live === "mine" && "is-mine")} />}
+              <AttentionBell count={tab.bell ?? 0} className="app-bottom-tab-bell" />
             </span>
             {tab.label}
             {tab.live && <span className="nh-sr-only">{tab.live === "mine" ? ", your turn" : ", live"}</span>}
+            {(tab.bell ?? 0) > 0 && <span className="nh-sr-only">, {tab.bell} waiting</span>}
           </span>
         ) : (
           tab.label
@@ -235,15 +239,18 @@ export function GmBottomTabs({
 }: Readonly<{ state?: GmView; token?: string; onSignOut?: () => void }>) {
   const route = useRoute();
   const section = litGmSection(route.path);
-  // While a fight runs, Play carries a lit lamp (frame rule 3.2).
+  // While a fight runs, Play carries a lit lamp (frame rule 3.2), and the bell while something waits on the GM.
   const fighting = state?.combat.active === true;
+  const owed = state ? owedItems(state).length : 0;
   const tabs = (
     <SectionTabs
       ariaLabel="GM sections"
       tabs={GM_SECTIONS.map((entry) => ({
         ...entry,
         icon: GM_SECTION_ICONS[entry.id],
-        ...(entry.id === "play" && fighting ? { live: "live" as const } : {})
+        // The bell takes the lamp's corner while something waits; the lamp comes back once it is answered.
+        ...(entry.id === "play" && fighting && owed === 0 ? { live: "live" as const } : {}),
+        ...(entry.id === "play" ? { bell: owed } : {})
       }))}
       activeId={section}
       onChange={(id) => openGmSection(id as GmSection, section)}

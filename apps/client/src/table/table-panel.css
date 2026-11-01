@@ -164,20 +164,6 @@
   width: 100%;
 }
 
-/* What waits on the GM, counted on the Fight tab so it shows from every tab. */
-.table-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  margin-left: var(--space-2);
-  padding: 0 5px;
-  background: var(--caution);
-  color: var(--text-on-neon);
-  font: 400 16px / 1 var(--font-numeric);
-}
-
 /* Log: the log fills the tab and the composer sits under it. */
 .table-log-tab {
   display: flex;
@@ -294,14 +280,18 @@
   min-height: 0;
   padding: var(--space-3);
 }
-/* The list's own tab: the bell and its count, no word. */
+/* A tab with the bell: the Encounter tab's word and its bell, or the list's own tab, the bell alone. The badge sits
+   past the bell's right edge, so the bell keeps room for it. */
 .table-tab-waiting {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
 }
 .table-tab-waiting > svg {
   color: var(--caution);
+}
+.table-tab-waiting .nh-bell {
+  margin-right: 8px;
 }
 /* What arrived on a tab since it was last opened: a quiet count after its word (C3 spec 2.3). */
 .table-tab-unread {

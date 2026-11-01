@@ -85,14 +85,14 @@ function table(changes: (state: GmView) => void = () => {}): GmView {
   return view;
 }
 
-describe("Needs you", () => {
+describe("the waiting list", () => {
   it("lists every decision the GM owes with its numbers, and counts them", () => {
     render(
       <ToastProvider>
         <NeedsYou state={table()} token={null} />
       </ToastProvider>
     );
-    const strip = screen.getByRole("region", { name: /Needs you · 4/ });
+    const strip = screen.getByRole("region", { name: "Waiting, 4" });
     expect(within(strip).getByText("Lyra's Fire Bolt hit Goblin 1")).toBeTruthy();
     expect(within(strip).getByText("9 fire.")).toBeTruthy();
     expect(within(strip).getByText("Borin asks for your ruling")).toBeTruthy();

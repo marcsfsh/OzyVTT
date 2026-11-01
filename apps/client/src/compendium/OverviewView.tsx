@@ -1,4 +1,4 @@
-import { Button, Group, IconPlus, KindCard } from "@vtt/ui";
+import { AttentionBell, Button, Group, IconPlus, KindCard } from "@vtt/ui";
 import type { HomebrewOverview } from "../homebrew/api";
 import { useCompendium } from "./context";
 import { useOverview, usePacks, useTable } from "./data";
@@ -8,7 +8,7 @@ import { COMPENDIUM_PATHS, recordPath, tablePath } from "./routes";
 
 type NeedsYou = HomebrewOverview["needsYou"][number];
 
-/** What a Needs you line says, and the button that answers it. */
+/** What a waiting record's line says, and the button that answers it. */
 function needWords(row: NeedsYou): Readonly<{ what: string; action: string; tab: "edit" | "history" }> {
   const left = row.issueCount > 0 ? ` · ${row.issueCount} ${row.issueCount === 1 ? "thing" : "things"} left` : "";
   switch (row.reason) {
@@ -30,7 +30,7 @@ function needWords(row: NeedsYou): Readonly<{ what: string; action: string; tab:
 /**
  * The Compendium's home, as Shelves (compendium spec 2.1, ADR-0055): what needs the GM as a strip across the top, the
  * nine kinds as cards (their counts, their homebrew and drafts in magenta, and a few of their records), and the
- * sources on one line at the foot. A phone shows Needs you as a box and the kinds two to a row without records.
+ * sources on one line at the foot. A phone shows what waits as a box and the kinds two to a row without records.
  */
 export function OverviewView() {
   const { token, phone, go, openNew } = useCompendium();
@@ -64,11 +64,16 @@ export function OverviewView() {
 
   const needs =
     data.needsYou.length === 0 ? (
-      <p className="cp-home-needs is-quiet">Nothing needs you. Every record is published as written.</p>
+      <p className="cp-home-needs is-quiet">Nothing waits on you. Every record is published as written.</p>
     ) : (
-      <section className={phone ? "cp-home-needs is-box" : "cp-home-needs"} aria-label="Needs you">
+      <section
+        className={phone ? "cp-home-needs is-box" : "cp-home-needs"}
+        aria-label={`Waiting, ${data.needsYou.length}`}
+      >
+        {/* The bell in place of the words Needs you (ADR-0058). */}
         <h3 className="cp-home-needs-head">
-          Needs you · <span className="cp-home-needs-count">{data.needsYou.length}</span>
+          <AttentionBell count={data.needsYou.length} />
+          <span className="nh-sr-only">Waiting, {data.needsYou.length}</span>
         </h3>
         <ul className="cp-home-needs-list">
           {data.needsYou.map((row) => {

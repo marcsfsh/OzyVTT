@@ -1,12 +1,13 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { IconEyeOff, cx } from "@vtt/ui";
+import { AttentionBell, IconEyeOff, cx } from "@vtt/ui";
 import { ActorPortrait, frameOf } from "../actors/ActorPortrait";
 import { healthBandFor } from "../encounter/conditions";
 import { useMediaQuery } from "../lib/useMediaQuery";
 import { focusTokenOnMap } from "../scene/tableGeometry";
 import { BAND_WORDS, turnLadder, type LadderEntry } from "./ladderRows";
+import { itemActorId, owedItems } from "./needs";
 import { useOrderLight } from "./orderLight";
 import "./turn-ladder.css";
 
@@ -54,6 +55,10 @@ export function TurnLadder(props: LadderProps) {
   const cards = props.layout === "cards";
   const fighting = props.state.combat.active;
   const hiddenTurn = props.role === "player" && props.state.combat.hiddenTurn;
+  // The GM's acting row carries the bell when its creature has something waiting on the GM (ADR-0058).
+  const acting = props.state.combat.turnActorId;
+  const owedNow =
+    props.role === "gm" && acting ? owedItems(props.state).filter((item) => itemActorId(item) === acting).length : 0;
   const wide = useMediaQuery("(min-width: 1280px)");
   const [peek, setPeek] = useState<Readonly<{ key: string; top: number; left: number }> | null>(null);
   const show = (key: string, target: HTMLElement) => {
@@ -88,7 +93,7 @@ export function TurnLadder(props: LadderProps) {
                   entry.hidden && "is-hidden"
                 )}
                 aria-current={entry.acting ? "true" : undefined}
-                aria-label={`${entry.name}, initiative ${fighting ? entry.score : "not rolled"}${entry.acting ? ", acting" : entry.next ? ", next" : ""}${entry.hidden ? ", hidden from players" : ""}`}
+                aria-label={`${entry.name}, initiative ${fighting ? entry.score : "not rolled"}${entry.acting ? ", acting" : entry.next ? ", next" : ""}${entry.hidden ? ", hidden from players" : ""}${entry.acting && owedNow > 0 ? `, ${owedNow} waiting` : ""}`}
                 disabled={!placed}
                 onClick={() => focusTokenOnMap(entry.actorId)}
                 onPointerEnter={(event) => show(entry.actorId, event.currentTarget)}
@@ -114,6 +119,7 @@ export function TurnLadder(props: LadderProps) {
                   <span className="ladder-name">
                     {entry.hidden && <IconEyeOff />}
                     {entry.name}
+                    {entry.acting && <AttentionBell count={owedNow} className="ladder-bell" />}
                   </span>
                   <RowLine entry={entry} />
                 </span>

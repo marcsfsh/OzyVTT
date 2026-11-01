@@ -32,7 +32,7 @@ export function TablePanel({
   phone = false
 }: Readonly<{
   label: string;
-  /** Needs you for the GM, the prompt slot for a player: above the tabs, never inside a scrolled list. */
+  /** The prompt slot for a player: above the tabs, never inside a scrolled list. */
   top?: ReactNode;
   tabs: readonly PanelTab[];
   active: string;

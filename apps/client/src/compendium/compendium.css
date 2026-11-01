@@ -1244,7 +1244,7 @@
   max-width: 1080px;
   margin-inline: auto;
 }
-/* Needs you: a strip with an amber edge at its left over the line, one row a record. */
+/* What waits on the GM: a strip with an amber edge at its left over the line, one row a record. */
 .cp-home-needs {
   margin: 0;
   padding: 2px 14px;
@@ -1258,15 +1258,13 @@
   font-size: var(--fs-sm);
 }
 .cp-home-needs-head {
+  display: flex;
+  align-items: center;
+  min-height: 24px;
   margin: var(--space-2) 0 var(--space-1);
-  color: var(--caution-text);
-  font: 600 11px / 1.3 var(--font-label);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  padding-top: 6px;
 }
-.cp-home-needs-count {
-  font: 400 15px / 1 var(--font-numeric);
-}
+
 .cp-home-needs-list {
   margin: 0;
   padding: 0;

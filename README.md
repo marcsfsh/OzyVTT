@@ -163,7 +163,7 @@ screen, and playing music on it. It needs Chromium once: `npx playwright install
 
 1. As GM, open **Encounters** and press **New encounter**. Pick its battle map or upload one, then work
    through the steps: tokens and monsters, walls and light, sound, and **Make live**. The
-   Encounters front page lists what still needs you, and **See as** shows an encounter the way the table
+   Encounters front page lists what each encounter still needs, and **See as** shows an encounter the way the table
    screen or one player would get it.
 2. A map with no grid says so: press **Set the grid** (or open the map under **Maps**). For a
    printed grid, drag diagonally across a 3x3 block of squares to set the scale. For a gridless

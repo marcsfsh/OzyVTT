@@ -124,7 +124,7 @@ const tabNames = (list: HTMLElement) =>
     .map((tab) => tab.textContent);
 
 describe("the GM's panel", () => {
-  const fightTab = "Encounter2, 2 waiting on you";
+  const fightTab = "Encounter2, 2 waiting";
   it("on a laptop: Encounter, Log, Party and Notes, with what waits on the GM leading Encounter and End turn in the footer", async () => {
     const user = userEvent.setup();
     render(

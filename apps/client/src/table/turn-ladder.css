@@ -200,3 +200,11 @@
 .turn-ladder--cards .ladder-cond:nth-child(n + 3) {
   display: none;
 }
+/* The acting row's bell: inside the clipped name line, so its badge sits lower and keeps room at its right. */
+.ladder-bell {
+  margin: 0 14px 0 6px;
+}
+.ladder-bell .nh-bell-count {
+  top: -2px;
+  right: -13px;
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { rosterActors, type GmActor, type GmView, type MutationResult } from "@vtt/domain";
 import type { MapSelection } from "../maps/map-catalog";
-import { Button, Drawer, IconBell, IconChevronLeft } from "@vtt/ui";
+import { AttentionBell, Button, Drawer, IconBell, IconChevronLeft } from "@vtt/ui";
 import { command } from "../lib/command";
 import { CharacterSheet } from "../sheet/CharacterSheet";
 import { MonsterBrowser } from "./MonsterBrowser";
@@ -54,7 +54,7 @@ export function fightExperienceOf(state: GmView) {
 /** How long a turn button ignores taps after a turn command settles: longer than a double tap. */
 const TURN_SETTLE_MS = 500;
 
-/** What the table puts in the GM's panel besides the fight: Needs you, the dice, the log, the token, the party. */
+/** What the table puts in the GM's panel besides the fight: the waiting list, the dice, the log, the token, the party. */
 export type GmPanelSlots = Readonly<{
   /** The Encounter tab's head on a laptop: the sound and the join address that the strip over the map once held. */
   head?: ReactNode;
@@ -87,7 +87,7 @@ export function GmEncounterPanel({
   selectedMap: MapSelection | null;
   mapLibrary?: readonly MapSelection[];
   onSelectMap?: (map: MapSelection | null) => void;
-  /** Below 980px: the fight splits into Act and Order tabs, and Needs you becomes a tab. */
+  /** On a phone: the tabs are the Switch, with the map as its first view. */
   phone?: boolean;
   slots?: GmPanelSlots;
   /** The GM's bearer, for the portraits' token art. */
@@ -617,25 +617,18 @@ export function GmEncounterPanel({
   // The list's own tab is the bell and its count, named "Waiting" for a screen reader.
   const waitingLabel = (
     <span className="table-tab-waiting">
-      <IconBell />
-      {needsCount > 0 && (
-        <span className="table-tab-count" aria-hidden="true">
-          {needsCount}
-        </span>
-      )}
+      <AttentionBell count={needsCount} />
+      {needsCount === 0 && <IconBell />}
       <span className="nh-sr-only">{needsCount > 0 ? `Waiting, ${needsCount}` : "Waiting"}</span>
     </span>
   );
+  // With the list over the turn, the Encounter tab carries the bell, so it shows from every tab.
   const fightLabel = (
-    <>
+    <span className="table-tab-waiting">
       Encounter
-      {needsCount > 0 && (
-        <span className="table-tab-count">
-          <span aria-hidden="true">{needsCount}</span>
-          <span className="nh-sr-only">, {needsCount} waiting on you</span>
-        </span>
-      )}
-    </>
+      <AttentionBell count={needsCount} />
+      {needsCount > 0 && <span className="nh-sr-only">, {needsCount} waiting</span>}
+    </span>
   );
   const head =
     slots?.head || (!phone && fighting) ? (

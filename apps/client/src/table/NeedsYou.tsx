@@ -1,7 +1,7 @@
 import { DamageRollPrompt } from "../encounter/DamageRollPrompt";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { GmActor, GmView, TargetAsk } from "@vtt/domain";
-import { Button, IconBell, IconChevron, IconChevronRight, useToast } from "@vtt/ui";
+import { AttentionBell, Button, IconChevron, IconChevronRight, useToast } from "@vtt/ui";
 import { setWaitingList, useWaitingList } from "../settings/preferences";
 import { useRollPreference } from "../dice/roll-preference";
 import { command, read } from "../lib/command";
@@ -13,7 +13,7 @@ import { SavePrompt } from "../encounter/SavePrompt";
 import { stepLabel, TurnOrder } from "../encounter/TurnOrder";
 import { aidGiverOf, type AidGiver, StabilizeControl } from "../encounter/StabilizeControl";
 import { useMapCalibration } from "../scene/gridPreview";
-import { damageWords, needsItems, needsTitle, type NeedsItem } from "./needs";
+import { damageWords, itemActorId, needsItems, needsTitle, waitsOnPlayer, type NeedsItem } from "./needs";
 import { creatureDistanceFeet } from "./targetHints";
 import { ActorAvatar } from "../actors/ActorAvatar";
 import "./needs-you.css";
@@ -66,32 +66,10 @@ async function aimFor(
   onFeedback(`Choose ${ask.actorName}'s target on the map.`);
 }
 
-/** The creature an item is about, for its card's face: who must answer, who was hit or who asks. */
+/** The creature an item is about, for its card's face. */
 function faceOf(item: NeedsItem, state: GmView): GmActor | null {
-  const byId = (id: string | undefined) => (id ? (state.actors.find((actor) => actor.id === id) ?? null) : null);
-  switch (item.kind) {
-    case "order":
-    case "reaction":
-    case "save":
-    case "dying":
-    case "rest":
-      return item.actor;
-    case "ask":
-      return item.actor ?? null;
-    case "target":
-      return byId(item.ask.actorId);
-    case "damage":
-      return byId(item.proposal.targetActorId);
-    case "damage-roll":
-      return byId(item.roll.sourceActorId);
-    case "initiative":
-      return item.actors[0] ?? null;
-  }
-}
-
-/** Items a player answers on their own device come after what the GM owes; within each, today's order holds. */
-export function waitsOnPlayer(item: NeedsItem): boolean {
-  return (item.kind === "order" || item.kind === "reaction" || item.kind === "save") && item.waiting;
+  const id = itemActorId(item);
+  return id ? (state.actors.find((actor) => actor.id === id) ?? null) : null;
 }
 
 /** A prompt a player answers on their own device, which the GM can open to answer instead. */
@@ -398,6 +376,8 @@ export function NeedsYou({
 }: Readonly<{ state: GmView; token: string | null; alone?: boolean }>) {
   const all = needsItems(state);
   const items = [...all.filter((item) => !waitsOnPlayer(item)), ...all.filter(waitsOnPlayer)];
+  const onPlayers = all.filter(waitsOnPlayer).length;
+  const owed = all.length - onPlayers;
   const place = useWaitingList();
   const { rollMode } = useRollPreference();
   const { toast } = useToast();
@@ -415,7 +395,7 @@ export function NeedsYou({
   useEffect(() => {
     const arrived = items.filter((item) => !seen.current.has(item.key));
     seen.current = new Set(items.map((item) => item.key));
-    if (arrived.length > 0) setAnnouncement(`Needs you: ${needsTitle(arrived[arrived.length - 1], state)}.`);
+    if (arrived.length > 0) setAnnouncement(`Waiting: ${needsTitle(arrived[arrived.length - 1], state)}.`);
     // Only a change in which items wait announces anything.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys]);
@@ -438,9 +418,15 @@ export function NeedsYou({
       {(items.length > 0 || alone) && (
         <section className={`needs-you${alone ? " is-alone" : " scroll-y"}`} aria-labelledby="needs-you-heading">
           <div className="needs-you-headrow">
+            {/* The bell counts what the GM owes; what waits on players is said beside it, in words. */}
             <h2 className="needs-you-head" id="needs-you-heading">
-              <IconBell />
-              <span>Needs you · {items.length}</span>
+              <AttentionBell count={owed} />
+              <span className="nh-sr-only">{owed > 0 ? `Waiting, ${owed}` : "Waiting"}</span>
+              {onPlayers > 0 && (
+                <span className="needs-you-players">
+                  {onPlayers} waiting on {onPlayers === 1 ? "a player" : "players"}
+                </span>
+              )}
             </h2>
             {placeSwitch}
           </div>

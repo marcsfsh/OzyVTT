@@ -1,0 +1,30 @@
+/* The bell (C3 spec 2.4 and 4): 16px, stroke 2, in the caution amber, its count on a 15px badge at its top right in
+   VT323 on the void. */
+.nh-bell {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--caution);
+}
+.nh-bell > svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2;
+}
+.nh-bell-count {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 2px;
+  box-sizing: border-box;
+  background: var(--void);
+  color: var(--caution);
+  border: 1px solid var(--caution);
+  font: 400 13px / 1 var(--font-numeric);
+}

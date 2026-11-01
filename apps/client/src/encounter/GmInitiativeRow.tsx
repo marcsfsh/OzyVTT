@@ -91,7 +91,7 @@ function InitiativeScore({
 
 /**
  * One row of the GM's turn order, with what hangs off it: the tools card when expanded and the acting console on the
- * active row. The decisions a creature owes wait in Needs you; the row marks them (a hit to apply, the dying tally).
+ * active row. The decisions a creature owes wait in the waiting list; the row marks them (a hit to apply, the dying tally).
  */
 export function GmInitiativeRow({
   entry,
