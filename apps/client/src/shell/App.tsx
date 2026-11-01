@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { GmView, PlayerView } from "@vtt/domain";
-import { RollCallPrompts } from "../encounter/RollCallPrompt";
+import { PromptBand } from "../table/PromptBand";
 import {
   currentHref,
   navigate,
@@ -110,10 +110,10 @@ export function App() {
         `.scroll-y` region; the pane gives out the height and the surface divides it. */}
       <TableCurrent.Provider value={session.current}>
         <div className="app-pane">
-          {/* The GM's calls for a roll follow the player to every page as a row that pushes the page down; on the
-          table they wait in its prompt slot instead. */}
+          {/* What waits for the player follows them to every page as A's band, which pushes the page down; on the
+          table it waits in the prompt slot instead. */}
           {shell?.role === "player" && entry.phase !== "drive" && !onPlayerTable(route) && (
-            <RollCallPrompts state={shell.state as PlayerView} />
+            <PromptBand state={shell.state as PlayerView} />
           )}
           {(!signedIn || entry.phase === "drive") && (
             <Landing
