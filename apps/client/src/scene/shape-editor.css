@@ -28,19 +28,7 @@
 .encounter-map-stage.has-dock-right .encounter-shape-editor {
   right: calc(var(--dock-side-width) + 0.7rem);
 }
-.encounter-shape-editor-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-.encounter-shape-editor-head strong {
-  text-transform: capitalize;
-}
-.encounter-shape-editor-head span {
-  color: var(--text-muted);
-  font-size: 0.7rem;
-}
+
 .encounter-shape-editor label {
   display: flex;
   flex-direction: column;
@@ -77,4 +65,8 @@
   margin: 0;
   color: var(--text-muted);
   font-size: 0.75rem;
+}
+.encounter-shape-editor-at {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
 }

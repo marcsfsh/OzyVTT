@@ -1,5 +1,5 @@
 import type { Annotation, AnnotationVisibility, PlayerAnnotation } from "@vtt/domain";
-import { Button, Switch } from "@vtt/ui";
+import { Button, MenuHead, Switch } from "@vtt/ui";
 import { annotationCenter } from "./annotationGlyph";
 import { drawingAudienceOptions } from "./mapTools";
 import type { MapCommands } from "./useMapCommands";
@@ -43,16 +43,16 @@ export function ShapeEditor({
   const { setColor, setVisibility, setMovable, removeAnnotation } = commands;
   return (
     <div className="encounter-shape-editor" role="group" aria-label="Selected shape">
-      <div className="encounter-shape-editor-head">
-        <strong>
-          {selected.geometry.sizeFeet}ft {selected.shape}
-        </strong>
-        {center && (
-          <span>
-            at {Math.round(center.x)}, {Math.round(center.y)}
-          </span>
-        )}
-      </div>
+      {/* A's menu head (C2 spec 2.6): its size and shape, with whose ink it is. */}
+      <MenuHead
+        name={`${selected.geometry.sizeFeet} ft ${selected.shape}`}
+        line={manage ? (role === "gm" ? "GM ink" : "Yours") : undefined}
+      />
+      {center && (
+        <span className="encounter-shape-editor-at">
+          at {Math.round(center.x)}, {Math.round(center.y)}
+        </span>
+      )}
       {manage ? (
         <>
           <label className="encounter-shape-editor-color">
@@ -117,7 +117,7 @@ export function ShapeEditor({
               void removeAnnotation(selected.id);
             }}
           >
-            Delete shape
+            Remove
           </Button>
         </>
       ) : (
