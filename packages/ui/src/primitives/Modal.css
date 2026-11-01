@@ -157,7 +157,9 @@
     box-shadow: none;
     filter: none;
   }
+  /* The body takes the height, so the footer stands pinned at the screen's foot however short the content. */
   .nh-modal--full .nh-modal-body {
+    flex: 1 1 auto;
     padding: var(--space-4);
   }
   .nh-modal--full .nh-modal-foot {

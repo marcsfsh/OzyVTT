@@ -5,7 +5,7 @@ import {
   type IntegrationCredentialMetadata,
   type IntegrationScope
 } from "@vtt/api-contract";
-import { Badge, Button, EmptyState, Input, Menu, MenuItem, Modal, useToast, type BadgeTone, Tick } from "@vtt/ui";
+import { Button, EmptyState, Input, Menu, MenuItem, Modal, Tag, useToast, type TagTone, Tick } from "@vtt/ui";
 import { useConfirm } from "../components/feedback";
 import { apiRequest } from "../lib/api";
 import { publishCredentials } from "./credentialCount";
@@ -32,10 +32,11 @@ export const stateOf = (credential: IntegrationCredentialMetadata, now = new Dat
     : credential.expiresAt && new Date(credential.expiresAt) <= now
       ? "expired"
       : "active";
-const STATE_WORDS: Readonly<Record<CredentialState, [string, BadgeTone]>> = {
-  active: ["Active", "info"],
-  expired: ["Expired", "caution"],
-  revoked: ["Revoked", "danger"]
+// Active in cyan, the rest quiet (settings spec 2.4): a tag in VT323, its words carrying the state.
+const STATE_WORDS: Readonly<Record<CredentialState, [string, TagTone]>> = {
+  active: ["Active", "ready"],
+  expired: ["Expired", "status"],
+  revoked: ["Revoked", "status"]
 };
 
 // One way to write a date and time (theme rule 20), with its capitals kept.
@@ -120,7 +121,7 @@ export function CredentialsTable({
 
   const stateBadge = (credential: IntegrationCredentialMetadata) => {
     const [words, tone] = STATE_WORDS[stateOf(credential)];
-    return <Badge tone={tone}>{words}</Badge>;
+    return <Tag tone={tone}>{words}</Tag>;
   };
   const rowActions = (credential: IntegrationCredentialMetadata) => {
     const live = !credential.revokedAt;
@@ -159,7 +160,10 @@ export function CredentialsTable({
       ) : phone ? (
         <ul className="settings-list" aria-label="Integration credentials">
           {credentials.map((credential) => (
-            <li key={credential.id} className="settings-list-row">
+            <li
+              key={credential.id}
+              className={credential.revokedAt ? "settings-list-row is-revoked" : "settings-list-row"}
+            >
               <span className="settings-list-text">
                 <b>{credential.name}</b>
                 <span>
@@ -186,7 +190,7 @@ export function CredentialsTable({
           </thead>
           <tbody>
             {credentials.map((credential) => (
-              <tr key={credential.id}>
+              <tr key={credential.id} className={credential.revokedAt ? "is-revoked" : undefined}>
                 <td>
                   <b>{credential.name}</b>
                 </td>
@@ -272,6 +276,7 @@ function NewCredentialDialog({
   onClose,
   onCreated
 }: Readonly<{ gmToken: string; onClose: () => void; onCreated: (issued: Issued) => void }>) {
+  const phone = useMediaQuery("(max-width: 760px)");
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<ReadonlySet<IntegrationScope>>(new Set());
   const [expiresAt, setExpiresAt] = useState("");
@@ -308,7 +313,8 @@ function NewCredentialDialog({
   return (
     <Modal
       open
-      size="md"
+      // A phone opens it full screen, Cancel and Create credential pinned at its foot (settings spec 2.4).
+      size={phone ? "full" : "md"}
       title="New credential"
       ariaLabel="New credential"
       onClose={onClose}

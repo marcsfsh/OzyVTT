@@ -12,18 +12,25 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+/* Each scope a small tag: VT323 15px in a 1px edge (settings spec 4). */
 .credentials-scopes code {
-  padding: 1px var(--space-1);
-  border: 1px solid var(--line);
+  padding: 0 4px;
+  border: 1px solid var(--line-raised);
   color: var(--text-dim);
-  font-size: var(--fs-2xs);
+  font: 400 15px / 18px var(--font-numeric);
+  letter-spacing: 0.02em;
+}
+/* A revoked credential's row is dimmed. */
+.credentials-table tr.is-revoked,
+.settings-list-row.is-revoked {
+  opacity: 0.55;
 }
 .credentials-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
-.credentials-form label {
+.credentials-form > label {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -43,9 +50,10 @@
   color: var(--text);
   font: 600 var(--fs-sm) / 1.3 var(--font-label);
 }
+/* The fourteen scopes as ticks in two columns. */
 .credentials-scope-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-1) var(--space-4);
 }
 .credentials-facts {

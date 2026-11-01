@@ -54,23 +54,6 @@
   margin: 0;
   padding-left: calc(var(--space-3) * 2 + 1em);
 }
-.settings-search-results {
-  position: absolute;
-  top: calc(100% + var(--space-1));
-  right: 0;
-  z-index: 30;
-  width: min(24rem, calc(100vw - 2 * var(--space-3)));
-  padding: var(--space-1);
-  border: 1px solid var(--line-raised);
-  background: var(--material-lip), var(--surface-2);
-  box-shadow: var(--shadow-2);
-}
-
-.settings-search-results ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 .settings-search-option {
   display: flex;
   align-items: center;
@@ -258,7 +241,7 @@
   white-space: nowrap;
 }
 .settings-table td {
-  padding: var(--space-2);
+  padding: 8px 10px;
   border-bottom: 1px solid var(--line);
   color: var(--text);
   vertical-align: middle;
@@ -352,13 +335,13 @@
 .settings-split > .settings-content {
   padding: 18px 28px calc(var(--space-10) + env(safe-area-inset-bottom));
 }
-.settings-list {
+.settings-index {
   display: flex;
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--line-strong);
 }
-.settings-list-search {
+.settings-index-search {
   display: flex;
   flex-direction: column;
   flex: none;
@@ -366,26 +349,26 @@
   padding: 12px 12px 8px;
 }
 /* While the field holds words its matches fill the list. */
-.settings-list-search:has(.settings-search-list) {
+.settings-index-search:has(.settings-search-list) {
   flex: 1 1 auto;
 }
-.settings-list-search .settings-search {
+.settings-index-search .settings-search {
   flex-direction: column;
   align-items: stretch;
   min-height: 0;
 }
-.settings-list-search .settings-search-icon {
+.settings-index-search .settings-search-icon {
   top: 14px;
 }
-.settings-list-search .settings-list-nav {
+.settings-index-nav {
   flex: 1 1 auto;
   min-height: 0;
   padding: 0 6px var(--space-3);
 }
-.settings-list-nav[hidden] {
+.settings-index-nav[hidden] {
   display: none;
 }
-.settings-list-nav .nh-sidelist-leading svg {
+.settings-index-nav .nh-sidelist-leading svg {
   width: 18px;
   height: 18px;
 }
@@ -444,11 +427,11 @@
 }
 
 /* A phone (settings spec 2.1 and 4): the list is the first page, its rows 52px; a section's column is 12px 14px. */
-.settings.is-phone .settings-list {
+.settings.is-phone .settings-index {
   flex: 1 1 auto;
   border-right: 0;
 }
-.settings.is-phone .settings-list .nh-sidelist-hit {
+.settings.is-phone .settings-index .nh-sidelist-hit {
   min-height: 52px;
 }
 .settings.is-phone .settings-content:not(.is-frame) {

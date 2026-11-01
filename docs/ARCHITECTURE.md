@@ -1090,8 +1090,8 @@ holds Release, the theme, Settings and Leave the table (`shell/useLeaveTable.tsx
 sections and More are the bottom tabs, and More opens `shell/MoreSheet.tsx` with the menu's rows. Prep's section
 bar (`PrepFrame`) holds Encounters, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
 (`/encounters`, `/roster`, `/encounters/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
-search or primary at the bar's end through `PrepBarSlot`. Every section with pages (Prep, the Codex, the Compendium
-and Settings) draws the one Titled section bar, `shell/SectionBar.tsx` (ADR-0048): the section's name as the page's
+search or primary at the bar's end through `PrepBarSlot`. Every section (Prep, the Codex, the Compendium,
+and Settings with no pages) draws the one Titled section bar, `shell/SectionBar.tsx` (ADR-0048): the section's name as the page's
 `h1`, its pages as the kit's tab list inside a navigation landmark, and an end slot (`SectionBarSlot`, which
 `PrepBarSlot` is) a page portals its primary into; on a phone it is the header row and the strip of pages. `litGmSection` and `prepPageFor` say what lights, and
 `lastLocationForSection` returns a section to where the GM was. A player has Table, Sheet (`/me`) and Codex, and a
@@ -1203,10 +1203,15 @@ A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blo
 `page/document.ts` places blocks by `codexParagraphs` from `@vtt/domain`, the rule the server assembles bodies by.
 The table's Codex tab is `table/CodexTab.tsx`, over the same reads.
 
-Settings (ADR-0036) lives in `settings/`. `sections.ts` declares the sections (Players, Encounters, Characters, Device,
-Access and API) with their audience and every setting's label and hint; the page, its search and the tests read it.
-`SettingsPage.tsx` draws the Codex shell's section bar or phone strip around the section the address names
-(`/settings/<section>`); a player's page is Device alone, so GM sections never mount for a player. Each section is
+Settings (ADR-0036, ADR-0057) lives in `settings/`. `sections.ts` declares the sections (Players, Encounters,
+Characters, Device, Access and API) with their audience and every setting's label and hint; the page, its search and the
+tests read it. `SettingsPage.tsx` draws the title row (the section bar with no pages, the section's primary at its end),
+the side list (`SettingsList.tsx`, the kit's `SideList` rows with icons and counts, and `SettingsSearch.tsx` at its
+top, whose matches take the rows' place) and the section the address names (`/settings/<section>`). On a phone
+`/settings` is the list and a section has Back. `sectionLines.ts` writes what each section holds now from the GM's
+state and the device (`integrations/credentialCount.ts` holds the active credentials); a section's head shows it. A
+table setting's write says Saved on its row (`SavedFlashProvider` in `SettingRow.tsx`), and Encounters groups its rows
+by moment (`SettingsMoment`). A player's page is Device alone, so GM sections never mount for a player. Each section is
 its own component and writes through the same commands as before (`table-writes.ts`). The integration credentials
 (`integrations/CredentialsTable.tsx`) read and write their GM routes. The API reference
 (`integrations/ApiReference.tsx`, an operation at `/settings/api/<operation id>` in `OperationDocument.tsx`) reads the
@@ -1237,7 +1242,7 @@ primitive's or the encounter panel's own `.encounter-primary`, from the press po
 middle.
 
 A tab strip's underline is its ink (`StripInk` in `@vtt/ui`), one line that `Tabs` and the link bars (the Codex,
-Compendium and Settings section bars, their phone tab bars and the sheet's) carry as their last child. The ink is a
+Compendium and Prep section bars, their phone strips and the sheet's) carry as their last child. The ink is a
 horizon with a faint cast, and it lies on the strip's line: `place()` adds the strip's `--nh-ink-shift` to seat it on
 an edge line, and an ink marked `onHorizon` (the top bar's sections) measures the bar marked `data-horizon` and shows
 that horizon's own stretch under it. A change of

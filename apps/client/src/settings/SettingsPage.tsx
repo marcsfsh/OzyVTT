@@ -122,9 +122,7 @@ export function SettingsPage({
   };
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
 
-  const listSearch = (
-    <SettingsSearch entries={settingsFor(role)} onPick={pick} variant="list" onQueryChange={setListQuery} />
-  );
+  const listSearch = <SettingsSearch entries={settingsFor(role)} onPick={pick} onQueryChange={setListQuery} />;
   const counts = gm
     ? {
         players: gm.actors.filter(
@@ -247,7 +245,7 @@ export function SettingsPage({
                     <IconButton
                       label="Search settings"
                       onClick={() =>
-                        document.querySelector<HTMLInputElement>(".settings-list .settings-search-input")?.focus()
+                        document.querySelector<HTMLInputElement>(".settings-index .settings-search-input")?.focus()
                       }
                     >
                       <IconSearch />

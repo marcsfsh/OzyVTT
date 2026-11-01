@@ -176,7 +176,10 @@ The shells:
   and its actions, who is here, the theme (Dusk and Dawn), Settings and Sign out. Each section with pages
   has the Titled section bar under it (`shell/SectionBar.tsx`, ADR-0048): 52px, the section's name in Chakra Petch 600
   capitals at 17px, a divider, the pages as words with the horizon ink, then the section's search and its primary
-  (the Cup at 42px) at the right end. No icons on the pages.
+  (the Cup at 42px) at the right end. No icons on the pages. Settings alone keeps the title row without the pages: its
+  sections are a side list (ADR-0057), the search at its top, each section with its icon and a count, and the section
+  beside it at 880px with its name, its line and what it holds now in its head. A phone opens Settings on that list,
+  and a section full screen under Back and its name.
 - GM, phone. No top bar. The four sections and More are the bottom tabs (64px, five equal tabs); More opens a sheet
   above them with the menu's rows and Search. Play or Table carries the live lamp while an encounter runs. The header
   row belongs to the page on screen: a section's page
@@ -452,7 +455,7 @@ its pages from these patterns.
 | Record document | The record as its readers see it, with a panel beside it answering what the GM asks                         |
 | List as a table | Toolbar (filters, sort, count), then a sortable table; rows with two facts on a phone                       |
 | Making as steps | Steps on the left, questions in the middle, a live preview on the right                                     |
-| Settings rows   | Cradle groups of rows: label and hint on the left, the control on the right, centred at 880px               |
+| Settings rows   | A side list of sections; Cradle groups of rows of 64px, the control at the right, in an 880px column        |
 | Arrival         | The sunset with one card or one pair of buttons                                                             |
 | Dialog          | A title on the horizon edge, the content, a footer with the primary at the right; a bottom sheet on a phone |
 
@@ -511,7 +514,8 @@ The sheet is the Ledger (ADR-0047; `docs/design/polish/D1-character-sheet/`).
   the top, and a foot that says when their turn comes. A spent reaction,
   incapacitation or server refusal keeps it unlit. Extra actions and movement beyond 30 ft must remain legible.
 - An option that can't be used now stays in its list, disabled, with the server's reason at full strength.
-- GM-only data and restricted-control groups have a violet `GmOnlyTag`. Individual controls retain their semantic
+- GM-only data and restricted-control groups have a violet `GmOnlyTag`, where players could see the place it sits: a GM
+  row in Device carries it, and the GM's own Settings sections, which a player never sees, do not. Individual controls retain their semantic
   colours: the view's primary is the Cup, targeting stays cyan, and danger actions retain their warning treatment.
 - The latest-roll line shows only rolls made from this sheet (`sheet-roll-ids.ts`).
 

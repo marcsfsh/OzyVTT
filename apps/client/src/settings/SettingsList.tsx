@@ -34,9 +34,9 @@ export function SettingsList({
   onGo: (id: SettingsSectionId) => void;
 }>) {
   return (
-    <aside className="settings-list">
-      <div className="settings-list-search">{search}</div>
-      <nav className="nh-sidelist settings-list-nav scroll-y" aria-label="Settings sections" hidden={searching}>
+    <aside className="settings-index">
+      <div className="settings-index-search">{search}</div>
+      <nav className="nh-sidelist settings-index-nav scroll-y" aria-label="Settings sections" hidden={searching}>
         <SideListGroup eyebrow="Sections">
           {sections.map((section) => (
             <SideListRow

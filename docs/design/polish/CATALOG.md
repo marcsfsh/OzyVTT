@@ -429,7 +429,7 @@ screen and Settings' table screen row Designed with E3.2 (`E3-sound-screen/SPEC.
 
 ## I. Settings
 
-Job: set the table up once and change it rarely. Status: Designed (`I-settings/SPEC.md`, `I-settings/PLAN.md`,
+Job: set the table up once and change it rarely. Status: Built (`I-settings/SPEC.md`, `I-settings/PLAN.md`,
 ADR-0057): a side list of the sections with a line of what each holds now, rows with their control at the right, the
 encounter rules grouped by moment, and Access with its rows and the credentials' table. F's time and tools add a Codex
 group to its side list (ADR-0070). I1, I2, I6 and I7 Designed (`I-settings-leftovers/SPEC.md`,

@@ -29,15 +29,12 @@ export function SettingsSearch({
   onPick,
   autoFocus = false,
   className,
-  variant = "popover",
   onQueryChange
 }: Readonly<{
   entries: readonly SettingEntry[];
   onPick: (entry: SettingEntry) => void;
   autoFocus?: boolean;
   className?: string;
-  /** "list": the matches fill Settings' list under the field, as its rows (settings spec 2.1); "popover" floats them. */
-  variant?: "popover" | "list";
   /** Whether the field holds words, for the list to give way to the matches. */
   onQueryChange?: (query: string) => void;
 }>) {
@@ -46,8 +43,6 @@ export function SettingsSearch({
     setQueryState(next);
     onQueryChange?.(next);
   };
-  const inList = variant === "list";
-  const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -56,21 +51,14 @@ export function SettingsSearch({
 
   const pick = (entry: SettingEntry) => {
     setQuery("");
-    setOpen(false);
     setActive(0);
     onPick(entry);
   };
-  // In the list the matches stay while the field holds words; a popover closes when the field loses focus.
-  const showing = (inList || open) && query.trim() !== "";
+  // The matches stay while the field holds words.
+  const showing = query.trim() !== "";
 
   return (
-    <div
-      ref={box}
-      className={cx("settings-search", className)}
-      onBlur={(event) => {
-        if (!box.current?.contains(event.relatedTarget as Node)) setOpen(false);
-      }}
-    >
+    <div ref={box} className={cx("settings-search", className)}>
       <IconSearch className="settings-search-icon" />
       <Input
         ref={input}
@@ -86,10 +74,8 @@ export function SettingsSearch({
         autoFocus={autoFocus}
         placeholder="Search settings"
         value={query}
-        onFocus={() => setOpen(true)}
         onChange={(event) => {
           setQuery(event.target.value);
-          setOpen(true);
           setActive(0);
         }}
         onKeyDown={(event) => {
@@ -103,13 +89,12 @@ export function SettingsSearch({
             event.preventDefault();
             pick(matches[active]);
           } else if (event.key === "Escape") {
-            if (inList) setQuery("");
-            setOpen(false);
+            setQuery("");
           }
         }}
       />
       {showing && (
-        <div className={inList ? "settings-search-list scroll-y" : "settings-search-results anim-popover"}>
+        <div className="settings-search-list scroll-y">
           {matches.length === 0 ? (
             <p className="settings-search-empty" role="status">
               No setting matches "{query.trim()}".
@@ -127,7 +112,7 @@ export function SettingsSearch({
                   onMouseEnter={() => setActive(index)}
                   onClick={() => pick(entry)}
                 >
-                  <span className="settings-search-label">{inList ? marked(entry.label, query) : entry.label}</span>
+                  <span className="settings-search-label">{marked(entry.label, query)}</span>
                   <span className="settings-search-section">{sectionLabel(entry)}</span>
                 </li>
               ))}
