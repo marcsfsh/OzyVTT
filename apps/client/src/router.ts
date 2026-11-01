@@ -323,9 +323,13 @@ export function isKnownPath(path: string): boolean {
       (segments.length === 2 && isSettingsSection(segments[1])) ||
       (segments.length === 3 && segments[1] === "api" && /^[A-Za-z][\w.-]{0,100}$/.test(segments[2]))
     );
-  // The Table screen tab is the display controls or, at `/sound`, the sound board.
+  // The Table screen tab is the screens, a screen as a remote at `/screens/<id>`, or at `/sound` the sound board.
   if (segments[0] === "viewer-controls")
-    return segments.length === 1 || (segments.length === 2 && segments[1] === "sound");
+    return (
+      segments.length === 1 ||
+      (segments.length === 2 && segments[1] === "sound") ||
+      (segments.length === 3 && segments[1] === "screens" && /^[A-Za-z0-9-]{1,80}$/.test(segments[2]))
+    );
   // A replay id is the archive's integer row id, so a non-numeric second segment is genuinely unknown.
   if (segments[0] === "replays")
     return segments.length === 1 || (segments.length === 2 && /^[0-9]{1,12}$/.test(segments[1]));

@@ -389,3 +389,78 @@
 .viewer-screen-card.is-pair .viewer-pair-form > :is(h3, h4, p:first-of-type) {
   display: none;
 }
+
+/* ----- A screen as a remote (table screen spec 2.3 and 4): the tools over the picture, and the side at 300px ----- */
+.viewer-remote-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: var(--space-4);
+}
+.viewer-remote-crumb {
+  margin: 0;
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+}
+.viewer-remote-crumb a {
+  color: var(--cyan-hi);
+}
+.viewer-remote-tools .viewer-tool-preview {
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--cyan) 30%, transparent);
+  cursor: crosshair;
+}
+.viewer-type-point > summary {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  color: var(--text-dim);
+  font: 600 var(--fs-sm) / 1.2 var(--font-label);
+  cursor: pointer;
+}
+.viewer-remote-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.viewer-onscreen.is-column {
+  flex-direction: column;
+  align-items: stretch;
+}
+.viewer-onscreen.is-column .viewer-onscreen-grow {
+  display: none;
+}
+.viewer-remote-others h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font: 600 11px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.viewer-remote-others ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.viewer-remote-others li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+}
+.viewer-remote-others p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.viewer-screens-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 979px) {
+  .viewer-remote-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

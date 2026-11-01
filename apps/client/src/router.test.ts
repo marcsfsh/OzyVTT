@@ -53,6 +53,9 @@ describe("The address table", () => {
     expect(gmTabForPath(SOUND_BOARD_PATH)).toBe("viewer");
     expect(isKnownPath(SOUND_BOARD_PATH)).toBe(true);
     expect(isKnownPath("/viewer-controls/sound/extra")).toBe(false);
+    // A screen opens as a remote at its own address.
+    expect(isKnownPath("/viewer-controls/screens/den-tv-1")).toBe(true);
+    expect(isKnownPath("/viewer-controls/screens")).toBe(false);
     expect(isKnownPath("/viewer-controls/music")).toBe(false);
     expect(isGmOnlyPath(SOUND_BOARD_PATH)).toBe(true);
   });

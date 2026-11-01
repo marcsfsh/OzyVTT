@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { goTo } from "../../test/route";
 import { ToastProvider } from "@vtt/ui";
 
 // The GM's Table screen page (table screen spec 2.3): what is on the screen as one bar, the paired screens as cards
@@ -66,6 +67,7 @@ vi.mock("../scene/mapImage", async (original) => ({
 import { ViewerControls } from "./ViewerControls";
 
 afterEach(() => {
+  goTo("/viewer-controls");
   answers.enabled = true;
   answers.activeMap = true;
 });
@@ -107,5 +109,28 @@ describe("the Table screen page", () => {
     const bar = await screen.findByRole("region", { name: "On the screen" });
     expect(await within(bar).findByRole("button", { name: "Present Smoke crossing" })).toBeInTheDocument();
     expect(bar).toHaveTextContent("Paused");
+  });
+});
+
+describe("a screen as a remote", () => {
+  it("names the screen with its state and when it was paired, offers Revoke, and lists the other screens", async () => {
+    goTo("/viewer-controls/screens/v2");
+    mount();
+    expect(await screen.findByRole("heading", { name: "Den TV", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText(/Connected · Sound on · paired/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Revoke this screen" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Table screen" })).toHaveAttribute("href", "/viewer-controls");
+    const others = screen.getByRole("region", { name: "Other screens" });
+    expect(within(others).getByText("Kitchen TV")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Presentation tool" })).getByRole("button", { name: "Ping a point" })
+    ).toBeInTheDocument();
+  });
+
+  it("returns to the screens for an unknown or revoked screen", async () => {
+    goTo("/viewer-controls/screens/v3");
+    mount();
+    await screen.findByText("Den TV");
+    await waitFor(() => expect(window.location.pathname).toBe("/viewer-controls"));
   });
 });

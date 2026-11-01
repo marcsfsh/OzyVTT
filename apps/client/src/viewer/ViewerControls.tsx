@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Menu, MenuItem, SegmentedControl, Select, StatusLamp, useToast } from "@vtt/ui";
 import { formatDay } from "../lib/formatWhen";
+import { navigate, useRoute } from "../router";
 import { ScreenPicture } from "./ScreenPicture";
 import type { Presentation } from "./ViewerApp";
 import { useConfirm } from "../components/feedback";
@@ -66,6 +67,9 @@ function measurementLabel(map: ViewerMap | undefined, points: readonly Point[]) 
 }
 
 export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps) {
+  const route = useRoute();
+  const remoteId = route.segments[1] === "screens" ? (route.segments[2] ?? null) : null;
+  const [loaded, setLoaded] = useState(false);
   const [presentation, setPresentation] = useState<Presentation | null>(null);
   const [viewers, setViewers] = useState<readonly ViewerMetadata[]>([]);
   const [connections, setConnections] = useState<readonly ViewerConnection[]>([]);
@@ -95,6 +99,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
     ]);
     setPresentation(state.presentation);
     setViewers(access.viewers);
+    setLoaded(true);
     setConnections(access.connections);
     const availableUrls = addresses.viewerUrls.length
       ? addresses.viewerUrls
@@ -152,7 +157,18 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
     const raw = imagePointFromClient(svgRef.current, event.clientX, event.clientY);
     if (!raw) return;
     const point = clampPoint(raw, map.width, map.height);
-    setDraftPoints((current) => (tool === "measure" && current.length === 1 ? [current[0], point] : [point]));
+    if (tool === "measure") {
+      setDraftPoints((current) => (current.length === 1 ? [current[0], point] : [point]));
+      return;
+    }
+    // Ping and Focus send on the press (table screen spec 2.3).
+    setDraftPoints([point]);
+    void run(async () => {
+      if (!mapIsPresented) throw new Error("Present this map first. These tools work on the map the screen shows.");
+      if (tool === "focus") await command({ type: "viewer.camera.set", camera: { center: point, zoom } });
+      else await command({ type: "viewer.ping", id: newId(), point, durationMs: 5_000 });
+      toast(tool === "focus" ? "The screen is focused there." : "Ping sent.", { tone: "success" });
+    });
   };
   const updatePoint = (index: number, coordinate: "x" | "y", value: number) =>
     setDraftPoints((current) => {
@@ -214,19 +230,283 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
       })
     );
   const revoke = async (viewer: ViewerMetadata) => {
-    if (
-      await confirm({
-        title: `Revoke ${viewer.name}?`,
-        body: "The screen loses access now and shows nothing more until it is paired again.",
-        confirmLabel: "Revoke",
-        danger: true
-      })
-    )
-      void run(async () => {
+    const sure = await confirm({
+      title: `Revoke ${viewer.name}?`,
+      body: "The screen loses access now and shows nothing more until it is paired again.",
+      confirmLabel: "Revoke",
+      danger: true
+    });
+    if (sure)
+      await run(async () => {
         await apiRequest(`/api/v1/viewer/access/${viewer.id}`, { token: gmToken, method: "DELETE" });
       });
+    return sure;
   };
   const onTheScreen = presentationHasMap ? (presentation?.activeMap?.altText ?? map?.altText ?? "A map") : null;
+
+  // What is on the screen: one bar on the page, a column beside a screen's remote.
+  const onScreenBar = (column: boolean) => (
+    <section className={column ? "viewer-onscreen is-column" : "viewer-onscreen"} aria-label="On the screen">
+      <span className="viewer-onscreen-eyebrow">On the screen</span>
+      <StatusLamp lit={presentationHasMap} />
+      <b className="viewer-onscreen-state">{presentationHasMap ? "ON" : "Paused"}</b>
+      <span className="viewer-onscreen-map">
+        {onTheScreen ? (
+          <>
+            <b>{onTheScreen}</b> {mapIsPresented ? "· the map you have open" : "· presented"}
+          </>
+        ) : (
+          "Nothing is presented"
+        )}
+      </span>
+      <span className="viewer-onscreen-grow" />
+      {presentationHasMap ? (
+        <Button
+          variant="secondary"
+          disabled={busy || !presentation}
+          onClick={() => void run(() => command({ type: "viewer.enabled.set", enabled: false }))}
+        >
+          Pause the table screen
+        </Button>
+      ) : (
+        map && (
+          <Button
+            variant={step === "present" ? "primary" : "secondary"}
+            disabled={busy || !presentation}
+            onClick={present}
+          >
+            Present {map.altText}
+          </Button>
+        )
+      )}
+      <Menu trigger="Present a map" label="Present a map" align="end">
+        <MenuItem disabled={busy || !map || presentationHasMap} onClick={present}>
+          {map ? `Present ${map.altText}` : "Present a map"}
+        </MenuItem>
+        <MenuItem disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={showInstead}>
+          {mapIsPresented ? "This map is on the screen" : map ? `Show ${map.altText} instead` : "Show this map instead"}
+        </MenuItem>
+        {onPreview && <MenuItem onClick={onPreview}>Preview the screen</MenuItem>}
+      </Menu>
+    </section>
+  );
+
+  // A screen as a remote (table screen spec 2.3): its head, the tools over the picture, and the side.
+  const remoteViewer = remoteId ? viewers.find((viewer) => viewer.id === remoteId && !viewer.revokedAt) : undefined;
+  if (remoteId && loaded && !remoteViewer) void navigate("/viewer-controls", { replace: true });
+  if (remoteId && remoteViewer) {
+    const connection = connections.find((entry) => entry.viewerId === remoteViewer.id);
+    const others = paired.filter((viewer) => viewer.id !== remoteViewer.id);
+    return (
+      <section
+        className="viewer-controls viewer-remote pane-frame pane-scene frame-col anim-view"
+        aria-labelledby="viewer-remote-title"
+      >
+        <header className="viewer-controls-heading">
+          <div className="viewer-controls-title">
+            <p className="viewer-remote-crumb">
+              <a
+                href="/viewer-controls"
+                onClick={(event) => {
+                  event.preventDefault();
+                  void navigate("/viewer-controls");
+                }}
+              >
+                Table screen
+              </a>
+            </p>
+            <h2 id="viewer-remote-title">{remoteViewer.name}</h2>
+            <p>
+              {connection ? `Connected · ${SOUND_WORDS[connection.sound]}` : "Not connected"} · paired{" "}
+              {formatDay(remoteViewer.createdAt)}
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            disabled={busy}
+            onClick={async () => {
+              if (await revoke(remoteViewer)) void navigate("/viewer-controls");
+            }}
+          >
+            Revoke this screen
+          </Button>
+        </header>
+        <div className="viewer-controls-body viewer-remote-body scroll-y frame-fill">
+          <section
+            className="viewer-col viewer-col-tools viewer-remote-tools"
+            aria-labelledby={map ? "viewer-tools-title" : undefined}
+            aria-label={map ? undefined : "Live presentation tools"}
+          >
+            {!map && (
+              <p className="viewer-no-map-notice" role="status">
+                Upload or pick a map in <strong>Encounters</strong> to present it here. Focus, ping and measure work on
+                the map the screen shows.
+              </p>
+            )}
+            {map && (
+              <>
+                <div className="viewer-tools-head">
+                  <h3 id="viewer-tools-title">Focus, ping and measure</h3>
+                  <p>
+                    {!mapIsPresented
+                      ? "Present this map to use these tools."
+                      : tool === "ping"
+                        ? "Press the picture to ping that point. Every paired screen shows it."
+                        : tool === "focus"
+                          ? "Press the picture to focus every paired screen there, at the zoom in Type a point."
+                          : "Press the picture at each end of the line, then show the measurement on every paired screen."}
+                  </p>
+                </div>
+                <SegmentedControl
+                  className="viewer-tool-tabs"
+                  ariaLabel="Presentation tool"
+                  value={tool}
+                  onChange={(value) => setTool(value as typeof tool)}
+                  options={[
+                    { value: "focus", label: "Focus view" },
+                    { value: "ping", label: "Ping a point" },
+                    { value: "measure", label: "Measure" }
+                  ]}
+                />
+                {/* The preview box is the click surface; no wrapper in between, since an auto-height intermediate
+              breaks the percentage chain that bounds the svg to the canvas. */}
+                {previewUrl && (
+                  <div
+                    className="viewer-tool-preview"
+                    onClick={choosePoint}
+                    aria-label="The presented map. Click a point, or type its coordinates in the fields below."
+                  >
+                    <svg
+                      ref={svgRef}
+                      viewBox={`0 0 ${map.width} ${map.height}`}
+                      width={map.width}
+                      height={map.height}
+                      preserveAspectRatio="xMidYMid meet"
+                    >
+                      <image href={previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
+                      {tool === "measure" && draftPoints.length === 2 && (
+                        <line x1={draftPoints[0].x} y1={draftPoints[0].y} x2={draftPoints[1].x} y2={draftPoints[1].y} />
+                      )}
+                      {draftPoints.map((point, index) => (
+                        <g key={index}>
+                          <circle cx={point.x} cy={point.y} r={Math.max(5, Math.min(map.width, map.height) / 70)} />
+                          {tool === "measure" && (
+                            <text x={point.x} y={point.y}>
+                              {index ? "B" : "A"}
+                            </text>
+                          )}
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+                <details className="viewer-type-point">
+                  <summary>Type a point</summary>
+                  <div className="viewer-tool-fields">
+                    {Array.from({ length: requiredPointCount }, (_, index) => (
+                      <fieldset key={index}>
+                        <legend>{tool === "measure" ? (index ? "End B" : "Start A") : "Point"}</legend>
+                        <label>
+                          X
+                          <input
+                            type="number"
+                            min="0"
+                            max={map.width}
+                            value={draftPoints[index]?.x ?? ""}
+                            onChange={(event) => updatePoint(index, "x", Number(event.target.value))}
+                          />
+                        </label>
+                        <label>
+                          Y
+                          <input
+                            type="number"
+                            min="0"
+                            max={map.height}
+                            value={draftPoints[index]?.y ?? ""}
+                            onChange={(event) => updatePoint(index, "y", Number(event.target.value))}
+                          />
+                        </label>
+                      </fieldset>
+                    ))}
+                    {tool === "focus" && (
+                      <label>
+                        Zoom
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="8"
+                          step="0.1"
+                          value={zoom}
+                          onChange={(event) => setZoom(Number(event.target.value))}
+                        />
+                      </label>
+                    )}
+                    {tool === "measure" && (
+                      <label>
+                        Displayed distance
+                        <input
+                          value={labelOverride}
+                          onChange={(event) => setLabelOverride(event.target.value)}
+                          maxLength={64}
+                          placeholder={suggestedLabel || "Choose two points"}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <div className="viewer-tool-actions">
+                    <Button
+                      variant={step === "point" ? "primary" : "secondary"}
+                      disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount}
+                      onClick={sendTool}
+                    >
+                      {tool === "focus" ? "Send focus" : tool === "ping" ? "Send ping" : "Show measurement"}
+                    </Button>
+                    {tool === "measure" && (
+                      <Button
+                        variant="secondary"
+                        disabled={busy || !presentation?.measurement}
+                        onClick={() => void run(() => command({ type: "viewer.measurement.clear" }))}
+                      >
+                        Clear measurement
+                      </Button>
+                    )}
+                  </div>
+                </details>
+              </>
+            )}
+          </section>
+          <aside className="viewer-remote-side" aria-label="The screens">
+            {onScreenBar(true)}
+            <section className="viewer-remote-others" aria-label="Other screens">
+              <h3>Other screens</h3>
+              {others.length === 0 ? (
+                <p>No other screen is paired.</p>
+              ) : (
+                <ul>
+                  {others.map((viewer) => {
+                    const other = connections.find((entry) => entry.viewerId === viewer.id);
+                    return (
+                      <li key={viewer.id}>
+                        <StatusLamp lit={other !== undefined} />
+                        <span className="viewer-screen-text">
+                          <strong>{viewer.name}</strong>
+                          <span>{other ? `Connected · ${SOUND_WORDS[other.sound]}` : lastSeen(viewer)}</span>
+                        </span>
+                        <Button size="sm" onClick={() => void navigate(`/viewer-controls/screens/${viewer.id}`)}>
+                          Open
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          </aside>
+        </div>
+        {dialog}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -247,54 +527,7 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
       </header>
 
       <div className="viewer-controls-body scroll-y frame-fill">
-        {/* What is on the screen, as one bar (table screen spec 2.3). */}
-        <section className="viewer-onscreen" aria-label="On the screen">
-          <span className="viewer-onscreen-eyebrow">On the screen</span>
-          <StatusLamp lit={presentationHasMap} />
-          <b className="viewer-onscreen-state">{presentationHasMap ? "ON" : "Paused"}</b>
-          <span className="viewer-onscreen-map">
-            {onTheScreen ? (
-              <>
-                <b>{onTheScreen}</b> {mapIsPresented ? "· the map you have open" : "· presented"}
-              </>
-            ) : (
-              "Nothing is presented"
-            )}
-          </span>
-          <span className="viewer-onscreen-grow" />
-          {presentationHasMap ? (
-            <Button
-              variant="secondary"
-              disabled={busy || !presentation}
-              onClick={() => void run(() => command({ type: "viewer.enabled.set", enabled: false }))}
-            >
-              Pause the table screen
-            </Button>
-          ) : (
-            map && (
-              <Button
-                variant={step === "present" ? "primary" : "secondary"}
-                disabled={busy || !presentation}
-                onClick={present}
-              >
-                Present {map.altText}
-              </Button>
-            )
-          )}
-          <Menu trigger="Present a map" label="Present a map" align="end">
-            <MenuItem disabled={busy || !map || presentationHasMap} onClick={present}>
-              {map ? `Present ${map.altText}` : "Present a map"}
-            </MenuItem>
-            <MenuItem disabled={busy || !presentation?.enabled || !map || mapIsPresented} onClick={showInstead}>
-              {mapIsPresented
-                ? "This map is on the screen"
-                : map
-                  ? `Show ${map.altText} instead`
-                  : "Show this map instead"}
-            </MenuItem>
-            {onPreview && <MenuItem onClick={onPreview}>Preview the screen</MenuItem>}
-          </Menu>
-        </section>
+        {onScreenBar(false)}
 
         {/* The screens as cards, connected first, then Pair another screen. */}
         <ul className="viewer-screens" aria-label="Paired screens">
@@ -314,8 +547,8 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
                     <strong>{viewer.name}</strong>
                     <span>{connection ? `Connected · ${SOUND_WORDS[connection.sound]}` : lastSeen(viewer)}</span>
                   </span>
-                  <Button size="sm" variant="destructive" disabled={busy} onClick={() => void revoke(viewer)}>
-                    Revoke
+                  <Button size="sm" onClick={() => void navigate(`/viewer-controls/screens/${viewer.id}`)}>
+                    Open
                   </Button>
                 </div>
               </li>
@@ -355,142 +588,16 @@ export function ViewerControls({ gmToken, map, onPreview }: ViewerControlsProps)
           </li>
         </ul>
 
-        <section
-          className="viewer-col viewer-col-tools"
-          aria-labelledby={map ? "viewer-tools-title" : undefined}
-          aria-label={map ? undefined : "Live presentation tools"}
-        >
-          {!map && (
-            <p className="viewer-no-map-notice" role="status">
+        <p className="viewer-screens-hint" role="status">
+          {map ? (
+            "Open a screen to point at the map it shows: focus, ping and measure."
+          ) : (
+            <>
               Upload or pick a map in <strong>Encounters</strong> to present it here. Focus, ping and measure work on
               the map the screen shows.
-            </p>
-          )}
-          {map && (
-            <>
-              <div className="viewer-tools-head">
-                <h3 id="viewer-tools-title">Focus, ping and measure</h3>
-                <p>
-                  {mapIsPresented
-                    ? "Choose a point on the map, then send it to every paired screen."
-                    : "Present this map to use these tools."}
-                </p>
-              </div>
-              <SegmentedControl
-                className="viewer-tool-tabs"
-                ariaLabel="Presentation tool"
-                value={tool}
-                onChange={(value) => setTool(value as typeof tool)}
-                options={[
-                  { value: "focus", label: "Focus view" },
-                  { value: "ping", label: "Ping point" },
-                  { value: "measure", label: "Measure line" }
-                ]}
-              />
-              {/* The preview box is the click surface; no wrapper in between, since an auto-height intermediate
-              breaks the percentage chain that bounds the svg to the canvas. */}
-              {previewUrl && (
-                <div
-                  className="viewer-tool-preview"
-                  onClick={choosePoint}
-                  aria-label="The presented map. Click a point, or type its coordinates in the fields below."
-                >
-                  <svg
-                    ref={svgRef}
-                    viewBox={`0 0 ${map.width} ${map.height}`}
-                    width={map.width}
-                    height={map.height}
-                    preserveAspectRatio="xMidYMid meet"
-                  >
-                    <image href={previewUrl} width={map.width} height={map.height} role="img" aria-label="" />
-                    {tool === "measure" && draftPoints.length === 2 && (
-                      <line x1={draftPoints[0].x} y1={draftPoints[0].y} x2={draftPoints[1].x} y2={draftPoints[1].y} />
-                    )}
-                    {draftPoints.map((point, index) => (
-                      <g key={index}>
-                        <circle cx={point.x} cy={point.y} r={Math.max(5, Math.min(map.width, map.height) / 70)} />
-                        {tool === "measure" && (
-                          <text x={point.x} y={point.y}>
-                            {index ? "B" : "A"}
-                          </text>
-                        )}
-                      </g>
-                    ))}
-                  </svg>
-                </div>
-              )}
-              <div className="viewer-tool-fields">
-                {Array.from({ length: requiredPointCount }, (_, index) => (
-                  <fieldset key={index}>
-                    <legend>{tool === "measure" ? (index ? "End B" : "Start A") : "Point"}</legend>
-                    <label>
-                      X
-                      <input
-                        type="number"
-                        min="0"
-                        max={map.width}
-                        value={draftPoints[index]?.x ?? ""}
-                        onChange={(event) => updatePoint(index, "x", Number(event.target.value))}
-                      />
-                    </label>
-                    <label>
-                      Y
-                      <input
-                        type="number"
-                        min="0"
-                        max={map.height}
-                        value={draftPoints[index]?.y ?? ""}
-                        onChange={(event) => updatePoint(index, "y", Number(event.target.value))}
-                      />
-                    </label>
-                  </fieldset>
-                ))}
-                {tool === "focus" && (
-                  <label>
-                    Zoom
-                    <input
-                      type="number"
-                      min="0.1"
-                      max="8"
-                      step="0.1"
-                      value={zoom}
-                      onChange={(event) => setZoom(Number(event.target.value))}
-                    />
-                  </label>
-                )}
-                {tool === "measure" && (
-                  <label>
-                    Displayed distance
-                    <input
-                      value={labelOverride}
-                      onChange={(event) => setLabelOverride(event.target.value)}
-                      maxLength={64}
-                      placeholder={suggestedLabel || "Choose two points"}
-                    />
-                  </label>
-                )}
-              </div>
-              <div className="viewer-tool-actions">
-                <Button
-                  variant={step === "point" ? "primary" : "secondary"}
-                  disabled={busy || !mapIsPresented || draftPoints.length < requiredPointCount}
-                  onClick={sendTool}
-                >
-                  {tool === "focus" ? "Send focus" : tool === "ping" ? "Send ping" : "Show measurement"}
-                </Button>
-                {tool === "measure" && (
-                  <Button
-                    variant="secondary"
-                    disabled={busy || !presentation?.measurement}
-                    onClick={() => void run(() => command({ type: "viewer.measurement.clear" }))}
-                  >
-                    Clear measurement
-                  </Button>
-                )}
-              </div>
             </>
           )}
-        </section>
+        </p>
       </div>
       {dialog}
     </section>
