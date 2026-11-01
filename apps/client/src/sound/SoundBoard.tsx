@@ -3,7 +3,6 @@ import type { SoundBoard as Board, SoundBoardView } from "@vtt/domain";
 import { Eyebrow, IconButton, IconPause, IconPlay, IconSkip, IconStop, Slider } from "@vtt/ui";
 import { SharedScreenSwitch } from "../viewer/SharedScreenSwitch";
 import { ScreenSoundStatus } from "./ScreenSoundStatus";
-import { SceneSounds } from "./SceneSounds";
 import { isSounding, playOrPause, useSoundBoard, useSoundCommand, useSoundLibrary, type SendSound } from "./sound-data";
 import { SoundLibraryPanel } from "./SoundLibraryPanel";
 import { LevelSlider } from "./LevelSlider";
@@ -118,21 +117,13 @@ function PlayingBar({
 
 /**
  * The GM's sound board, the Table screen tab's second view: what plays on the table screen and how loud, the
- * library it plays from, and each scene's own sound. Sound comes out of the table screen only; this device and
+ * library it plays from; each encounter's own sound is on its page. Sound comes out of the table screen only; this device and
  * the players' stay silent.
  */
 const PARTS = ["playlist", "ambience", "effects", "library", "unused"] as const;
 type Part = (typeof PARTS)[number];
 
-export function SoundBoard({
-  gmToken,
-  scenes,
-  activeEncounterId
-}: Readonly<{
-  gmToken: string;
-  scenes: readonly Readonly<{ id: string; name: string }>[];
-  activeEncounterId: string | null;
-}>) {
+export function SoundBoard({ gmToken }: Readonly<{ gmToken: string }>) {
   const view = useSoundBoard();
   const library = useSoundLibrary(gmToken);
   const send = useSoundCommand();
@@ -199,9 +190,6 @@ export function SoundBoard({
                     board={view.board}
                     send={send}
                   />
-                )}
-                {part === "playlist" && (
-                  <SceneSounds board={view.board} scenes={scenes} activeEncounterId={activeEncounterId} send={send} />
                 )}
               </div>
             </div>

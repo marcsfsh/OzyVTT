@@ -189,13 +189,7 @@ export function GmShell({
       )}
 
       {/* The shared-screen controls own their frame: what the table screen shows, or at `/sound` what it plays. */}
-      {tab("viewer") && route.segments[1] === "sound" && (
-        <SoundBoard
-          gmToken={token}
-          scenes={scenes.map((scene) => ({ id: scene.id, name: scene.name }))}
-          activeEncounterId={state.combat.activeEncounterId ?? null}
-        />
-      )}
+      {tab("viewer") && route.segments[1] === "sound" && <SoundBoard gmToken={token} />}
       {tab("viewer") && route.segments[1] !== "sound" && (
         // A phone has no top bar, so the page names itself (frame spec 2.2).
         <PhoneHeader title="Table screen" />

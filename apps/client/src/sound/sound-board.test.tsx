@@ -49,7 +49,6 @@ import { SoundBoard } from "./SoundBoard";
 
 const TAVERN = "11111111-1111-5111-8111-111111111111";
 const RAIN = "44444444-4444-5444-8444-444444444444";
-const SCENE = "77777777-7777-4777-8777-777777777777";
 const PLAY = "00000000-0000-4000-8000-000000000001";
 
 function view(change: Record<string, unknown> = {}, screens: SoundBoardView["screens"] = []): SoundBoardView {
@@ -95,14 +94,14 @@ describe("the Table tab's sound control", () => {
 });
 
 describe("the sound board", () => {
-  it("puts a library sound on the board and saves the mix as an encounter's sound", async () => {
+  it("puts a library sound on the board, and leaves an encounter's sound to its page", async () => {
     const user = userEvent.setup();
     board = view({ ambient: [{ assetId: RAIN, volume: 0.5, durationMs: 30_000, playing: null }] }, [
       { connectionId: "p", name: "GM preview", sound: "muted", unplayable: [] }
     ]);
     render(
       <ToastProvider>
-        <SoundBoard gmToken="gm" scenes={[{ id: SCENE, name: "Crypt" }]} activeEncounterId={null} />
+        <SoundBoard gmToken="gm" />
       </ToastProvider>
     );
     // The GM's own silent preview is not a table screen.
@@ -127,12 +126,9 @@ describe("the sound board", () => {
     await user.click(within(side).getByRole("button", { name: /^Ambience/ }));
     await user.click(screen.getByRole("switch", { name: "Rain" }));
     expect(sent).toContainEqual(["sound:play", expect.objectContaining({ target: "ambient", assetId: RAIN })]);
+    // An encounter's sound lives on the encounter's own page now (E3 spec 2.4), so the board lists no encounters.
     await user.click(within(side).getByRole("button", { name: /^Playlist/ }));
-    await user.click(screen.getByRole("button", { name: "Save current sound" }));
-    expect(sent).toContainEqual([
-      "sound:set-encounter-preset",
-      expect.objectContaining({ encounterId: SCENE, preset: "save-current" })
-    ]);
+    expect(screen.queryByRole("button", { name: "Save current sound" })).toBeNull();
   });
 
   it("draws the Playing bar: the track and its layers, where it is, and the controls as one row", async () => {
@@ -146,7 +142,7 @@ describe("the sound board", () => {
     });
     render(
       <ToastProvider>
-        <SoundBoard gmToken="gm" scenes={[]} activeEncounterId={null} />
+        <SoundBoard gmToken="gm" />
       </ToastProvider>
     );
     const bar = await screen.findByRole("region", { name: "Now playing" });
