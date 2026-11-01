@@ -304,6 +304,7 @@ describe("The GM's atlas", () => {
     render(<Harness />);
     await user.click(await screen.findByRole("button", { name: /Harbourmaster's Tower/ }));
     await user.click(await screen.findByRole("button", { name: "Edit pin" }));
+    await user.click(await screen.findByRole("tab", { name: "Who sees it" }));
     const toggle = await screen.findByLabelText("This pin marks the party");
     expect(toggle).toHaveAttribute("aria-checked", "false");
     const reads = listMarkers.mock.calls.length;

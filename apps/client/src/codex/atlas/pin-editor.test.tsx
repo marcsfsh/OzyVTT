@@ -58,7 +58,7 @@ const MARKER = (over: Partial<CodexMarker> = {}): CodexMarker => ({
 
 const renderEditor = (
   marker: CodexMarker,
-  options: Readonly<{ mapRevealed?: boolean; autosave?: boolean; onRevealMap?: () => void }> = {}
+  options: Readonly<{ mapRevealed?: boolean; autosave?: boolean; onRevealMap?: () => void; onDone?: () => void }> = {}
 ) =>
   render(
     <PinEditor
@@ -78,7 +78,7 @@ const renderEditor = (
       onRevealPage={vi.fn()}
       onRevealMap={options.onRevealMap}
       onActivateScene={vi.fn()}
-      onDone={vi.fn()}
+      onDone={options.onDone ?? vi.fn()}
     />
   );
 
@@ -110,8 +110,10 @@ describe("A shown pin on a hidden map", () => {
 });
 
 describe("A pin's tags and label", () => {
-  it("shows the stored tags", () => {
+  it("shows the stored tags", async () => {
     renderEditor(MARKER({ tags: ["dungeon", "shop"] }));
+    // Tags sit under Who sees it (F3 atlas spec 2.3).
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Who sees it" }));
     const chosen = screen.getByRole("list", { name: /chosen/i });
     expect(chosen).toHaveTextContent("dungeon");
     expect(chosen).toHaveTextContent("shop");
@@ -120,7 +122,9 @@ describe("A pin's tags and label", () => {
   it("saves a new tag, slugified to the server's rule, with the label in one write", async () => {
     updateMarker.mockResolvedValue(MARKER());
     renderEditor(MARKER({ tags: ["dungeon"] }));
-    await userEvent.setup().type(screen.getByLabelText("Tags"), "Old Mill{Enter}");
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Who sees it" }));
+    await user.type(screen.getByLabelText("Tags"), "Old Mill{Enter}");
     await waitFor(() => expect(updateMarker).toHaveBeenCalled(), { timeout: 4_000 });
     expect(updateMarker).toHaveBeenCalledWith("gm", "k1", { label: "Old Svalich Road", tags: ["dungeon", "old-mill"] });
   });
@@ -141,8 +145,26 @@ describe("A pin's tags and label", () => {
   it("with autosave off, keeps Who sees it immediate, with its word under the switch", async () => {
     revealMarker.mockResolvedValue(MARKER({ revealedToPlayers: false }));
     renderEditor(MARKER({ tags: [] }), { autosave: false });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: "Who sees it" }));
     expect(screen.getByText("Everyone")).toBeInTheDocument();
-    await userEvent.setup().click(screen.getByRole("switch", { name: "Who sees this pin: Everyone" }));
+    await user.click(screen.getByRole("switch", { name: "Who sees this pin: Everyone" }));
     await waitFor(() => expect(revealMarker).toHaveBeenCalledWith("gm", "k1", false));
+  });
+});
+
+describe("The editor's tabs", () => {
+  it("shows one tab at a time, the label under Look and the pages under Links, and Done returns", async () => {
+    const onDone = vi.fn();
+    renderEditor(MARKER({ tags: [] }), { onDone });
+    const user = userEvent.setup();
+    expect(screen.getByRole("tab", { name: "Look", selected: true })).toBeInTheDocument();
+    expect(screen.getByLabelText("Label")).toBeInTheDocument();
+    expect(screen.queryByText("Linked pages")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Links" }));
+    expect(screen.getByText("Linked pages")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Label")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(onDone).toHaveBeenCalled();
   });
 });

@@ -928,3 +928,20 @@
 .atlas-spotmenu-item.is-danger {
   color: var(--danger-text);
 }
+
+/* The pin editor's tabs (F3 atlas spec 2.3): one panel at a time, Delete pin and Done as the Cup at the foot. */
+.atlas-pineditor-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+.atlas-pineditor .atlas-pineditor-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+.atlas-appearance.is-open {
+  display: block;
+}
