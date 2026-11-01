@@ -1,5 +1,5 @@
 /* The Codex's shared pieces: the hidden block, the Reveal panel, the page picker, the mini map and the date bar.
-   Hidden is violet with the crossed eye, everyone is indigo with the eye, chosen characters are cyan with a person. */
+   Hidden is violet with a dashed edge and the crossed eye, everyone is quiet ink, chosen characters are cyan. */
 
 .cx-hint {
   margin: 0;
@@ -18,9 +18,25 @@
   border-left: 3px solid var(--cx-block-hue);
   background: color-mix(in srgb, var(--cx-block-hue) 10%, var(--surface-1));
 }
-/* A hidden block is a dashed violet frame: something players are owed, not yet theirs. A draft keeps its solid bar. */
+/* A hidden block is a dashed violet frame (Codex frame rule 3.2): 1px dashed violet at 75% over a 7% violet fill,
+   its title in 12px violet capitals. A draft keeps its solid bar. */
 .cx-block.is-hidden:not(.is-draft) {
-  border: 1px dashed var(--cx-block-hue);
+  padding: 10px 14px 12px;
+  border: 1px dashed color-mix(in srgb, var(--violet) 75%, transparent);
+  background: color-mix(in srgb, var(--violet) 7%, transparent);
+}
+.cx-block.is-hidden .cx-block-title {
+  font: 600 12px / 1.25 var(--font-label);
+  letter-spacing: 0.12em;
+}
+.cx-block.is-hidden .cx-block-label {
+  height: 22px;
+  min-height: 0;
+  padding: 0 6px;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--violet) 75%, transparent);
+  font: 400 15px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
 }
 .cx-block.is-everyone {
   --cx-block-hue: var(--indigo);
@@ -79,11 +95,16 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
+.cx-block-labelicon {
+  width: 12px;
+  height: 12px;
+  margin-right: 4px;
+}
 .cx-block-body {
   color: var(--text);
 }
 .cx-block.is-hidden .cx-block-body {
-  color: color-mix(in srgb, var(--violet-hi) 45%, var(--text));
+  color: var(--text);
 }
 .cx-block-body > :first-child {
   margin-top: 0;

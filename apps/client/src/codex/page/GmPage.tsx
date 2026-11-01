@@ -9,7 +9,7 @@ import {
   IconPencil,
   Menu,
   MenuItem,
-  SegmentedControl,
+  Tabs,
   Skeleton,
   cx,
   sinceLabel,
@@ -69,9 +69,9 @@ import { PageWriter } from "./PageWriter";
 import "./page.css";
 
 const PHONE_TABS = [
-  { value: "overview", label: "Overview" },
-  { value: "relations", label: "Relations" },
-  { value: "mentions", label: "Mentions" }
+  { id: "overview", label: "Overview" },
+  { id: "relations", label: "Relations" },
+  { id: "mentions", label: "Mentions" }
 ];
 
 /** The audience a block has now, in the shared pieces' shape. */
@@ -325,6 +325,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   );
   const visibility = (
     <div className="cx-visline">
+      <KindChip type={page.entityType} />
       {pageAudience}
       <VisibilityCounts blocks={page.blocks} hiddenFields={page.hiddenFields} fields={page.fields} party={party} />
     </div>
@@ -410,7 +411,11 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
     <>
       {seeAs.on ? null : (
         <>
-          <FieldList fields={fields} />
+          {fields.length > 0 && (
+            <MetaSection label="Facts">
+              <FieldList fields={fields} />
+            </MetaSection>
+          )}
           <MetaSection label="Relationships">
             <RelationshipList connections={connections} pageTitle={page.title} onOpen={openConnection} />
           </MetaSection>
@@ -446,13 +451,11 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
         <div className="cx-page-phonebody">
           {!seeAs.on && (
             <>
-              <PhoneRecordHeader title={page.title} entityType={page.entityType} fields={page.fields} />
-              {visibility}
-              <SegmentedControl
+              <PhoneRecordHeader title={page.title}>{visibility}</PhoneRecordHeader>
+              <Tabs
                 ariaLabel="Page sections"
-                size="sm"
-                options={PHONE_TABS}
-                value={phoneTab}
+                tabs={PHONE_TABS}
+                activeId={phoneTab}
                 onChange={setPhoneTab}
                 className="cx-phonetabs"
               />
@@ -461,7 +464,11 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           {error && <Alert tone="danger">{error}</Alert>}
           {seeAs.on || phoneTab === "overview" ? (
             <>
-              {!seeAs.on && <FieldList fields={fields} />}
+              {!seeAs.on && fields.length > 0 && (
+                <MetaSection label="Facts">
+                  <FieldList fields={fields} />
+                </MetaSection>
+              )}
               <div className="cx-doc">{document}</div>
               {!seeAs.on && (
                 <MetaSection label="Relationships">
@@ -497,7 +504,6 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
         <div className="cx-page-headmain">
           <TitleLine className="cx-page-titlerow" crumb={<PageCrumb entityType={page.entityType} go={go} />}>
             <h1 className="cx-page-title">{page.title}</h1>
-            <KindChip type={page.entityType} />
           </TitleLine>
           {visibility}
         </div>

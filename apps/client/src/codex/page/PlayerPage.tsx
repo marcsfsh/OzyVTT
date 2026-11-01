@@ -165,7 +165,11 @@ export function PlayerPageBody({
   const fields = metaFields(page.entityType, page.fields);
   const meta = (
     <>
-      <FieldList fields={fields} />
+      {fields.length > 0 && (
+        <MetaSection label="Facts">
+          <FieldList fields={fields} />
+        </MetaSection>
+      )}
       <MetaSection label="Relationships">
         <RelationshipList connections={connections} pageTitle={page.title} onOpen={onOpenConnection} />
       </MetaSection>
@@ -179,8 +183,16 @@ export function PlayerPageBody({
       <>
         <PageMapHeader token={token} pins={pins} onOpenPin={onOpenPin} />
         <div className="cx-page-phonebody">
-          <PhoneRecordHeader title={page.title} entityType={page.entityType} fields={page.fields} />
-          <FieldList fields={fields} />
+          <PhoneRecordHeader title={page.title}>
+            <div className="cx-visline">
+              <KindChip type={page.entityType} />
+            </div>
+          </PhoneRecordHeader>
+          {fields.length > 0 && (
+            <MetaSection label="Facts">
+              <FieldList fields={fields} />
+            </MetaSection>
+          )}
           {doc}
           <MetaSection label="Relationships">
             <RelationshipList connections={connections} pageTitle={page.title} onOpen={onOpenConnection} />
@@ -289,8 +301,10 @@ export function PlayerPage({ id }: Readonly<{ id: string }>) {
           <div className="cx-page-headmain">
             <TitleLine className="cx-page-titlerow" crumb={<PageCrumb entityType={summary.entityType} go={go} />}>
               <h1 className="cx-page-title">{summary.title}</h1>
-              <KindChip type={summary.entityType} />
             </TitleLine>
+            <div className="cx-visline">
+              <KindChip type={summary.entityType} />
+            </div>
           </div>
         </header>
       )}

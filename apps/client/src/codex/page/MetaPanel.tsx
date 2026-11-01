@@ -114,16 +114,17 @@ export function FieldList({ fields }: Readonly<{ fields: readonly MetaField[] }>
     <dl className="cx-meta-fields">
       {fields.map((field) => (
         <div key={field.key} className={cx("cx-meta-row", field.hidden && "is-hidden")}>
-          <dt className="cx-meta-key">
-            {field.label}
+          <dt className="cx-meta-key">{field.label}</dt>
+          <dd>
+            {field.value}
+            {/* A hidden field reads as every hidden part does (rule 3.2): its tag after the value. */}
             {field.hidden && (
-              <span className="cx-meta-hidden">
-                <IconEyeOff />
+              <span className="nh-aud is-hidden cx-meta-hidden">
+                <IconEyeOff className="nh-aud-icon" />
                 Hidden
               </span>
             )}
-          </dt>
-          <dd>{field.value}</dd>
+          </dd>
         </div>
       ))}
     </dl>

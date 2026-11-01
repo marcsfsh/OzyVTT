@@ -42,34 +42,36 @@
   flex-wrap: wrap;
   gap: var(--space-2);
 }
-/* The page's name at the size the drawn page gives it: the one display-face line on the screen. */
+/* A record's title row (theme spec 2.2): the title in the display face's capitals at 24px, 20px on a phone. */
 .cx-page-title {
   margin: 0;
-  font: var(--fw-display) 34px / 1.1 var(--font-display);
+  font: var(--fw-display) 24px / 1.15 var(--font-display);
   text-transform: uppercase;
   letter-spacing: var(--tracking-display);
   color: var(--heading-ink);
   text-shadow: var(--heading-shadow);
 }
 .cx-page-title.is-phone {
-  font-size: var(--fs-h1);
+  font-size: 20px;
 }
+/* The title's line: the kind in quiet words, then who sees the page and what is hidden as tags. */
 .cx-kind {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 1.6rem;
-  padding: 2px var(--space-2);
-  border: 1px solid var(--line-raised);
-  background: var(--surface-2);
   color: var(--text-dim);
   font: 600 var(--fs-xs) / 1 var(--font-label);
+}
+.cx-kind svg {
+  width: 13px;
+  height: 13px;
 }
 .cx-visline {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  min-height: 26px;
 }
 .cx-seeas {
   display: inline-flex;
@@ -98,37 +100,31 @@
 .cx-page-notice {
   padding: var(--space-2) var(--space-6) 0;
 }
+/* The text at the left and the side at 340px (the writer's fields Cradle 360px), 28px from the text. */
 .cx-page-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  column-gap: 28px;
   flex: 1 1 auto;
   min-height: 0;
+  padding-right: var(--space-6);
 }
 .cx-page-cols.is-writing {
   grid-template-columns: minmax(0, 1fr) 360px;
-}
-@media (min-width: 1280px) {
-  .cx-page-cols {
-    grid-template-columns: minmax(0, 1fr) 360px;
-  }
-  .cx-page-cols.is-writing {
-    grid-template-columns: minmax(0, 1fr) 400px;
-  }
 }
 .cx-page-docscroll {
   min-height: 0;
   overscroll-behavior: contain;
 }
-/* The reading measure is 680px of text (theme rule 11), inside the document's own padding. */
+/* The reading measure is 680px of text at 15px and 1.65 (theme rule 11), at the left of its column. */
 .cx-doc {
-  max-width: calc(680px + 2 * var(--space-6));
-  margin: 0 auto;
-  padding: var(--space-4) var(--space-6) calc(var(--space-10) + env(safe-area-inset-bottom));
+  max-width: calc(680px + var(--space-6));
+  padding: var(--space-4) 0 calc(var(--space-10) + env(safe-area-inset-bottom)) var(--space-6);
   color: var(--text);
 }
 .cx-doc-text {
   position: relative;
-  font: 400 var(--fs-body) / var(--lh-body) var(--font-body);
+  font: 400 15px / 1.65 var(--font-body);
 }
 .cx-doc-text p {
   color: var(--text);
@@ -139,14 +135,13 @@
   padding-left: calc(var(--space-3) - 3px);
   border-left: 3px solid var(--magenta);
 }
+/* The side holds open groups you read (theme spec 2.3): each heading an eyebrow under a 1px rule. */
 .cx-page-meta {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
   min-height: 0;
-  padding: var(--space-4) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
-  border-left: 1px solid var(--line-strong);
-  background: var(--surface-1);
+  padding: var(--space-4) 0 calc(var(--space-8) + env(safe-area-inset-bottom));
   overscroll-behavior: contain;
 }
 .cx-page-loading,
@@ -163,6 +158,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
 }
 .cx-meta-fields {
   display: flex;
@@ -171,23 +168,18 @@
 }
 .cx-meta-row {
   display: grid;
-  grid-template-columns: 7rem minmax(0, 1fr);
+  grid-template-columns: 5rem minmax(0, 1fr);
   gap: var(--space-2);
-  padding: var(--space-1) 0;
-  border-bottom: 1px dashed var(--line);
+  padding: 5px 0;
 }
 .cx-meta-row dd {
   margin: 0;
   color: var(--text);
-  font: 600 var(--fs-sm) / 1.35 var(--font-body);
+  font: 400 var(--fs-sm) / 1.45 var(--font-body);
 }
-.cx-meta-row.is-hidden {
-  padding-left: var(--space-2);
-  border-left: 2px solid var(--rim-gm);
-  background: color-mix(in srgb, var(--rim-gm) 10%, transparent);
-}
-.cx-meta-row.is-hidden dd {
-  color: var(--violet-text);
+.cx-meta-row dd .cx-meta-hidden {
+  margin-inline-start: var(--space-1);
+  vertical-align: 1px;
 }
 .cx-meta-key {
   display: inline-flex;
@@ -197,25 +189,6 @@
   font: 700 var(--fs-2xs) / 1.5 var(--font-label);
   letter-spacing: var(--tracking-eyebrow);
   text-transform: uppercase;
-}
-/* A field's Hidden word sits under its label, so the label keeps its line. */
-dt.cx-meta-key {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-}
-dt.cx-meta-key .cx-meta-hidden {
-  margin-inline-start: 0;
-  font-size: var(--fs-2xs);
-}
-.cx-meta-hidden {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25em;
-  margin-inline-start: auto;
-  color: var(--violet-text);
-  font-size: var(--fs-sm);
-  font-weight: 400;
 }
 .cx-meta-groups {
   display: flex;
@@ -387,37 +360,25 @@ dt.cx-meta-key .cx-meta-hidden {
 }
 .cx-recordhead {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.cx-recordhead-avatar {
-  display: grid;
-  place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  flex: none;
-  border: 2px solid var(--line-raised);
-  background: var(--surface-2);
-  color: var(--text);
-  font: var(--fw-display) var(--fs-sm) / 1 var(--font-display);
-  text-transform: uppercase;
-}
-.cx-recordhead-text {
-  display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  gap: var(--space-1);
 }
-.cx-recordhead-sub {
-  color: var(--text-dim);
-  font: 500 var(--fs-xs) / 1.2 var(--font-body);
-}
+/* The phone's Overview, Relations and Mentions: words with the horizon ink on a hairline (theme rule 1, 44px). */
 .cx-phonetabs {
-  display: flex;
-  width: 100%;
+  border-bottom: 1px solid var(--line);
 }
-.cx-phonetabs .nh-segmented-option {
-  flex: 1 1 auto;
+.cx-phonetabs.nh-tabs--horizontal {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.cx-phonetabs .nh-tab,
+.cx-phonetabs .nh-tab:hover,
+.cx-phonetabs .nh-tab--active,
+.cx-phonetabs .nh-tab--active:hover {
+  min-height: 44px;
+  background: none;
+  box-shadow: none;
 }
 
 /* ----- Writing ----- */
@@ -768,4 +729,15 @@ form.cx-folderrow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Hidden in a list's row: violet with the struck eye, after the row's words. */
+.cx-meta-hidden:not(.nh-aud) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  margin-inline-start: auto;
+  color: var(--violet-text);
+  font-size: var(--fs-sm);
+  font-weight: 400;
 }

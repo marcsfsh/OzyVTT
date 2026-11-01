@@ -113,7 +113,8 @@ describe("Reading a page as the GM", () => {
     const line = document.querySelector(".cx-visline") as HTMLElement;
     expect(line).toHaveTextContent("Revealed to everyone");
     expect(line).toHaveTextContent("1 block revealed to Lyra Emberwise");
-    expect(line).toHaveTextContent("1 block and 1 field hidden");
+    expect(line).toHaveTextContent("1 block, 1 field");
+    expect(line.querySelector(".nh-aud.is-hidden")).toHaveAccessibleName("1 block and 1 field hidden");
   });
 
   it("marks a Hidden field in words beside its value", async () => {

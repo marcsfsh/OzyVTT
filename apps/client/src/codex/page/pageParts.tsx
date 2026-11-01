@@ -65,31 +65,12 @@ export function PageMapHeader({
   );
 }
 
-/** A record's header on a phone: initials, the title, and the kind with the role or kind field beside it. */
-export function PhoneRecordHeader({
-  title,
-  entityType,
-  fields
-}: Readonly<{ title: string; entityType: CodexEntityType; fields: Readonly<Record<string, string>> }>) {
-  const initials = title
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("");
-  const role = fields.role?.trim() || fields.kind?.trim() || fields.type?.trim();
+/** A record's title on a phone (Codex frame 2.2): the title at 20px, then its line (the kind, and for the GM who sees it). */
+export function PhoneRecordHeader({ title, children }: Readonly<{ title: string; children?: React.ReactNode }>) {
   return (
     <div className="cx-recordhead">
-      <span className="cx-recordhead-avatar" aria-hidden="true">
-        {initials}
-      </span>
-      <div className="cx-recordhead-text">
-        <h1 className="cx-page-title is-phone">{title}</h1>
-        <span className="cx-recordhead-sub">
-          {entityDef(entityType).label}
-          {role ? ` · ${role}` : ""}
-        </span>
-      </div>
+      <h1 className="cx-page-title is-phone">{title}</h1>
+      {children}
     </div>
   );
 }
@@ -130,9 +111,9 @@ export function VisibilityCounts({
         </span>
       ))}
       {hiddenParts.length > 0 && (
-        <span className="nh-aud is-hidden">
+        <span className="nh-aud is-hidden" aria-label={`${hiddenParts.join(" and ")} hidden`}>
           <IconEyeOff className="nh-aud-icon" />
-          {hiddenParts.join(" and ")} hidden
+          {hiddenParts.join(", ")}
         </span>
       )}
     </>

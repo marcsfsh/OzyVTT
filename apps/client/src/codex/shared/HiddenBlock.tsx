@@ -59,10 +59,10 @@ export function HiddenBlock({
       aria-label={`${name} · ${revealedLabel(value, party)}`}
     >
       <div className="cx-block-head">
+        {/* A hidden block's struck eye sits in its tag, as every hidden part's does (rule 3.2). */}
         {!menu &&
-          (hidden ? (
-            <IconEyeOff className="cx-block-icon" />
-          ) : value.audience === "everyone" ? (
+          !hidden &&
+          (value.audience === "everyone" ? (
             <IconEye className="cx-block-icon" />
           ) : (
             <IconUser className="cx-block-icon" />
@@ -73,7 +73,10 @@ export function HiddenBlock({
           <WhoSeesItMenu value={value} party={party} what={name} disabled={busy} onChange={onAudienceChange} />
         ) : (
           <>
-            <span className="cx-block-label">{revealedLabel(value, party)}</span>
+            <span className="cx-block-label">
+              {hidden && <IconEyeOff className="cx-block-labelicon" />}
+              {revealedLabel(value, party)}
+            </span>
             {!draft &&
               (hidden
                 ? onReveal && (

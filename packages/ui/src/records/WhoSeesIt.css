@@ -1,43 +1,42 @@
-/* Who sees a record or a part of one. Hidden is violet with the crossed eye, Everyone is indigo with the eye,
-   chosen characters are cyan with a person. */
+/* Who sees a record or a part of one, as a tag in its 22px box (theme rule 7, Codex frame rule 3.2). Hidden reads one
+   way: violet with a dashed edge and the struck eye. Everyone is quiet ink with the eye; chosen characters are cyan
+   with a person. */
 .nh-aud {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: 1.75rem;
-  padding: 2px var(--space-2);
-  border: 1px solid var(--line-raised);
-  background: var(--surface-2);
-  color: var(--text);
-  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+  gap: 4px;
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text-dim);
+  font: 400 15px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 .nh-aud-icon {
-  width: 1em;
-  height: 1em;
+  width: 12px;
+  height: 12px;
   flex: none;
 }
-.nh-aud.is-everyone {
-  border-color: color-mix(in srgb, var(--indigo) 70%, transparent);
-  color: var(--indigo-text);
-}
 .nh-aud.is-hidden {
-  border-color: var(--rim-gm);
-  background: color-mix(in srgb, var(--rim-gm) 14%, var(--surface-1));
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--violet) 75%, transparent);
   color: var(--violet-text);
 }
 .nh-aud.is-characters {
-  border-color: var(--cyan);
-  background: color-mix(in srgb, var(--cyan) 10%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--cyan) 70%, transparent);
   color: var(--cyan-hi);
 }
-/* The control is the chip, raised as a trigger with the menu's own caret. */
-/* As small as the chip it is, with the full tap height around it. */
+/* The control is the tag, with the menu's own caret and the full tap height around it. */
 .nh-menu-trigger.nh-aud {
-  min-height: 1.75rem;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  font: 600 var(--fs-xs) / 1.1 var(--font-label);
+  min-height: 22px;
+  height: 22px;
+  gap: 4px;
+  padding: 0 6px;
+  font: 400 15px / 1 var(--font-numeric);
 }
 .nh-menu-trigger.nh-aud::after {
   content: "";
@@ -50,7 +49,9 @@
 }
 .nh-menu-trigger.nh-aud::before {
   border-color: inherit;
+  border-style: inherit;
   background: transparent;
+  box-shadow: none;
 }
 .nh-aud-item-hidden {
   color: var(--violet-text);
