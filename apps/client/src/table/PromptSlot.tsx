@@ -203,6 +203,26 @@ export function PromptSlot({
     }
   };
 
+  // What a card is, as its eyebrow says it (C4 spec 2.2): the announcement reads it before the title.
+  const eyebrowOf = (entry: SlotEntry): string => {
+    switch (entry.kind) {
+      case "reaction":
+        return "Reaction";
+      case "death-save":
+        return "Death save";
+      case "save":
+        return "Saving throw";
+      case "initiative":
+        return "The encounter starts";
+      case "order":
+        return "Your turn";
+      case "roll-call":
+        return "Roll";
+      case "damage-roll":
+        return "Damage";
+    }
+  };
+
   // A new prompt in the slot: announce it, and bring the focus to it unless the player is typing elsewhere.
   useLayoutEffect(() => {
     const key = first?.key ?? null;
@@ -211,7 +231,7 @@ export function PromptSlot({
       slot.current?.contains(document.activeElement) === true || document.activeElement === document.body;
     shownKey.current = key;
     if (first) {
-      setAnnouncement(`A prompt for you: ${titleOf(first)}.`);
+      setAnnouncement(`${eyebrowOf(first)}: ${titleOf(first)}.`);
       if (!typing(document.activeElement) || hadFocus) heading.current?.focus({ preventScroll: true });
     } else if (hadFocus) onSettled?.()?.focus({ preventScroll: true });
     // Keyed on which prompt leads the slot.
@@ -235,7 +255,7 @@ export function PromptSlot({
         const cost = slotCost(first.actor, first.reaction.actionId);
         card = (
           <PromptCard
-            eyebrow="Reaction · answer now"
+            eyebrow="Reaction"
             title={words.title}
             detail={cost ? `${words.detail} ${cost}` : words.detail}
             {...(words.numbers ? { numbers: words.numbers } : {})}
@@ -259,6 +279,7 @@ export function PromptSlot({
         card = (
           <PromptCard
             tone="danger"
+            eyebrow="Death save"
             title="You are dying"
             meta={`${saves.successes} ${saves.successes === 1 ? "success" : "successes"} · ${saves.failures} ${saves.failures === 1 ? "failure" : "failures"}`}
             detail="You're Unconscious, so you can't act or move. An ally can heal you, or stabilize you with the Help action."
@@ -284,7 +305,7 @@ export function PromptSlot({
         const { save } = first;
         card = (
           <PromptCard
-            eyebrow="Saving throw · answer now"
+            eyebrow="Saving throw"
             title={`DC ${save.dc} ${abilityName(save.ability)} saving throw`}
             detail={`${save.sourceName ? `${save.sourceName}'s ` : ""}${save.actionName}${
               save.awaitingDamage
@@ -311,7 +332,7 @@ export function PromptSlot({
       case "damage-roll":
         card = (
           <PromptCard
-            eyebrow="Damage · roll now"
+            eyebrow="Damage"
             title={`Roll damage for ${first.roll.actionName}`}
             detail={damageRollLine(first.roll)}
             headingRef={headingRef}
@@ -339,7 +360,7 @@ export function PromptSlot({
       case "order":
         card = (
           <PromptCard
-            eyebrow="Your turn · answer now"
+            eyebrow="Your turn"
             title={turnOrderTitle(first.actor.name, first.waiting.boundary)}
             detail="These happen at the same moment, so you choose their order."
             headingRef={headingRef}

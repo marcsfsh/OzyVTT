@@ -122,7 +122,9 @@ describe("the player's prompt slot", () => {
     expect(screen.getByRole("button", { name: "Cast Shield" }).className).toContain("encounter-primary");
     expect(screen.getByText("1 more after this: DC 15 Dexterity saving throw")).toBeTruthy();
     // The reaction is announced for a screen reader.
-    expect(screen.getByText("A prompt for you: Goblin 1's attack would hit you.")).toBeTruthy();
+    expect(screen.getByText("Reaction: Goblin 1's attack would hit you.")).toBeTruthy();
+    // The eyebrow names the kind only; nothing hurries the player.
+    expect(screen.getByRole("region", { name: "Prompts" }).textContent).not.toMatch(/answer now|roll now/i);
   });
 
   it("moves on to the next prompt once one is answered, and gives the focus back when the slot empties", () => {
