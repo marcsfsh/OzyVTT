@@ -78,9 +78,10 @@ describe("The players' atlas", () => {
     const table = await screen.findByRole("table");
     await waitFor(() => expect(within(table).getByText("Ysolde Varn")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "Set party position" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Hidden pins" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Details" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "People" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Hidden pins/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Map details/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add a map" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "People: on" })).toBeInTheDocument();
     // A right-click opens nothing on a player's map.
     fireEvent.contextMenu(document.querySelector(".atlas-map-svg")!, { clientX: 10, clientY: 10 });
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
@@ -103,9 +104,19 @@ describe("The players' atlas", () => {
     expect(params.get("pin")).toBe("k1");
   });
 
-  it("lists the shared maps inside", async () => {
+  it("lists the shared maps as a tree at the side", async () => {
     renderAtlas();
-    await userEvent.setup().click(await screen.findByRole("tab", { name: "Maps inside" }));
-    expect(within(screen.getByRole("list", { name: "Maps inside this one" })).getByText("Docks")).toBeInTheDocument();
+    await screen.findByRole("table");
+    const tree = within(screen.getByRole("group", { name: "Maps" }));
+    expect(tree.getByRole("button", { name: "Docks" })).toBeInTheDocument();
+  });
+
+  it("offers only Open its page on a pin's menu, which changes nothing", async () => {
+    renderAtlas();
+    await screen.findByRole("table");
+    await waitFor(() => expect(document.querySelector('[data-pin-id="k1"]')).not.toBeNull());
+    fireEvent.contextMenu(document.querySelector('[data-pin-id="k1"] circle')!, { clientX: 5, clientY: 5 });
+    const menu = within(await screen.findByRole("menu", { name: "Pin: Harbourmaster's Tower" }));
+    expect(menu.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Open its page"]);
   });
 });

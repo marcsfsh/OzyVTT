@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { IconChevronLeft, SegmentedControl, Tabs, EmptyState } from "@vtt/ui";
+import { Button, IconChevronLeft, Modal, EmptyState, cx } from "@vtt/ui";
+import { countOf } from "@vtt/domain";
 import type { PlayerCodexMap, PlayerCodexPageSummary } from "@vtt/domain";
 import { playerCodexApi } from "../api";
 import { useMediaQuery } from "../../lib/useMediaQuery";
@@ -7,7 +8,7 @@ import { atlasPath, pagePath } from "../routes";
 import { useCodexQuery } from "../useCodexQuery";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { AtlasMap } from "./AtlasMap";
-import { AtlasCrumbs, LayerChips, LayersMenu, MapsInside, PinFilter, PinTable } from "./AtlasPanel";
+import { AtlasCrumbs, LayerRows, LayersMenu, MapTree, PinFilter, PinTable, treeOrder } from "./AtlasPanel";
 import { ATLAS_PHONE_QUERY } from "./AtlasView";
 import { factionGround, peopleAtPins, useAtlasLayers } from "./layers";
 import { PinView } from "./PinView";
@@ -15,8 +16,7 @@ import { defaultMapId, mapKindLine, useDimmedPins, useMapTree } from "./tree";
 import "./atlas.css";
 
 const NO_PINS: readonly never[] = [];
-type PanelTab = "pins" | "maps";
-type PhoneView = "map" | PanelTab;
+type PhoneView = "map" | "pins";
 
 /**
  * The players' atlas: the maps and pins the server shares with this player, read-only. Every pin's links are already
@@ -48,7 +48,7 @@ export function PlayerAtlas({
   const phone = useMediaQuery(ATLAS_PHONE_QUERY);
   const currentMapId = mapId ?? defaultMapId(maps, partyMapId);
   const currentMap = maps.find((map) => map.id === currentMapId) ?? null;
-  const { roots, chain, children } = useMapTree(maps, currentMapId);
+  const { chain } = useMapTree(maps, currentMapId);
   const parentName = currentMap?.parentMapId
     ? (maps.find((map) => map.id === currentMap.parentMapId)?.name ?? null)
     : null;
@@ -69,7 +69,6 @@ export function PlayerAtlas({
   );
   const partyPin = pins.find((pin) => pin.isParty) ?? null;
   const partyFocus = useMemo(() => (partyPin ? { x: partyPin.x, y: partyPin.y } : null), [partyPin?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [tab, setTab] = useState<PanelTab>("pins");
   const [phoneView, setPhoneView] = useState<PhoneView>("map");
   const [centerOn, setCenterOn] = useState<string | null>(null);
 
@@ -94,6 +93,29 @@ export function PlayerAtlas({
       centerOnPinId={centerOn}
       onCentered={() => setCenterOn(null)}
       onPinClick={select}
+      pinMenu={(pinId) => {
+        const pin = pins.find((candidate) => candidate.id === pinId);
+        if (!pin) return null;
+        // A player's menu changes nothing: it only opens what the pin leads to (F3 atlas rule 6).
+        const items = [
+          ...(pin.pageIds[0]
+            ? [
+                {
+                  id: "page",
+                  label: "Open its page",
+                  iconId: "scroll",
+                  onSelect: () => onOpen(pagePath(pin.pageIds[0]!))
+                }
+              ]
+            : []),
+          ...(pin.subMapId
+            ? [{ id: "map", label: "Open the map inside", iconId: "compass", onSelect: () => enter(pin.subMapId!) }]
+            : [])
+        ];
+        return items.length > 0
+          ? { name: pin.label?.trim() || "Unlabelled pin", line: mapName(pin.mapId) ?? "", items }
+          : null;
+      }}
     />
   ) : (
     <EmptyState className="atlas-firstmap">No maps yet. Maps your GM shares appear here.</EmptyState>
@@ -126,8 +148,13 @@ export function PlayerAtlas({
       />
     </>
   );
-  const mapsBody = (
-    <MapsInside children={children} roots={roots} currentRootId={chain[0]?.id ?? null} gm={false} onEnter={enter} />
+  const mapGlass = currentMap && (
+    <div className="atlas-glass is-top">
+      <AtlasCrumbs chain={chain} onEnter={enter} />
+      <span className="atlas-mapline">
+        {[mapKindLine(currentMap.kind, parentName), countOf(pins.length, "pin")].join(" · ")}
+      </span>
+    </div>
   );
 
   if (phone)
@@ -142,47 +169,49 @@ export function PlayerAtlas({
           }
           actions={<LayersMenu layers={layers} onToggle={toggleLayer} gm={false} />}
         />
-        <SegmentedControl
-          ariaLabel="Atlas view"
-          className="atlas-phoneswitch"
-          value={phoneView}
-          onChange={(next) => setPhoneView(next as PhoneView)}
-          options={[
-            { value: "map", label: "Map" },
-            { value: "pins", label: "Pins" },
-            { value: "maps", label: "Maps inside" }
-          ]}
-        />
-        {phoneView === "map" && (
-          <div className="atlas-phonemap">
-            {map}
-            {pinSide && <div className="atlas-sheet scroll-y">{pinSide}</div>}
-          </div>
+        <div className="nh-filterchips atlas-mapchips" role="group" aria-label="Maps">
+          {treeOrder(maps).map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className={cx("nh-filterchip", "interactive", entry.id === currentMapId && "is-on")}
+              aria-pressed={entry.id === currentMapId}
+              onClick={() => enter(entry.id)}
+            >
+              {entry.name}
+            </button>
+          ))}
+        </div>
+        <div className="atlas-phonemap">
+          {map}
+          {pinSide && <div className="atlas-sheet scroll-y">{pinSide}</div>}
+          {!pinSide && currentMap && (
+            <Button className="atlas-pinsbutton" onClick={() => setPhoneView("pins")}>
+              {`Pins · ${pins.length}`}
+            </Button>
+          )}
+        </div>
+        {phoneView === "pins" && currentMap && (
+          <Modal open size="md" align="bottom" title={`Pins · ${pins.length}`} onClose={() => setPhoneView("map")}>
+            {pinsBody}
+          </Modal>
         )}
-        {phoneView === "pins" && <div className="atlas-phonelist scroll-y">{pinsBody}</div>}
-        {phoneView === "maps" && <div className="atlas-phonelist scroll-y">{mapsBody}</div>}
       </div>
     );
 
   return (
-    <div className="atlas">
+    <div className="atlas atlas-cols">
+      <nav className="atlas-tree scroll-y" aria-label="Maps and layers">
+        <MapTree maps={maps} currentMapId={currentMapId} pinCount={pins.length} gm={false} onEnter={enter} />
+        <LayerRows layers={layers} onToggle={toggleLayer} gm={false} />
+      </nav>
       <div className="atlas-stage">
-        <div className="atlas-toolbar">
-          <AtlasCrumbs chain={chain} onEnter={enter} />
-          <span className="atlas-grow" />
-          <LayerChips layers={layers} onToggle={toggleLayer} gm={false} />
+        <div className="atlas-mapframe">
+          {map}
+          {mapGlass}
         </div>
-        <div className="atlas-mapframe">{map}</div>
       </div>
       <aside className="atlas-panel" aria-label={currentMap ? currentMap.name : "Atlas"}>
-        {currentMap && (
-          <header className="atlas-panel-head">
-            <div className="atlas-panel-titles">
-              <h2 className="atlas-panel-title">{currentMap.name}</h2>
-              <span className="atlas-panel-kind">{mapKindLine(currentMap.kind, parentName)}</span>
-            </div>
-          </header>
-        )}
         {pinSide ? (
           <div className="atlas-panel-body scroll-y">
             <button type="button" className="atlas-back" onClick={close}>
@@ -192,27 +221,12 @@ export function PlayerAtlas({
           </div>
         ) : (
           currentMap && (
-            <>
-              <Tabs
-                className="atlas-panel-tabs"
-                ariaLabel="Map panel"
-                idBase="atlas-panel"
-                activeId={tab}
-                onChange={(next) => setTab(next as PanelTab)}
-                tabs={[
-                  { id: "pins", label: "Pins" },
-                  { id: "maps", label: "Maps inside" }
-                ]}
-              />
-              <div
-                className="atlas-panel-body scroll-y"
-                role="tabpanel"
-                id={`atlas-panel-panel-${tab}`}
-                aria-labelledby={`atlas-panel-tab-${tab}`}
-              >
-                {tab === "pins" ? pinsBody : mapsBody}
+            <div className="atlas-panel-body scroll-y">
+              <div className="atlas-pins-head">
+                <h2 className="atlas-pins-title">{`Pins · ${pins.length}`}</h2>
               </div>
-            </>
+              {pinsBody}
+            </div>
           )
         )}
       </aside>
