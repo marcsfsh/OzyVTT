@@ -1,197 +1,198 @@
-/* The table screen's strip and column, read across a room: the drawn sizes at 1920 wide, scaled with the screen's
-   width below that. Paint only, like viewer.css: nothing here makes a field render. */
-.screen-top {
-  grid-row: 1;
-  grid-column: 1 / -1;
+/* The table screen's ladder (table screen spec 2.1 and 4), read across a room: the drawn sizes at 1280 wide, scaled with
+   the screen's width (a 1080p TV draws them half as large again). Paint only, like viewer.css: nothing here makes a
+   field render. */
+.screen-ladder {
+  position: relative;
+  grid-area: 1 / 1;
   display: flex;
-  align-items: center;
-  gap: clamp(1rem, 2vw, 2.5rem);
+  flex-direction: column;
   min-width: 0;
-  padding: clamp(0.5rem, 0.9vw, 1.1rem) clamp(1rem, 1.7vw, 2rem);
+  min-height: 0;
+  border-right: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+/* The head: the wordmark and the round on the VCR counter, the horizon line 3px under them. */
+.screen-ladder-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: clamp(10px, 1.1vw, 21px) clamp(14px, 1.4vw, 27px);
   background:
-    var(--grad-horizon) bottom / 100% 2px no-repeat,
-    var(--surface-1);
+    var(--grad-horizon) bottom / 100% 3px no-repeat,
+    var(--bg);
 }
 .screen-mark {
   flex: none;
 }
-/* The mark at the drawn TV size: the app bar's 22px and 30px, scaled to the room. */
 .screen-mark .nh-wordmark-ozy {
-  font-size: clamp(22px, 1.9vw, 36px);
+  font-size: clamp(24px, 2.35vw, 45px);
 }
 .screen-mark .nh-wordmark-vtt {
-  font-size: clamp(30px, 2.6vw, 50px);
+  font-size: clamp(28px, 2.65vw, 51px);
 }
 .screen-vcr {
   flex: none;
-  padding-left: clamp(1rem, 1.6vw, 2rem);
-  border-left: 1px solid var(--line-strong);
 }
-.screen-tiles {
-  display: flex;
-  align-items: stretch;
-  flex: 1 1 auto;
-  gap: clamp(0.25rem, 0.5vw, 0.75rem);
-  min-width: 0;
-  margin: 0;
-  padding: 0 0 0 clamp(1rem, 1.6vw, 2rem);
-  border-left: 1px solid var(--line-strong);
-  list-style: none;
-  overflow-x: hidden;
-}
-.screen-tile {
-  display: flex;
+.screen-ladder-waiting {
   flex: none;
-  flex-direction: column;
+  margin: 0;
+  padding: var(--space-2) clamp(14px, 1.4vw, 27px);
+  color: var(--text-dim);
+  font-size: clamp(15px, 1.25vw, 24px);
+}
+.screen-ladder-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.screen-rungs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* A row a turn: 70px, the initiative in VT323 30px in 42px, the portrait 46px, the name 20px in full. */
+.screen-rung {
+  position: relative;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: clamp(5rem, 6.5vw, 8rem);
-  padding: var(--space-2) var(--space-3);
+  gap: clamp(10px, 0.95vw, 18px);
+  min-height: clamp(56px, 5.47vw, 105px);
+  padding: 0 clamp(12px, 1.25vw, 24px) 0 clamp(6px, 0.63vw, 12px);
+  border-bottom: 1px solid var(--line);
+}
+.screen-rung-init {
+  flex: none;
+  width: clamp(34px, 3.3vw, 63px);
+  color: var(--text-dim);
+  font: 400 clamp(24px, 2.35vw, 45px) / 1 var(--font-numeric);
+  text-align: right;
+}
+.screen-rung-face {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+}
+.screen-rung-face .nh-portrait {
+  width: clamp(38px, 3.6vw, 69px);
+  height: clamp(38px, 3.6vw, 69px);
+}
+.screen-rung-who {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.screen-rung-name {
+  color: var(--text);
+  font: 600 clamp(17px, 1.56vw, 30px) / 1.15 var(--font-body);
+  overflow-wrap: normal;
+}
+.screen-rung.is-done .screen-rung-name {
   color: var(--text-dim);
 }
-.screen-tile.is-acting {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.screen-tile-face {
-  position: relative;
-  display: inline-flex;
-}
-.screen-tile-next {
-  position: absolute;
-  left: calc(100% + 6px);
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 2px 5px;
-  background: var(--text);
-  color: var(--bg);
-  font: 400 clamp(14px, 1vw, 20px) / 1 var(--font-numeric);
-  letter-spacing: 0.04em;
-}
-.screen-tile-text {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  max-width: 11rem;
-  font-size: clamp(15px, 1.05vw, 21px);
-  white-space: nowrap;
-}
-.screen-tile-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.screen-tile.is-acting .screen-tile-name {
-  font-weight: 700;
-}
-.screen-tile-score {
-  font: 400 clamp(18px, 1.3vw, 26px) / 1 var(--font-numeric);
-}
-.screen-tile.is-acting .screen-tile-score {
-  color: var(--hp-text);
-}
-.screen-tile.is-gm-turn {
-  min-width: clamp(6rem, 7vw, 9rem);
-}
-.screen-tile-gm {
-  color: var(--violet-text);
-  font: 400 clamp(20px, 1.4vw, 28px) / 1 var(--font-numeric);
-  letter-spacing: 0.04em;
+.screen-rung-label {
+  color: var(--caution-text);
+  font: 600 clamp(11px, 1vw, 20px) / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
-
-/* The column: at 1920 the drawn 540px, narrower on a smaller screen, under the map on a portrait one. */
-.screen-column {
-  grid-area: 2 / 2;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-left: 1px solid var(--line-strong);
-  background: var(--surface-1);
+/* NEXT: 3px 6px, a cyan edge, VT323 17px in cyan. */
+.screen-rung-next {
+  flex: none;
+  padding: 3px 6px;
+  border: 1px solid var(--cyan);
+  color: var(--cyan-hi);
+  font: 400 clamp(14px, 1.33vw, 26px) / 1 var(--font-numeric);
+  letter-spacing: 0.04em;
 }
-.screen-column-scroll {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: clamp(0.75rem, 1vw, 1.25rem);
-  min-height: 0;
-  padding: clamp(1rem, 1.5vw, 1.75rem);
+/* The acting row grows into a card: 124px, a 5px caution edge and a caution wash, the initiative in caution at 36px,
+   the portrait 76px, Acting now and the name in chrome at 28px, kept whole. */
+.screen-rung.is-acting {
+  min-height: clamp(96px, 9.7vw, 186px);
+  border-left: 5px solid var(--caution);
+  background: color-mix(in srgb, var(--caution) 12%, transparent);
 }
-.screen-column-resize {
+.screen-rung.is-acting .screen-rung-init {
+  color: var(--caution-text);
+  font-size: clamp(28px, 2.8vw, 54px);
+}
+.screen-rung.is-acting .screen-rung-face .nh-portrait {
+  width: clamp(60px, 5.9vw, 114px);
+  height: clamp(60px, 5.9vw, 114px);
+}
+.screen-rung.is-acting .screen-rung-name {
+  font: 400 clamp(22px, 2.2vw, 42px) / 1.05 var(--font-wordmark);
+  text-transform: uppercase;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.screen-rung.is-idle {
+  padding-left: clamp(14px, 1.4vw, 27px);
+}
+/* A hidden creature's turn: a dashed violet portrait with the eye struck through, GM turn in dim ink. */
+.screen-rung-face.is-gm {
+  width: clamp(60px, 5.9vw, 114px);
+  height: clamp(60px, 5.9vw, 114px);
+  border: 2px dashed var(--violet);
+  color: var(--violet-text);
+}
+.screen-rung-face.is-gm svg {
+  width: 40%;
+  height: 40%;
+}
+.screen-rung.is-gm-turn .screen-rung-name {
+  color: var(--text-dim);
+}
+/* The drag handle on the ladder's edge, for setting the screen up. */
+.screen-ladder-resize {
   position: absolute;
-  z-index: 3;
   top: 0;
+  right: -6px;
   bottom: 0;
-  left: -7px;
-  width: 14px;
+  z-index: 2;
+  width: 12px;
   cursor: col-resize;
   touch-action: none;
 }
-.screen-column-resize::before {
+.screen-ladder-resize::before {
   content: "";
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  transform: translateX(-50%);
-  background: transparent;
-  transition:
-    background var(--dur-hover),
-    width var(--dur-hover);
-}
-.screen-column-resize:hover::before,
-.screen-column-resize:active::before {
+  top: 50%;
+  left: 4px;
   width: 4px;
-  background: var(--cyan);
+  height: 48px;
+  transform: translateY(-50%);
+  background: var(--line-raised);
+  opacity: 0;
 }
-.screen-card {
+.screen-ladder-resize:hover::before,
+.screen-ladder-resize:active::before {
+  opacity: 1;
+}
+/* The foot: the latest roll, who and what at 18px, the total in VT323 58px, the dice in quiet VT323 24px. */
+.screen-ladder-foot {
+  position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: clamp(1rem, 1.25vw, 1.5rem);
-  border: 1px solid var(--line-strong);
-  background: var(--surface-2);
-}
-.screen-card-label {
-  margin: 0;
-  color: var(--text-dim);
-  font: 400 clamp(16px, 1.15vw, 23px) / 1 var(--font-numeric);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.screen-acting-head {
-  display: flex;
-  align-items: center;
-  gap: clamp(1rem, 1.25vw, 1.5rem);
-  min-width: 0;
-}
-.screen-acting-who {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-2);
-  min-width: 0;
+  padding: clamp(10px, 1.1vw, 21px) clamp(14px, 1.4vw, 27px) clamp(12px, 1.25vw, 24px);
+  border-top: 1px solid var(--line-strong);
+  background: linear-gradient(180deg, var(--surface-1), var(--bg));
 }
-.screen-acting-name {
+.screen-ladder-label {
   margin: 0;
-  overflow-wrap: anywhere;
-  font: 400 clamp(1.5rem, 1.9vw, 2.4rem) / 1.05 var(--font-wordmark);
+  color: var(--text-muted);
+  font: 600 clamp(11px, 1vw, 20px) / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-.screen-acting-next {
-  margin: 0;
-  color: var(--text-dim);
-  font-size: clamp(16px, 1.05vw, 21px);
-}
-.screen-acting.is-gm-turn .screen-acting-name {
-  color: var(--violet-text);
 }
 .screen-roll-who {
   margin: 0;
   color: var(--text);
-  font-size: clamp(17px, 1.15vw, 22px);
+  font-size: clamp(15px, 1.4vw, 27px);
 }
 .screen-roll-line {
   display: flex;
@@ -202,15 +203,11 @@
 }
 .screen-roll-total {
   color: var(--text);
-  font: 400 clamp(48px, 3.4vw, 68px) / 1 var(--font-numeric);
+  font: 400 clamp(42px, 4.5vw, 87px) / 1 var(--font-numeric);
 }
 .screen-roll-dice {
   color: var(--text-dim);
-  font: 400 clamp(20px, 1.4vw, 28px) / 1 var(--font-numeric);
-}
-/* A new roll's light runs along the card's top edge to its total (ADR-0045). */
-.screen-roll {
-  position: relative;
+  font: 400 clamp(18px, 1.9vw, 36px) / 1 var(--font-numeric);
 }
 .screen-roll-nat {
   margin-left: var(--space-2);
@@ -219,32 +216,54 @@
 .screen-roll-empty {
   margin: 0;
   color: var(--text-dim);
-  font-size: clamp(16px, 1.05vw, 21px);
+  font-size: clamp(15px, 1.25vw, 24px);
 }
 
+/* A phone held upright: the ladder stacks over the map, its rows smaller and the roll one row. */
 @media (max-aspect-ratio: 4/3) {
-  .screen-column {
-    grid-area: 3 / 1;
-    border-top: 1px solid var(--line-strong);
-    border-left: 0;
+  .screen-ladder {
+    grid-area: 1 / 1;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
   }
-  .screen-column-resize {
+  .screen-ladder-resize {
     display: none;
   }
-  .screen-column-scroll {
+  .screen-ladder-head {
+    padding: 10px 14px;
+  }
+  .screen-rung {
+    min-height: 42px;
+  }
+  .screen-rung-init {
+    width: 30px;
+    font-size: 22px;
+  }
+  .screen-rung-face .nh-portrait {
+    width: 30px;
+    height: 30px;
+  }
+  .screen-rung-name {
+    font-size: 16px;
+  }
+  .screen-rung.is-acting {
+    min-height: 84px;
+  }
+  .screen-rung.is-acting .screen-rung-face .nh-portrait,
+  .screen-rung-face.is-gm {
+    width: 56px;
+    height: 56px;
+  }
+  .screen-rung.is-acting .screen-rung-name {
+    font-size: 22px;
+  }
+  .screen-ladder-foot {
     flex-direction: row;
-    max-height: 32vh;
-  }
-  .screen-column-scroll > .screen-card {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-  .screen-top {
     flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
   }
-  .screen-tiles {
-    flex-basis: 100%;
-    padding-left: 0;
-    border-left: 0;
+  .screen-roll-total {
+    font-size: 46px;
   }
 }

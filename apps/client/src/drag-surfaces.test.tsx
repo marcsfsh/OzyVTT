@@ -29,7 +29,7 @@ import { MapTokenTray } from "./scene/MapTokenTray";
 import { ScenesContext, type ScenesContextValue } from "./scenes/context";
 import { SceneList } from "./scenes/SceneList";
 import { FloatingSheet } from "./sheet/CharacterSheet";
-import { ScreenColumn } from "./viewer/ScreenParts";
+import { ScreenLadder } from "./viewer/ScreenParts";
 import { MapStage, type Presentation } from "./viewer/ViewerApp";
 import { ViewerPreviewPanel } from "./viewer/ViewerPreviewPanel";
 
@@ -149,8 +149,8 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
   },
   { selector: ".viewer-stage", ui: () => <MapStage presentation={presentation} /> },
   {
-    selector: ".screen-column-resize",
-    ui: () => <ScreenColumn presentation={presentation} onResize={() => {}} />
+    selector: ".screen-ladder-resize",
+    ui: () => <ScreenLadder presentation={presentation} onResize={() => {}} />
   },
   { selector: ".viewer-preview-titlebar", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
   { selector: ".viewer-preview-resize", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },

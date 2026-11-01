@@ -12,7 +12,7 @@ import { AuthorizedTokenGlyph } from "../tokens/tokenImages";
 import { AnnotationGlyph, PingGlyph } from "../scene/annotationGlyph";
 import { useDamageNumbers, type SeenHealth } from "../scene/damageNumbers";
 import { useScreenLight } from "./screenLight";
-import { ScreenColumn, ScreenTop } from "./ScreenParts";
+import { ScreenLadder } from "./ScreenParts";
 import { ScreenPairing } from "./ScreenPairing";
 import { TableSound } from "./TableSound";
 import "./viewer.css";
@@ -545,9 +545,8 @@ export function ViewerApp() {
       onPointerDown={wake}
       onKeyDown={wake}
     >
-      <ScreenTop presentation={presentation} />
+      <ScreenLadder presentation={presentation} onResize={resizeColumn} />
       <MapStage presentation={presentation} />
-      <ScreenColumn presentation={presentation} onResize={resizeColumn} />
       <button
         type="button"
         className="viewer-fullscreen"

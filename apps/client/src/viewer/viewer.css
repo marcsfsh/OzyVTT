@@ -82,18 +82,20 @@
   min-height: 1.5rem;
   color: var(--danger-text) !important;
 }
-/* The strip across the top, the map, and the column: 540px at 1920 wide (28.125vw), narrower on a smaller screen. */
+/* The ladder at the left and the map in the rest: 400px of 1280 (31.25vw), the width the screen was given. */
 .viewer-shell {
   position: relative;
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--viewer-column-width, clamp(17rem, 28.125vw, 540px));
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: var(--viewer-column-width, clamp(18rem, 31.25vw, 600px)) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--void);
+  /* The map's cell, where its overlays sit too: beside the ladder, or under it on a phone held upright. */
+  --viewer-map-cell: 1 / 2;
 }
 .viewer-stage {
-  grid-area: 2 / 1;
+  grid-area: var(--viewer-map-cell);
   position: relative;
   /* The map's own void, so a view gliding in from further out never shows the page behind it. */
   background: var(--void);
@@ -283,15 +285,15 @@
   transform: translateX(-50%);
   color: var(--magenta-text);
 }
-/* No map yet: the waiting words take the map's cell, under the strip and beside the column. */
+/* No map yet: the waiting words take the map's cell, beside the ladder. */
 .viewer-shell > .viewer-waiting {
-  grid-area: 2 / 1;
+  grid-area: var(--viewer-map-cell);
 }
 /* Fullscreen and the connection sit over the map's top corners, in its grid cell, clear of the strip and the column. */
 .viewer-fullscreen {
   position: relative;
   z-index: 5;
-  grid-area: 2 / 1;
+  grid-area: var(--viewer-map-cell);
   align-self: start;
   justify-self: start;
   margin: 1.25rem;
@@ -311,7 +313,7 @@
 .viewer-connection {
   position: relative;
   z-index: 5;
-  grid-area: 2 / 1;
+  grid-area: var(--viewer-map-cell);
   align-self: start;
   justify-self: end;
   margin: 1.25rem;
@@ -341,7 +343,8 @@
 @media (max-aspect-ratio: 4/3) {
   .viewer-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 55%) minmax(0, 1fr);
+    --viewer-map-cell: 2 / 1;
   }
 }
 /* Reduced motion: the active row and ring still appear, without pulsing. */
@@ -463,7 +466,7 @@
 /* On the map screen the prompt sits in the map's bottom corner, so it never covers the column. */
 .viewer-shell > .viewer-sound-unlock {
   position: relative;
-  grid-area: 2 / 1;
+  grid-area: var(--viewer-map-cell);
   align-self: end;
   justify-self: start;
   margin: 1.25rem;
