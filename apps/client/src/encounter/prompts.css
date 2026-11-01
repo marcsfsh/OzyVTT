@@ -42,8 +42,45 @@
   gap: 0.4rem;
   align-items: center;
 }
-.save-prompt-roll {
-  flex: 0 0 auto;
+/* The roll row (theme rule 5, C3 running spec 2.5): its name and what pressing does at the left, the die or the
+   number at the right in VT323; the whole row is the button, on a 2px cyan base with a light cyan wash. */
+.roll-row {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 6px 12px;
+  border: 0;
+  background: color-mix(in srgb, var(--cyan) 8%, transparent);
+  box-shadow: inset 0 -2px 0 var(--cyan);
+  color: var(--text);
+  font: 600 14px / 1.25 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+.roll-row:hover:not(:disabled),
+.roll-row:focus-visible {
+  background: color-mix(in srgb, var(--cyan) 14%, transparent);
+}
+.roll-row:disabled {
+  color: var(--text-muted);
+  box-shadow: inset 0 -1px 0 var(--line);
+  background: none;
+  cursor: default;
+}
+.roll-row-text {
+  display: grid;
+  gap: 2px;
+}
+.roll-row-text small {
+  color: var(--text-muted);
+  font: 400 12px / 1.2 var(--font-body);
+}
+.roll-row-n {
+  color: var(--cyan-hi);
+  font: 400 30px / 1 var(--font-numeric);
 }
 /* A typed face and its button: the button keeps its whole label ("Reroll · Heroic Inspiration") and drops under the
    field when a phone's row is too narrow for both. */
@@ -73,8 +110,8 @@
   text-align: left;
 }
 /* Paint grows to 44px: in a wrapping .4rem-gap row, overhangs from two neighbours would collide. */
-.save-prompt-actions button,
-.save-prompt-confirm button {
+.save-prompt-actions button:not(.roll-row),
+.save-prompt-confirm button:not(.roll-row) {
   min-height: var(--tap-min);
   padding: 0.4rem 0.8rem;
   border: 1px solid var(--line-strong);
@@ -86,8 +123,8 @@
   text-align: center;
   cursor: pointer;
 }
-.save-prompt-actions button:hover:not(:disabled),
-.save-prompt-confirm button:hover:not(:disabled) {
+.save-prompt-actions button:not(.roll-row):hover:not(:disabled),
+.save-prompt-confirm button:not(.roll-row):hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
 }
 /* The dismiss is transparent, so growing its paint to 44px costs nothing visually; an overhang would

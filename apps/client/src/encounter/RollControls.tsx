@@ -340,8 +340,12 @@ export function RollControls({
       <span className="save-prompt-confirm">
         {summary}
         {viewer === "gm" && <ForceModeButtons current={currentMode} disabled={busy} onPick={onForce} />}
-        <button type="button" className="encounter-primary" disabled={busy} onClick={onConfirm}>
-          Confirm
+        {/* Theme rule 5: the roll is a row, and the whole row is the button. */}
+        <button type="button" className="roll-row is-rolled" disabled={busy} onClick={onConfirm}>
+          <span className="roll-row-text">
+            Confirm
+            <small aria-hidden="true">press to confirm</small>
+          </span>
         </button>
         {extraActions}
         {rerollable && (viewer === "gm" || inspired) && (
@@ -362,8 +366,16 @@ export function RollControls({
   }
   return (
     <span className="save-prompt-actions">
-      <button type="button" className="save-prompt-roll" disabled={busy} onClick={() => onRoll()}>
-        {rollLabel}
+      {/* Theme rule 5: the roll is a row, its name at the left and the die at the right; the whole row is the
+          button, and it says what pressing does. */}
+      <button type="button" className="roll-row save-prompt-roll" disabled={busy} onClick={() => onRoll()}>
+        <span className="roll-row-text">
+          {rollLabel}
+          <small aria-hidden="true">press to roll</small>
+        </span>
+        <span className="roll-row-n" aria-hidden="true">
+          d20
+        </span>
       </button>
       {mayType && (
         <FaceEntry label={faceLabel} busy={busy} onFace={onTyped} onInvalid={onInvalidFace} typeAs={typeAs} />
