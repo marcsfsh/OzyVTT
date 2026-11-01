@@ -23,6 +23,7 @@ import { sceneCommands } from "./scenes.js";
 import { soundCommands } from "./sound.js";
 import { summonCommands } from "./summons.js";
 import { tableSettingCommands } from "./table-settings.js";
+import { tokenGroupCommands } from "./token-groups.js";
 import { objectCommands } from "./objects.js";
 import { hazardCommands } from "./hazards.js";
 import { visionCommands } from "./vision.js";
@@ -50,6 +51,7 @@ export const gameCommands: readonly AnyCommand[] = [
   ...effectCommands,
   ...rulingCommands,
   ...tableSettingCommands,
+  ...tokenGroupCommands,
   ...sceneCommands,
   ...mapCommands,
   ...summonCommands,

@@ -2296,6 +2296,19 @@ export const RulesPolicySchema = z
   .strict();
 export type RulesPolicy = z.infer<typeof RulesPolicySchema>;
 
+/** The GM's token groups on Prep's Tokens page (ADR-0063): named groups, and which group each creature is filed in.
+ *  A creature in no group sits under Party or Monsters. GM-only: no player or table screen projection carries it. */
+export const TokenGroupsSchema = z
+  .object({
+    groups: z
+      .array(z.object({ id: z.uuid(), name: z.string().trim().min(1).max(40) }).strict())
+      .max(50)
+      .default([]),
+    members: z.record(z.string(), z.uuid()).default({})
+  })
+  .strict();
+export type TokenGroups = z.infer<typeof TokenGroupsSchema>;
+
 /** The token visibility a surface pre-selects when staging; the server never substitutes it. */
 export const StagingDefaultsSchema = z
   .object({
@@ -2464,6 +2477,8 @@ export const GameStateSchema = z.object({
   targeting: TargetingSchema.default("player"),
   /** Table defaults for staging new combatants. GM-set, GM-read. */
   stagingDefaults: StagingDefaultsSchema.prefault({}),
+  /** The GM's token groups (ADR-0063). GM-set, GM-read; no player or table screen projection carries it. */
+  tokenGroups: TokenGroupsSchema.prefault({}),
   /** How much a player sees of another player's character (see PartyVisibilitySchema). GM-set; player-read via `PlayerView`. */
   partyVisibility: PartyVisibilitySchema.default("name-and-class"),
   /** Dice thrown before they count (see HeldRollSchema). GM-only. */

@@ -196,6 +196,10 @@ import type {
   SetTokenImageSchema,
   TableSetPartyVisibilitySchema,
   TableSetStagingDefaultsSchema,
+  TokenGroupCreateSchema,
+  TokenGroupRenameSchema,
+  TokenGroupDeleteSchema,
+  ActorSetTokenGroupSchema,
   TableSetPlayerDiceSchema,
   TableSetTargetingSchema,
   TempHpSchema,
@@ -487,6 +491,23 @@ export interface ClientToServerEvents {
   /** GM sets who picks the targets of a player's action in an encounter (ADR-0044). */
   "table:set-targeting": (
     payload: CommandPayload<typeof TableSetTargetingSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  /** GM makes, renames or deletes a token group, and files a creature in one (ADR-0063). */
+  "token-group:create": (
+    payload: CommandPayload<typeof TokenGroupCreateSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "token-group:rename": (
+    payload: CommandPayload<typeof TokenGroupRenameSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "token-group:delete": (
+    payload: CommandPayload<typeof TokenGroupDeleteSchema>,
+    acknowledgement: (result: MutationResult) => void
+  ) => void;
+  "actor:set-token-group": (
+    payload: CommandPayload<typeof ActorSetTokenGroupSchema>,
     acknowledgement: (result: MutationResult) => void
   ) => void;
   /** GM sets the table's staging defaults (the visibility a newly staged combatant's token starts at). */

@@ -5,7 +5,7 @@ test (`apps/server/test/app-map.test.ts`) fails when this is stale. Search it fo
 reading it whole. `docs/ARCHITECTURE.md` explains how the pieces fit together.
 
 - API version `1` · realtime protocol `1`
-- 19 GameState fields · 190 commands · 367 HTTP paths
+- 20 GameState fields · 194 commands · 371 HTTP paths
 
 ## GameState shape
 
@@ -31,6 +31,7 @@ single JSON blob the server persists and projects per role.
 - `schemaVersion`
 - `stagingDefaults`
 - `targeting`
+- `tokenGroups`
 
 ## Commands
 
@@ -40,7 +41,7 @@ schema in `packages/domain/src/commands.ts`, its route and scope in `GAME_COMMAN
 one table entry under `apps/server/src/commands/`. Both transports register from that table, and
 the OpenAPI document generates the command's operation from it. Then the projection decision.
 
-Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `trap`, `turn`, `vision`, `wall`.
+Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `check`, `crafting`, `damage`, `death-save`, `dice`, `door`, `effect`, `encounter`, `environment`, `fog`, `initiative`, `item`, `light`, `object`, `reaction`, `replay`, `rest`, `roll-call`, `rules`, `save`, `sound`, `spell-zone`, `summon`, `survival`, `table`, `terrain`, `time`, `token`, `token-group`, `trap`, `turn`, `vision`, `wall`.
 
 | Command | Scope |
 | --- | --- |
@@ -79,6 +80,7 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `actor.set-size` | `actor:write` |
 | `actor.set-speed` | `actor:write` |
 | `actor.set-temp-hp` | `actor:write` |
+| `actor.set-token-group` | `combat:write` |
 | `actor.set-token-image` | `actor:write` |
 | `actor.set-visibility` | `actor:write` |
 | `actor.spend-hit-dice` | `actor:write` |
@@ -213,6 +215,9 @@ Namespaces: `action`, `actor`, `annotation`, `builder`, `character`, `chat`, `ch
 | `terrain.reset` | `encounter:write` |
 | `time.pass` | `combat:write` |
 | `time.set-dawn` | `combat:write` |
+| `token-group.create` | `combat:write` |
+| `token-group.delete` | `combat:write` |
+| `token-group.rename` | `combat:write` |
 | `token.move` | `combat:write` |
 | `token.set-altitude` | `combat:write` |
 | `trap.disarm` | `combat:write` |
@@ -400,6 +405,7 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/actors/{actorId}/summons/command`
 - `POST /api/v1/game/actors/{actorId}/swap-spell`
 - `POST /api/v1/game/actors/{actorId}/temp-hp`
+- `POST /api/v1/game/actors/{actorId}/token-group`
 - `POST /api/v1/game/actors/{actorId}/token-image`
 - `POST /api/v1/game/actors/{actorId}/uses/restore`
 - `POST /api/v1/game/actors/{actorId}/uses/spend`
@@ -510,6 +516,9 @@ from the route registry in `packages/api-contract/src/routes/`.
 - `POST /api/v1/game/terrain/reset`
 - `POST /api/v1/game/time/dawn`
 - `POST /api/v1/game/time/pass`
+- `POST /api/v1/game/token-groups`
+- `POST /api/v1/game/token-groups/delete`
+- `POST /api/v1/game/token-groups/rename`
 - `POST /api/v1/game/tokens/{actorId}/altitude`
 - `POST /api/v1/game/tokens/{actorId}/move`
 - `POST /api/v1/game/traps`

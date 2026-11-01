@@ -1231,6 +1231,36 @@ export const RulesSetPolicySchema = z
     expectedRevision: z.number().int().nonnegative().optional()
   })
   .strict();
+/** GM makes a token group (ADR-0063). */
+export const TokenGroupCreateSchema = z
+  .object({
+    commandId: z.uuid(),
+    name: z.string().trim().min(1).max(40),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM renames a token group. */
+export const TokenGroupRenameSchema = z
+  .object({
+    commandId: z.uuid(),
+    groupId: z.uuid(),
+    name: z.string().trim().min(1).max(40),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
+/** GM deletes a token group; its creatures return to Party or Monsters. */
+export const TokenGroupDeleteSchema = z
+  .object({ commandId: z.uuid(), groupId: z.uuid(), expectedRevision: z.number().int().nonnegative().optional() })
+  .strict();
+/** GM files a creature in a token group, or takes it out (`groupId: null`). */
+export const ActorSetTokenGroupSchema = z
+  .object({
+    commandId: z.uuid(),
+    actorId: z.string().min(1),
+    groupId: z.uuid().nullable(),
+    expectedRevision: z.number().int().nonnegative().optional()
+  })
+  .strict();
 /** GM sets the table's staging defaults: the visibility a newly staged combatant's token starts at. */
 export const TableSetStagingDefaultsSchema = z
   .object({

@@ -748,6 +748,8 @@ export function removeActor(state: GameState, actorId: string) {
   // A removed actor can no longer sustain effects on others (its grapples release, ADR-0020).
   endEffectsSustainedBy(state, actorId);
   state.actors = state.actors.filter((item) => item.id !== actorId);
+  // A removed creature leaves the GM's token groups too (ADR-0063).
+  delete state.tokenGroups.members[actorId];
   // Drop the actor from every inactive prepared scene so no scene references a combatant that no longer exists.
   if (
     state.combat.encounters.some(
