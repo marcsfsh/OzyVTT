@@ -39,6 +39,8 @@ export function SettingsList({
   codex?: Readonly<{
     tools: readonly CodexTool[];
     current: CodexToolId | null;
+    /** What a tool holds now where a word helps: Autosave On, Version history 12. */
+    counts?: Readonly<Partial<Record<CodexToolId, string | number>>>;
     onGo: (id: CodexToolId) => void;
   }>;
 }>) {
@@ -72,6 +74,7 @@ export function SettingsList({
                 key={tool.id}
                 label={tool.label}
                 leading={<CodexIcon iconId={tool.iconId} />}
+                count={codex.counts?.[tool.id]}
                 current={tool.id === codex.current}
                 href={codexToolPath(tool.id)}
                 onSelect={() => codex.onGo(tool.id)}

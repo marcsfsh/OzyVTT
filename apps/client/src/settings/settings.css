@@ -374,6 +374,9 @@
 }
 .settings-index-codexnav {
   flex: none;
+  /* The same gutter the sections' scroller keeps, so both groups' counts share one edge. */
+  scrollbar-gutter: stable;
+  overflow-y: hidden;
 }
 .settings-index-nav .nh-sidelist-leading svg {
   width: 18px;
@@ -433,13 +436,14 @@
   }
 }
 
-/* A phone (settings spec 2.1 and 4): the list is the first page, its rows 52px; a section's column is 12px 14px. */
+/* A phone (settings spec 2.1 and 4, I leftovers 2.6): the list is the first page, its rows 48px; a section's column is
+   12px 14px. */
 .settings.is-phone .settings-index {
   flex: 1 1 auto;
   border-right: 0;
 }
 .settings.is-phone .settings-index .nh-sidelist-hit {
-  min-height: 52px;
+  min-height: 48px;
 }
 .settings.is-phone .settings-content:not(.is-frame) {
   padding: 12px 14px calc(var(--space-10) + env(safe-area-inset-bottom));

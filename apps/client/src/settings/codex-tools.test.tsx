@@ -15,6 +15,22 @@ const codex = vi.hoisted(() => ({
   setSettings: vi.fn(),
   importBundle: vi.fn()
 }));
+vi.mock("../lib/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/api")>();
+  return {
+    ...actual,
+    jsonRequest: vi.fn(async (path: string) => {
+      if (path !== "/api/v1/openapi.json") throw new Error("not here");
+      return {
+        openapi: "3.1.0",
+        paths: {
+          "/api/v1/a": { get: { operationId: "a", tags: ["Actors"] }, post: { operationId: "b", tags: ["Actors"] } },
+          "/api/v1/c": { get: { operationId: "c", tags: ["Codex"] } }
+        }
+      };
+    })
+  };
+});
 vi.mock("../codex/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../codex/api")>();
   return { ...actual, codexApi: { ...actual.codexApi, ...codex } };
@@ -74,6 +90,18 @@ describe("The Codex's tools in Settings", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/settings/codex/notes"));
     expect(screen.getByRole("button", { name: "Choose files" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Which layer to import into" })).toBeInTheDocument();
+  });
+
+  it("counts the API's operations and says what Autosave and Version history hold, the chosen tool lit", async () => {
+    renderAt("/settings/codex/autosave");
+    const sections = within(screen.getByRole("navigation", { name: "Settings sections" }));
+    await waitFor(() => expect(sections.getByRole("link", { name: /^API/ })).toHaveTextContent("API3"));
+    const tools = within(screen.getByRole("navigation", { name: "Codex tools" }));
+    await waitFor(() => expect(tools.getByRole("link", { name: /^Autosave/ })).toHaveTextContent("AutosaveOn"));
+    expect(tools.getByRole("link", { name: /^Version history/ })).toHaveTextContent("Version history12");
+    expect(tools.getByRole("link", { name: /^Autosave/ })).toHaveAttribute("aria-current", "page");
+    // No section is lit while a tool is open.
+    expect(sections.queryAllByRole("link").filter((link) => link.getAttribute("aria-current") === "page")).toEqual([]);
   });
 
   it("writes autosave as today, and keeps version history's rows on their own page", async () => {

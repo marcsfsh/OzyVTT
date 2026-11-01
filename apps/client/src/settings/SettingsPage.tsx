@@ -31,6 +31,7 @@ import { useRollPreference } from "../dice/roll-preference";
 import { useActiveCredentialCount } from "../integrations/credentialCount";
 import { SettingsSearch } from "./SettingsSearch";
 import { CODEX_TOOLS, codexToolPath, isCodexTool, type CodexToolId } from "./codexTools";
+import { useListFacts } from "./listFacts";
 import { CodexToolSection } from "./CodexToolSection";
 import "../codex/shell/shell.css";
 import "./settings.css";
@@ -104,6 +105,7 @@ export function SettingsPage({
   const { rollInput } = useRollPreference();
   const pinchZoom = usePinchZoom();
   const activeCredentials = useActiveCredentialCount(gm ? (gmToken ?? null) : null);
+  const listFacts = useListFacts(gm ? (gmToken ?? null) : null);
   const facts = { theme, rollInput, pinchZoom, activeCredentials };
   const lineOf = (id: SettingsSectionId) => sectionLine(id, gm, facts);
 
@@ -132,7 +134,12 @@ export function SettingsPage({
   };
   const go = (id: SettingsSectionId) => void navigate(pathForSection(id));
   const goTool = (id: CodexToolId) => void navigate(codexToolPath(id));
-  const toolsGroup = role === "gm" ? { tools: CODEX_TOOLS, current: tool, onGo: goTool } : undefined;
+  const toolCounts: Readonly<Partial<Record<CodexToolId, string | number>>> = {
+    ...(listFacts.autosave !== null ? { autosave: listFacts.autosave ? "On" : "Off" } : {}),
+    ...(listFacts.versions !== null ? { history: listFacts.versions } : {})
+  };
+  const toolsGroup =
+    role === "gm" ? { tools: CODEX_TOOLS, current: tool, counts: toolCounts, onGo: goTool } : undefined;
 
   const listSearch = <SettingsSearch entries={settingsFor(role)} onPick={pick} onQueryChange={setListQuery} />;
   const counts = gm
@@ -144,7 +151,8 @@ export function SettingsPage({
           gm.rulesPolicy.dial === "freeform"
             ? null
             : FAMILY_COPY.filter(({ family }) => gm.rulesPolicy.exceptions[family] !== "freeform").length,
-        access: activeCredentials
+        access: activeCredentials,
+        api: listFacts.operations
       }
     : {};
 
