@@ -1283,7 +1283,10 @@ tests read it. `SettingsPage.tsx` draws the title row (the section bar with no p
 the side list (`SettingsList.tsx`, the kit's `SideList` rows with icons and counts, and `SettingsSearch.tsx` at its
 top, whose matches take the rows' place) and the section the address names (`/settings/<section>`). The GM's list also
 has the Codex's tools (`codexTools.ts`, ADR-0070), each at `/settings/codex/<tool>` and drawn by `CodexToolSection.tsx`
-from the Codex's own `BackupView` and `CodexSettingsView` with a `part`; the search finds them. On a phone
+from the Codex's own `BackupView` and `CodexSettingsView` with a `part`; the search finds them. The list's API and
+Codex counts come from `listFacts.ts`, which reads the OpenAPI document and the Codex settings once. A credential has its
+own page at `/settings/access/credentials/{id}` (`integrations/CredentialPage.tsx`, over the list and the audit read,
+with Rotate and Revoke from `useCredentialActions`; ADR-0071). On a phone
 `/settings` is the list and a section has Back. `sectionLines.ts` writes what each section holds now from the GM's
 state and the device (`integrations/credentialCount.ts` holds the active credentials); a section's head shows it. A
 table setting's write says Saved on its row (`SavedFlashProvider` in `SettingRow.tsx`), and Encounters groups its rows
@@ -1292,8 +1295,10 @@ its own component and writes through the same commands as before (`table-writes.
 (`integrations/CredentialsTable.tsx`) read and write their GM routes. The API reference
 (`integrations/ApiReference.tsx`, an operation at `/settings/api/<operation id>` in `OperationDocument.tsx`) reads the
 OpenAPI document the route registry generates, through `integrations/openapi-model.ts` and `api-rows.ts`: the
-document's tags, in its order, group the table, and an operation's page shows the document's example body where it
-has one.
+document's tags, in its order, group the rows, and each row names the live-game command it is, matched by that
+command's route in the contract's `GAME_COMMANDS` for each type the live command catalog names
+(`commandsByOperation`). An operation's page puts its request and its response side by side and shows the document's
+example body where it has one.
 
 The themes are Dusk and Dawn (`dusk` and `dawn` on `<html data-theme>`, ADR-0037), one token set in
 `packages/ui/src/styles/design-tokens.css` with Dusk in `:root`. Each HTML entry decides the theme before first paint

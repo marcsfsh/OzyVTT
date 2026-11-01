@@ -193,9 +193,18 @@ The shells:
   capitals at 17px, a divider, the pages as words with the horizon ink, then the section's search and its primary
   (the Cup at 42px) at the right end. No icons on the pages. Settings alone keeps the title row without the pages: its
   sections are a side list (ADR-0057), the search at its top, each section with its icon and a count, and the section
-  beside it at 880px with its name, its line and what it holds now in its head. Under the sections the GM's list has
-  CODEX (ADR-0070): Backup, Restore, Bring in notes, Autosave and Version history, each its own page of the Codex
-  tool's rows. A phone opens Settings on that list, and a section or a tool full screen under Back and its name.
+  beside it at 880px with its name, its line and what it holds now in its head. The list is the settled side list
+  (ADR-0071): API counts its operations, and under the sections the GM's list has CODEX (ADR-0070): Backup, Restore,
+  Bring in notes, Autosave (On) and Version history (its count), each its own page of the Codex tool's rows. A phone
+  opens Settings on that list (rows 48px), and a section or a tool full screen under Back and its name.
+- Settings' API section (ADR-0071) is the field ("Find a path, a summary or a command"), Tags, Filters and Sort, then
+  each tag as a group of rows under its eyebrow and count: the method tag and summary over the path in VT323, and at
+  the right As a command with its type (or No command), who can call it and the arrow. An operation's page has All
+  operations as its crumb, the method and path with Copy, one line of who can call it, its id, its tag and its
+  command, then REQUEST and RESPONSE side by side with their examples, the other responses as rows; a phone shows one
+  side under a control. At the table puts Set token image… and Force release on each row (two 44px icons on a phone).
+  A credential's name in Access opens its own page: its line, Rotate and Revoke as rows, and HISTORY · {N}, a refusal
+  in amber.
 - GM, phone. No top bar. The four sections and More are the bottom tabs (64px, five equal tabs); More opens a sheet
   above them with the menu's rows and Search. Play or Table carries the live lamp while an encounter runs. The header
   row belongs to the page on screen: a section's page

@@ -440,9 +440,11 @@ screen and Settings' table screen row Designed with E3.2 (`E3-sound-screen/SPEC.
 Job: set the table up once and change it rarely. Status: Built (`I-settings/SPEC.md`, `I-settings/PLAN.md`,
 ADR-0057): a side list of the sections with a line of what each holds now, rows with their control at the right, the
 encounter rules grouped by moment, and Access with its rows and the credentials' table. F's time and tools add a Codex
-group to its side list (ADR-0070). I1, I2, I6 and I7 Designed (`I-settings-leftovers/SPEC.md`,
-`I-settings-leftovers/PLAN.md`, ADR-0071): the side list drawn as the settled one, the API reference as grouped rows
-with each operation's command, an operation's two sides, buttons at the table, and a credential's page.
+group to its side list (ADR-0070). I1, I2, I6 and I7 Built in part (`I-settings-leftovers/SPEC.md`,
+`I-settings-leftovers/PLAN.md`, ADR-0071): the side list drawn as the settled one with API's and the Codex tools'
+counts, the API reference as grouped rows with each operation's command, an operation's two sides, buttons at the
+table, and a credential's page. Not built: Tags, Filters and Sort folded into the field's More, the buttons' shorter
+names (Token image, Release), At the table's rows out of their table, and a field's notes on hover.
 
 | Id  | Surface                     | Opens at               | Who        | Files                                                                                                          |
 | --- | --------------------------- | ---------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
@@ -451,7 +453,7 @@ with each operation's command, an operation's two sides, buttons at the table, a
 | I3  | Encounters                  | `/settings/fights`     | GM         | `settings/FightsSection.tsx`                                                                                   |
 | I4  | Characters                  | `/settings/characters` | GM         | `settings/CharactersSection.tsx`                                                                               |
 | I5  | Device                      | `/settings/device`     | GM, player | `settings/DeviceSection.tsx`                                                                                   |
-| I6  | Access and credentials      | `/settings/access`     | GM         | `settings/AccessSection.tsx`, `integrations/CredentialsTable.tsx`                                              |
+| I6  | Access and credentials      | `/settings/access`     | GM         | `settings/AccessSection.tsx`, `integrations/CredentialsTable.tsx`, `integrations/CredentialPage.tsx`           |
 | I7  | API reference and operation | `/settings/api`        | GM         | `integrations/ApiReference.tsx`, `integrations/OperationDocument.tsx`                                          |
 
 ## Notes from the survey
