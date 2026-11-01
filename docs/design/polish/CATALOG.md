@@ -185,7 +185,7 @@ the roll as the button in waiting cards. The Notes and Party tabs follow F and D
 
 Built with C6 (`C4-C6-player/SPEC.md`, `C4-C6-player/PLAN.md`, ADR-0061): a prompt on glass over the map, its eyebrow
 naming only its kind, a reaction's answer as its roll row, and the death saves as lamps. C4.1 and C4.2 are C's; C4.4 and
-C4.5 stay as they are, and C4.6 is Designed with replays (`E3-replays/SPEC.md` 2.5). Each question in a round offers
+C4.5 stay as they are, and C4.6 is Built with replays (`E3-replays/SPEC.md` 2.5). Each question in a round offers
 five options, each built from settled parts.
 
 | Id   | Surface                | Opens at             | Who    | Files                                                                                                                                                                              |
@@ -299,9 +299,10 @@ E2.1 and E2.2 Built in part (`E2-maps-tokens/SPEC.md`, ADR-0063; the map beside 
 
 E3.1 Designed with E2 (`E2-maps-tokens/SPEC.md`, ADR-0063), with the token picker (C6.8). E3.2 Built in part
 (`E3-sound-screen/SPEC.md`, `E3-sound-screen/PLAN.md`, ADR-0065): the sound board as kinds at the side under one Playing
-bar with a scrubber, kind chips, and each encounter's sound on its page. E3.3 to E3.5 Designed with C4.6
+bar with a scrubber, kind chips, and each encounter's sound on its page. E3.3 to E3.5 Built in part with C4.6
 (`E3-replays/SPEC.md`, `E3-replays/PLAN.md`, ADR-0069): the list as a table with the chosen replay beside it, the whole
-fight beside the map, a line of rounds with Launch at its end, and a player's replays as cards under the sheet.
+fight beside the map, a line of rounds with Launch at its end, and a player's replays as cards under the sheet. Not
+built: sorting by column head, the map's picture beside the list and on the cards, and the order as chips on glass.
 
 | Id   | Surface         | Opens at                 | Who        | Files                                                                                                     |
 | ---- | --------------- | ------------------------ | ---------- | --------------------------------------------------------------------------------------------------------- |
@@ -309,7 +310,7 @@ fight beside the map, a line of rounds with Launch at its end, and a player's re
 | E3.2 | Sound board     | `/viewer-controls/sound` | GM         | `sound/SoundBoard.tsx`, `sound/SoundLibraryPanel.tsx`, `sound/SoundSections.tsx`, `sound/sound-board.css` |
 | E3.3 | Replays list    | `/replays`               | GM, player | `replay/ReplayList.tsx`, `replay/replay.css`                                                              |
 | E3.4 | Replay viewer   | `/replays/:id`           | GM, player | `replay/ReplayViewer.tsx`, `replay/ReplayStage.tsx`                                                       |
-| E3.5 | Rename a replay | list menu                | GM         | `replay/ReplayList.tsx` (`RenameReplay`)                                                                  |
+| E3.5 | Rename a replay | More                     | GM         | `replay/ReplayActions.tsx` (`RenameReplay`)                                                               |
 
 ## F. The Codex
 

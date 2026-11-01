@@ -225,6 +225,15 @@ title: what plays, the room's lamp, the track and its layers, a scrubber that se
 track, Stop all and Master. A library row puts its sound on the board with Music, Ambience and Effect chips, lit where
 it already is. An encounter's sound is on the encounter's page.
 
+Replays (ADR-0069) are a table, newest first: the name (the encounter under a name the GM gave it), Fought, Turns,
+Length and, for the GM, the eye. The chosen row is lit and its replay sits beside it with More, its line, Players see it
+and Watch; a phone's row opens the replay's page. Watching puts the head row (the name, when it was fought, its turns and
+length, More) over the transport and the map, with the whole fight beside it, the current turn lit. The transport is
+Previous, Play and Next as icon buttons, the line of rounds (a section a round, a tick a turn, the watched part, the knob,
+and marks for damage in amber, healing in cyan and a creature at 0 in red) that seeks when pressed or dragged, the count
+("Turn 08 of 15") and, for the GM, Launch from turn {n}. More holds Players see it, Rename, Download JSON and Delete
+replay. A player's replays are cards under the sheet, two to a row, while no encounter runs.
+
 A page header is for records only (ADR-0048). A list, a settings section or an overview starts with its content and at
 most one description line (14px, `--text-dim`, the GM only tag in front of it on a page players can also open). A
 record opens with its title row: the title in Chakra Petch 600 capitals at 24px (20px on a phone), its tags, one 13px

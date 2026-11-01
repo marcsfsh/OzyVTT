@@ -1115,7 +1115,8 @@ the encounter and its round, opening the picker), search and the one menu (`shel
 holds Release, the theme, Settings and Leave the table (`shell/useLeaveTable.tsx`). A phone has no top bar: the
 sections and More are the bottom tabs, and More opens `shell/MoreSheet.tsx` with the menu's rows. Prep's section
 bar (`PrepFrame`) holds Encounters, Party, Maps, Tokens, Sound and Replays (`PREP_PAGES`) over their existing addresses
-(`/encounters`, `/roster`, `/encounters/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`); a page puts its
+(`/encounters`, `/roster`, `/encounters/maps`, the new `/prep/tokens`, `/viewer-controls/sound`, `/replays`, where a
+replay plays at `/replays/:id` and a player reaches the same list from the shelf under their sheet); a page puts its
 search or primary at the bar's end through `PrepBarSlot`. Every section (Prep, the Codex, the Compendium,
 and Settings with no pages) draws the one Titled section bar, `shell/SectionBar.tsx` (ADR-0048): the section's name as the page's
 `h1`, its pages as the kit's tab list inside a navigation landmark, and an end slot (`SectionBarSlot`, which

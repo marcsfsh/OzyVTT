@@ -36,12 +36,6 @@
   gap: var(--space-2);
   margin-left: auto;
 }
-.replay-row-actions {
-  display: flex;
-  gap: var(--space-2);
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
 .replay-header h2 {
   margin: 0;
 }
@@ -342,50 +336,6 @@
 .replay-list-back {
   align-self: flex-start;
   margin-bottom: var(--space-2);
-}
-.replay-rows {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.replay-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--row-h);
-  padding: var(--space-3);
-  border-bottom: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-}
-.replay-row:last-child {
-  border-bottom: 0;
-}
-.replay-row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-.replay-row-title {
-  color: var(--text);
-  font-weight: 700;
-}
-.replay-row-meta {
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
-@media (max-width: 560px) {
-  .replay-row {
-    flex-wrap: wrap;
-  }
-  .replay-row-text {
-    flex: 1 0 100%;
-  }
 }
 
 /* Below 850px the two columns become one: the map keeps a band and the side lists take the rest as
