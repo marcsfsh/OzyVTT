@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Alert, Button, IconButton, IconEyeOff, cx, useToast } from "@vtt/ui";
 import { formatWorldDate, type CodexCalendar, type CodexInWorldDate, type GmCodexCalendar } from "@vtt/domain";
 import { calendarApi } from "../api";
-import { CalendarEditor, CampaignDateEditor } from "../CalendarEditor";
+import { CampaignDateEditor } from "../CalendarEditor";
+import { navigate } from "../../router";
+import { calendarPath } from "../routes";
 import { sameInWorldDate } from "../chronicle";
 import { hourLabel } from "../../rest/game-date";
 import "./shared.css";
@@ -48,7 +50,6 @@ export function DateBar(props: GmDateBarProps | PlayerDateBarProps) {
 function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight = false, onChanged }: GmDateBarProps) {
   const { toast } = useToast();
   const [dateOpen, setDateOpen] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const now = calendar?.currentDate ?? null;
@@ -79,26 +80,16 @@ function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight =
   const unpublish = () =>
     change(() => calendarApi.unpublish(token), "Players no longer see a date.", "Couldn't hide the players' date.");
 
-  const calendarEditor = editorOpen && (
-    <CalendarEditor
-      gmToken={token}
-      calendar={calendar}
-      onSaved={() => {
-        setEditorOpen(false);
-        void onChanged();
-      }}
-      onClose={() => setEditorOpen(false)}
-    />
-  );
+  // Edit calendar opens the calendar's own page (F time spec 2.4); your date keeps its small dialog here.
+  const editCalendar = () => void navigate(calendarPath());
 
   if (!calendar || calendar.months.length === 0)
     return (
       <div className={cx("cx-datebar", tight && "is-tight")}>
         <span className="cx-hint">The world has no calendar yet.</span>
-        <Button variant="secondary" size="sm" onClick={() => setEditorOpen(true)}>
+        <Button variant="secondary" size="sm" onClick={editCalendar}>
           Set up the calendar
         </Button>
-        {calendarEditor}
       </div>
     );
 
@@ -138,7 +129,7 @@ function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight =
             <IconEyeOff />
           </IconButton>
         )}
-        <Button size="sm" onClick={() => setEditorOpen(true)}>
+        <Button size="sm" onClick={editCalendar}>
           Edit calendar
         </Button>
       </span>
@@ -165,7 +156,6 @@ function GmDateBar({ token, calendar, gameHours = null, gameMinutes = 0, tight =
           onClose={() => setDateOpen(false)}
         />
       )}
-      {calendarEditor}
     </div>
   );
 }

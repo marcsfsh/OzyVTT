@@ -211,6 +211,8 @@ export const atlasPath = (mapId: string | null, markerId?: string | null) =>
 export const journalEntryPath = (entryId: string) => withQuery(pathForSection("story"), { entry: entryId });
 export const sessionPath = (id: string) => `${CODEX_ROOT}/sessions/${id}`;
 export const questPath = (id: string, mode?: "edit") => withQuery(`${CODEX_ROOT}/quests/${id}`, { mode });
+/** `/codex/calendar?part=`: the GM's calendar page. An old address with `?y=` or `?m=` still lands on the story. */
+export const calendarPath = (part?: string | null) => withQuery(`${CODEX_ROOT}/calendar`, { part: part ?? null });
 export const templatePath = (id?: string | null) =>
   id ? `${CODEX_ROOT}/templates/${id}` : pathForSection("templates");
 export type RelationshipsView = "web" | "grid" | "time";

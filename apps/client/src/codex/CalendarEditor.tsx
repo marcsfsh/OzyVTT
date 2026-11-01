@@ -6,13 +6,13 @@ import { calendarApi } from "./api";
 type EraDraft = Readonly<{ name: string; startYear: string }>;
 
 /** A numeric draft field back to an integer, as the server does. */
-const toYear = (raw: string) => Math.trunc(Number(raw) || 0);
+export const toYear = (raw: string) => Math.trunc(Number(raw) || 0);
 
 /**
  * Build the PUT body from explicit keys, never by spreading the fetched calendar: it may carry
  * `publishedDate`, which the strict `CalendarSchema` rejects.
  */
-function calendarBody(
+export function calendarBody(
   over: Readonly<{
     yearName: string;
     eras: readonly CodexCalendarEra[];

@@ -170,6 +170,19 @@ describe("Addresses from before the remaster", () => {
   });
 });
 
+describe("The calendar's page", () => {
+  it("opens at /codex/calendar from the bar's More, with nothing lit", async () => {
+    const user = userEvent.setup();
+    renderShell("/codex");
+    await waitFor(() => expect(listPages).toHaveBeenCalled());
+    await user.click(screen.getByLabelText("More in the Codex"));
+    await user.click(screen.getByRole("menuitem", { name: "Calendar" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/calendar"));
+    expect(await screen.findByRole("heading", { level: 2, name: "Calendar" })).toBeInTheDocument();
+    expect(lit()).toHaveLength(0);
+  });
+});
+
 describe("The browser's own buttons", () => {
   it("goes back to the previous section, and forward again", async () => {
     const user = userEvent.setup();

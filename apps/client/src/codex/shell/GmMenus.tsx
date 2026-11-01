@@ -1,6 +1,6 @@
 import { IconMore, IconPlus, Menu, MenuItem } from "@vtt/ui";
 import { useBarStepDown } from "../../shell/SectionBar";
-import { GM_MENU_SECTIONS, SECTION_TITLE, pathForSection, type CodexSection } from "../routes";
+import { GM_MENU_SECTIONS, SECTION_TITLE, calendarPath, pathForSection, type CodexSection } from "../routes";
 import type { CodexCharacter } from "./context";
 
 /**
@@ -52,8 +52,8 @@ export function NewMenu({
 }
 
 /**
- * The bar's More (Codex frame rule 3.8): Prep templates, Backup, and Autosave and history, then See the Codex as
- * players for Everyone or one character, which opens the real player Codex on a preview token.
+ * The bar's More (Codex frame rule 3.8): Prep templates, Backup, Autosave and history, and Calendar, then See the
+ * Codex as players for Everyone or one character, which opens the real player Codex on a preview token.
  */
 export function GmMenu({
   section,
@@ -84,6 +84,7 @@ export function GmMenu({
           {SECTION_TITLE[item]}
         </MenuItem>
       ))}
+      <MenuItem onClick={() => go(calendarPath())}>Calendar</MenuItem>
       <MenuItem onClick={() => onPreview(null)}>See the Codex as players: Everyone</MenuItem>
       {party.map((character) => (
         <MenuItem key={character.id} onClick={() => onPreview(character.id)}>

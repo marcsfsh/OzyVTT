@@ -1,0 +1,128 @@
+/* The calendar page (F time spec 2.4): the parts at the side, the chosen part's rows at the right. Tokens only. */
+
+.cal-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line-strong);
+}
+.cal-title {
+  margin: 0;
+  font: var(--fw-display) 24px / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.cal-grow {
+  flex: 1 1 auto;
+}
+.cal-cols {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: 0;
+}
+.cal-nav {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--line-strong);
+}
+.cal-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  max-width: 44rem;
+  padding: var(--space-4);
+}
+.cal-part-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.cal-part-title {
+  margin: 0;
+  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.cal-part-line,
+.cal-hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cal-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.cal-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-1);
+  border: 1px solid var(--line);
+}
+.cal-row.is-dragging {
+  border-color: var(--cyan);
+  box-shadow: var(--shadow-2);
+}
+.cal-row > .nh-input:first-of-type {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cal-row .cal-days {
+  flex: none;
+  width: 6rem;
+  font-family: var(--font-numeric);
+  font-size: 20px;
+}
+.cal-date {
+  margin: 0;
+  font-family: var(--font-numeric);
+  font-size: 28px;
+  color: var(--violet);
+}
+.cal-date.is-players {
+  color: var(--cyan);
+}
+.cal-date-actions,
+.cal-warning-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.cal-warning-actions {
+  margin-top: var(--space-2);
+}
+
+/* A phone: the parts as chips over the chosen part's rows. */
+.cal-page.is-phone .cal-cols {
+  display: flex;
+  flex-direction: column;
+}
+.cal-page.is-phone .cal-nav {
+  border-right: 0;
+  padding: var(--space-2) var(--space-3);
+}
+.cal-page.is-phone .cal-main {
+  max-width: none;
+  padding: var(--space-3);
+}
+.cal-page.is-phone .cal-row .cal-days {
+  width: 4.5rem;
+}

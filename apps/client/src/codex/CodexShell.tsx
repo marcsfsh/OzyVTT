@@ -6,6 +6,7 @@ import { useMediaQuery } from "../lib/useMediaQuery";
 import {
   codexSectionOf,
   isRetiredSection,
+  pathForSection,
   pagePath,
   questPath,
   recordIdOf,
@@ -14,6 +15,7 @@ import {
 } from "./routes";
 import { NotFoundView } from "../components/NotFoundView";
 import { QuickCreate, type QuickCreateRequest } from "./QuickCreate";
+import { CalendarPage, calendarPartOf } from "./CalendarPage";
 import { createQuest, createSession } from "./creates";
 import { provideCodexCommands } from "./codex-commands";
 import { openSearch } from "../shell/search-store";
@@ -63,13 +65,16 @@ export function CodexShell({
   const route = useRoute();
   const address = codexSectionOf(route.segments);
   const section = address && !isRetiredSection(address) ? address : null;
+  // The calendar is the GM's own page now; an old calendar address with a month in it still lands on the story.
+  const calendarPage = address === "calendar" && !route.query.has("y") && !route.query.has("m");
   const recordId = recordIdOf(route.segments);
   const phone = useMediaQuery(CODEX_PHONE_QUERY);
 
   // An old address lands where its content lives now, replacing itself so Back skips it.
   useEffect(() => {
-    if (address && isRetiredSection(address)) void navigate(retiredTarget(address, route.query), { replace: true });
-  }, [address, route.query]);
+    if (address && isRetiredSection(address) && !calendarPage)
+      void navigate(retiredTarget(address, route.query), { replace: true });
+  }, [address, route.query, calendarPage]);
 
   const [quickCreate, setQuickCreate] = useState<QuickCreateRequest | null>(null);
   // See as players mounts the real player Codex on a short-lived player token the server mints for Everyone or
@@ -263,6 +268,14 @@ export function CodexShell({
           <CodexShellContext.Provider value={shell}>
             <View />
           </CodexShellContext.Provider>
+        ) : calendarPage ? (
+          <CalendarPage
+            gmToken={gmToken}
+            phone={phone}
+            part={calendarPartOf(route.query.get("part"))}
+            onPart={(part) => replaceQuery((query) => query.set("part", part))}
+            onBack={() => go(pathForSection("story"))}
+          />
         ) : !address || !isRetiredSection(address) ? (
           <NotFoundView role="gm" />
         ) : null}
