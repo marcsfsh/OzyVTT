@@ -26,6 +26,8 @@ import { selectToken, useSelectedToken } from "../scene/selectedToken";
 import { useMapView, useSwitchMoments } from "../table/phoneSwitch";
 import { NotesTab } from "../table/NotesTab";
 import { useWaitingList } from "../settings/preferences";
+import { useUnreadCount } from "../table/unreadTabs";
+import { useCombatLog } from "./CombatLog";
 import { rollsLine, StartFight } from "./StartFight";
 
 /** A monster defeated in the last fight on this scene stays out of the next one unless the GM adds it back. */
@@ -725,6 +727,16 @@ export function GmEncounterPanel({
     fallback,
     `${fighting}|${phone}`
   );
+  // Log carries a count of the lines that arrived since this device last had it open (C3 spec 2.3).
+  const logLines = useCombatLog();
+  const unreadLog = useUnreadCount(
+    "log",
+    tab === "log",
+    logLines.map((entry) => entry.id)
+  );
+  const shownTabs = tabs.map((entry) =>
+    entry.id === "log" && unreadLog > 0 ? { ...entry, label: <UnreadLabel word="Log" count={unreadLog} /> } : entry
+  );
   // The session outlives the roll while its result shows, and the result is read on the Encounter view.
   useSwitchMoments({
     enabled: mapView !== null,
@@ -737,7 +749,7 @@ export function GmEncounterPanel({
     <>
       <TablePanel
         label={fighting ? `The encounter · round ${state.combat.round}` : "The table"}
-        tabs={tabs}
+        tabs={shownTabs}
         active={tab}
         onActive={setTab}
         phone={phone}
@@ -769,6 +781,19 @@ export function GmEncounterPanel({
         ) : null;
       })()}
       {confirmDialog}
+    </>
+  );
+}
+
+/** A tab's word with what arrived since it was last opened, in quiet VT323 after it. */
+function UnreadLabel({ word, count }: Readonly<{ word: string; count: number }>) {
+  return (
+    <>
+      {word}
+      <span className="table-tab-unread" aria-hidden="true">
+        {count}
+      </span>
+      <span className="nh-sr-only">, {count} new</span>
     </>
   );
 }

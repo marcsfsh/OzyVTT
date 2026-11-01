@@ -20,6 +20,13 @@ import { TablePanel } from "./TablePanel";
 import { TableDock } from "./TableDock";
 import { PhoneSwitch } from "./phoneSwitch";
 import { setWaitingList } from "../settings/preferences";
+import { socket } from "../socket";
+import "../encounter/CombatLog";
+
+/** The log's own listener, taken as its module registered it, so a test can deliver lines as the server would. */
+const pushLogLine = vi.mocked(socket.on).mock.calls.find(([event]) => event === "log:entry")?.[1] as unknown as (
+  entry: unknown
+) => void;
 
 // The panel beside the map is one tablist per role and moment: its tabs are real tabs tied to their panels, the
 // chosen one is remembered per device, and the footer holds the view's one primary.
@@ -191,6 +198,39 @@ describe("the GM's panel", () => {
     ]);
     expect(screen.getByRole("tab", { name: /^Encounter/, selected: true })).toBeTruthy();
     view.unmount();
+  });
+
+  it("counts the log lines that arrived since Log was last opened, and drops the count when it opens", async () => {
+    const user = userEvent.setup();
+    const view = () =>
+      render(
+        <ToastProvider>
+          <EncounterPanel role="gm" state={gmView(true)} selectedMap={null} slots={slots} />
+        </ToastProvider>
+      );
+    const first = view();
+    const push = pushLogLine;
+    const line = (id: number) =>
+      act(() => push({ id, at: "", kind: "chat", text: `Line ${id}`, gmOnly: false, revision: 1 }));
+    line(9001);
+    line(9002);
+    line(9003);
+    line(9004);
+    const list = () => screen.getByRole("tablist", { name: "The encounter · round 2" });
+    // The first line set the mark, as a first visit counts nothing already there; three more arrived after it.
+    expect(within(list()).getByRole("tab", { name: "Log, 3 new" })).toBeTruthy();
+    // The count survives a reload on the same device.
+    first.unmount();
+    const second = view();
+    expect(within(list()).getByRole("tab", { name: "Log, 3 new" })).toBeTruthy();
+    await user.click(within(list()).getByRole("tab", { name: "Log, 3 new" }));
+    expect(within(list()).getByRole("tab", { name: "Log" })).toBeTruthy();
+    await user.click(within(list()).getByRole("tab", { name: /^Encounter/ }));
+    line(9005);
+    expect(within(list()).getByRole("tab", { name: "Log, 1 new" })).toBeTruthy();
+    // Party carries no count.
+    expect(within(list()).getByRole("tab", { name: "Party" })).toBeTruthy();
+    second.unmount();
   });
 
   it("on a phone: the Switch, Map first, then Encounter with the acting creature and the order, Log and Party", () => {

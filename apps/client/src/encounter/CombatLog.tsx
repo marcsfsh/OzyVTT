@@ -53,7 +53,8 @@ socket.on("log:removed", drop);
 socket.on("connect", load); // re-read after a reconnect or a role change (GM login reconnects the socket)
 if (socket.connected) load();
 
-function useCombatLog() {
+/** The log's lines as this reader holds them, oldest first; the GM's Log tab counts the ones it has not seen. */
+export function useCombatLog() {
   return useSyncExternalStore(
     subscribe,
     () => entries,

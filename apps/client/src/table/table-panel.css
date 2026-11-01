@@ -303,3 +303,9 @@
 .table-tab-waiting > svg {
   color: var(--caution);
 }
+/* What arrived on a tab since it was last opened: a quiet count after its word (C3 spec 2.3). */
+.table-tab-unread {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font: 400 15px / 1 var(--font-numeric);
+}
