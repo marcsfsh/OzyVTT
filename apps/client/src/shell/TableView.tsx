@@ -212,7 +212,11 @@ export function TableView(props: TableViewProps) {
             <div className="table-sheet-foot">
               {/* The fights the GM shared. Renders nothing when nothing is shared. */}
               {!state.combat.active && (
-                <ReplayShelf token={token} onOpen={(archiveId) => navigate(`/replays/${archiveId}`)} />
+                <ReplayShelf
+                  token={token}
+                  onOpen={(archiveId) => navigate(`/replays/${archiveId}`)}
+                  onAll={() => navigate("/replays")}
+                />
               )}
             </div>
           )
