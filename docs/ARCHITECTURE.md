@@ -18,7 +18,7 @@ GM browser ─────┤                    ├─▶ validate ─┼─▶
                 └─ HTTP /api/v1 ─────┘   authorize ├─▶ viewer presentation ├─ data/vtt.sqlite
                                                    ├─▶ sound board         │
                                                    └─▶ combat log ─────────┘
-Table viewer ◀── SSE + cookie, player-safe presentation projection only (and what the sound board plays)
+Table screen ◀── SSE + cookie, player-safe presentation projection only (and what the sound board plays)
 ```
 
 The stores are independent. Each has its own revision counter and its own change notification,
@@ -1146,11 +1146,14 @@ over the composer (`table/LogComposer.tsx`): a quick die sends one `1dN` and the
 any other text is a chat line through `chat:send`, to everyone or whispered as Who hears it says, and an unknown
 `/` word is refused before anything is sent. Dice options opens the full `DicePanel`, the GM's calls for a roll
 included. The table screen's row in the menu
-(`table/TvControl.tsx`) pauses or resumes the screen and opens its preview (`viewer/preview-open.ts`). The screen
-itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`) draws a strip of the turn order with the VCR counter,
-the map fitted whole unless the screen chose Follow GM view or zoomed, and a column with who acts now and the
-latest public roll; its pictures read only the feed's placed tokens and the actor id. The GM's preview loads the
-same page, so the two lay out alike. Nothing floats
+(`table/TvControl.tsx`) pauses the screen, puts the live encounter back on it and docks its preview
+(`viewer/preview-open.ts`). The screen itself (`viewer/ViewerApp.tsx`, with `viewer/ScreenParts.tsx`, ADR-0056) draws
+the turn ladder (the round on the VCR counter, a row a turn with the acting row as its card, and the latest public roll
+at its foot) beside the map fitted whole unless the screen chose Follow GM view or zoomed; pairing, connecting, Paused
+and Waiting for a map are `viewer/HorizonScreen.tsx`. Its pictures read only the feed's placed tokens and the actor id.
+The GM's Table screen page draws each screen's picture with `viewer/ScreenPicture.tsx` from the GM's own presentation
+read, so the projection is unchanged. The preview (`viewer/ViewerPreviewPanel.tsx`) docks the real page in a corner as
+a picture in picture on every GM page but the Table screen page, so the two lay out alike. Nothing floats
 over the map but tokens and marks; notices land in the status line through `ToastOutlet`. The map and the panel share small module stores: the targeting session (`encounter/targeting.ts`),
 the live map's grid and size (`scene/tableGeometry.ts`) and the GM's selected token (`scene/selectedToken.ts`).
 

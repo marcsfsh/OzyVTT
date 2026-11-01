@@ -50,7 +50,7 @@ describe("the frame's menu", () => {
     expect(menu().getByText("Game master")).toBeInTheDocument();
     expect(menu().getByRole("group", { name: "Who is here, 1 of 2", hidden: true })).toBeInTheDocument();
     expect(await menu().findByRole("group", { name: "Table screen, off", hidden: true })).toBeInTheDocument();
-    expect(labels()).toEqual(["Preview the table screen here", "Table screen settings", "Settings", "Sign out"]);
+    expect(labels()).toEqual(["Preview it here", "Table screen settings", "Settings", "Sign out"]);
   });
 
   it("asks before signing the GM out", async () => {

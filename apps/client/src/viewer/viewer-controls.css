@@ -107,17 +107,6 @@
   color: var(--cyan-hi);
   font-family: var(--font-mono);
 }
-.viewer-control-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.65rem;
-}
-/* The labels name a map, so they wrap inside their button and never run into the next one. */
-.viewer-control-actions .nh-btn {
-  white-space: normal;
-  text-wrap: balance;
-  text-align: center;
-}
 /* Pairing a screen: its code, its name and the button, in one block under the address. */
 .viewer-pair-form {
   display: flex;
@@ -237,9 +226,6 @@
   .viewer-controls-status {
     justify-content: start;
     margin-top: var(--space-2);
-  }
-  .viewer-control-actions {
-    grid-template-columns: 1fr;
   }
   .viewer-address {
     grid-template-columns: 1fr;

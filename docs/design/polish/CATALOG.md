@@ -412,7 +412,7 @@ search's dialog (G9), the catalog picker (G11) and the other kinds' editors (G7)
 
 ## H. The table screen
 
-Job: what the room sees on the TV, and the GM's controls for it. Status: Designed (`H-table-screen/SPEC.md`,
+Job: what the room sees on the TV, and the GM's controls for it. Status: Built (`H-table-screen/SPEC.md`,
 `H-table-screen/PLAN.md`, ADR-0056): the turn ladder on the TV, the horizon line for pairing and waiting, the GM's
 screens as cards that open as remotes, and the preview as a picture in picture. The sound page, the scenes' See as:
 screen and Settings' table screen row Designed with E3.2 (`E3-sound-screen/SPEC.md`, ADR-0065).

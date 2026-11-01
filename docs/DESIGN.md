@@ -242,13 +242,21 @@ Before an encounter, the same frame changes in three places:
 The table screen (the shared TV) is for reading across a room. Gameplay has no controls; pairing, fullscreen and
 optional local map framing remain available as device utilities.
 
-- A top band: the wordmark, the VCR counter at 52px, and the turn order with 64px portraits, the acting tile in the sun
-  frame and NEXT beside the next visible portrait. When the server says `hiddenTurn`, show GM turn without a hidden
-  actor's identity or portrait; the next visible tile is only the next visible combatant, not a promise about hidden turns.
-- The map fitted (never cropped) on the left, and a 540px column on the right: an Acting now card (a 112px portrait in
-  the sun frame, ACTING NOW, the name in chrome, who is next) and the latest roll at TV size. Nothing covers the map.
-  The existing TV feed has no rolls. In phase 7 reserve this card with "Roll display is not available yet.";
-  phase 8's viewer-roll ADR and implementation complete it. Never fetch a GM or player feed from the TV.
+- The ladder at the left (400px of 1280) and the map in the rest, fitted and never cropped (ADR-0056). The ladder's head
+  is the wordmark and the round on the VCR counter with the horizon line under them; then one row a turn in initiative
+  order: the initiative in VT323, the portrait and the name in full. The acting row grows into a card (a caution edge
+  and wash, Acting now in caution capitals, the name in chrome kept whole), the next row carries NEXT with a cyan edge,
+  and a hidden creature's turn is a GM turn row with a dashed violet portrait and no identity. Before the first turn
+  no row is lit and the head says "Waiting for the first turn". A long order scrolls with the turn so the acting row and
+  the next stay in view; names never shrink to fit.
+- The ladder's foot is the latest public roll: who and what, the total in VT323 with a NAT tag, the dice in quiet VT323,
+  or "No roll to show yet." Nothing covers the map. With a map and no encounter the ladder names the map under "No
+  encounter running". The ladder's edge drags to set its width for that screen.
+- Pairing, connecting, Paused and Waiting for a map are horizon screens: the sky, the wordmark and one line.
+- Every paired screen shows the same thing. The GM's Table screen page (from the menu) is a bar of what is on the
+  screen and a card per screen with its picture; a screen's card opens it as a remote with focus, ping and measure,
+  which reach every screen. Preview it here docks the screen as a picture in picture (420px, 250px on a phone above the
+  tabs) that stays on every page until closed, drags to another corner, and steps aside on the Table screen page.
 - It shows only what the table screen's projection holds: no hidden combatants, no enemy hit points, the players' fog.
 - Names 20 to 22px, numbers in VT323 from 28 to 80px.
 
@@ -259,7 +267,7 @@ Unchanged rules:
 - One primary scroller per pane. The canvas region fills the leftover space with `flex: 1; min-height: 0`.
 - Targets: a 1080p-class laptop and a 390x844-class phone in portrait. The width floor is 320px.
 - Breakpoints come from one ladder: `max-width` 760 / 650 / 560, and `min-width` 850 / 980 / 1280 where a layout earns
-  another column. The table viewer reflows on aspect ratio, because a TV is always landscape.
+  another column. The table screen reflows on orientation: landscape is the ladder beside the map, upright stacks the ladder over it.
 - Spacing uses the 4px `--space-*` ladder.
 
 ## Pictures and default avatars

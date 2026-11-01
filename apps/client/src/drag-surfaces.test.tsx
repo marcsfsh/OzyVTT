@@ -153,7 +153,6 @@ const SURFACES: ReadonlyArray<Readonly<{ selector: string; ui: () => ReactElemen
     ui: () => <ScreenLadder presentation={presentation} onResize={() => {}} />
   },
   { selector: ".viewer-preview-titlebar", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
-  { selector: ".viewer-preview-resize", ui: () => <ViewerPreviewPanel gmToken="gm" onClose={() => {}} /> },
   { selector: ".cs-float-grip", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   { selector: ".cs-float-resize", ui: () => <FloatingSheet name="Lyra">Sheet</FloatingSheet> },
   {

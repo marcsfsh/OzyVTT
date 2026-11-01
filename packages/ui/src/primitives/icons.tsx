@@ -292,6 +292,16 @@ export function IconDownload({ className }: Readonly<{ className?: string }>) {
   );
 }
 
+/** Pop out: a window with an arrow leaving its corner, for opening something in its own window. */
+export function IconPopOut({ className }: Readonly<{ className?: string }>) {
+  return (
+    <Glyph className={className}>
+      <path d="M3.6 5.2h8v2.8H6.4v9.6H16v-5.2h2.8v8H3.6z" />
+      <path d="M13.2 3.6h7.2v7.2l-2.6-2.6-4.6 4.6-2-2 4.6-4.6z" />
+    </Glyph>
+  );
+}
+
 /* ---- Map-tool glyphs: one drawn shape per tool, all `currentColor`, so an active tool is the same glyph in
    the accent colour. ---- */
 

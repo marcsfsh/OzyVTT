@@ -253,7 +253,10 @@ export function GmShell({
       {/* The Compendium owns its frame: a section bar over its tables, and a record at its own address. */}
       {tab("compendium") && <CompendiumShell token={token} party={party} game={state} />}
 
-      {showViewerPreview && <ViewerPreviewPanel gmToken={token} onClose={() => setViewerPreviewOpen(false)} />}
+      {/* The table screen page has its own picture of the screen, so the docked preview steps aside there. */}
+      {showViewerPreview && route.segments[0] !== "viewer-controls" && (
+        <ViewerPreviewPanel gmToken={token} onClose={() => setViewerPreviewOpen(false)} />
+      )}
 
       {/* Settings owns its addresses: a section at `/settings/<section>` and an operation of the API reference at
         `/settings/api/<operation id>`. Opening the reference in a new tab asks for the GM password once, since the GM

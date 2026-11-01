@@ -1,5 +1,5 @@
-/* The GM's floating preview of the table screen: a title bar over the screen drawn at a TV's size and scaled to fit,
-   so the stage keeps the screen's 16:9 proportions at any width. */
+/* The GM's preview of the table screen docked as a picture in picture (table screen spec 4): a bar over the screen
+   drawn at a TV's size and scaled to the dock's width, so the picture keeps the screen's 16:9. */
 .viewer-preview-panel {
   position: fixed;
   z-index: 50;
@@ -11,64 +11,52 @@
   background: var(--surface-1);
   box-shadow: var(--shadow-2);
 }
+/* Docked 20px from its corner (10px on a phone, above the bottom tabs). */
+.viewer-preview-panel.is-bottom-right {
+  right: 20px;
+  bottom: 20px;
+}
+.viewer-preview-panel.is-bottom-left {
+  left: 20px;
+  bottom: 20px;
+}
+.viewer-preview-panel.is-top-right {
+  top: 20px;
+  right: 20px;
+}
+.viewer-preview-panel.is-top-left {
+  top: 20px;
+  left: 20px;
+}
+/* The bar: 38px with the horizon line on top. */
 .viewer-preview-titlebar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: var(--tap-min);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  gap: var(--space-2);
+  min-height: 38px;
+  padding: 3px var(--space-1) 0 var(--space-3);
   border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
-  cursor: move;
+  background:
+    var(--grad-horizon) top / 100% 3px no-repeat,
+    var(--surface-2);
+  cursor: grab;
   touch-action: none;
 }
 .viewer-preview-titlebar strong {
-  font-size: var(--fs-sm);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-.viewer-preview-hint {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
-.viewer-preview-action {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
-  color: var(--text);
-  font: 600 var(--fs-xs) / 1.6 var(--font-label);
-  cursor: pointer;
-}
-.viewer-preview-action:hover,
-.viewer-preview-action:active {
-  border-color: color-mix(in srgb, var(--cyan) 55%, transparent);
-}
-.viewer-preview-close {
-  flex: none;
-  width: 2rem;
-  height: 2rem;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  background: transparent;
+.viewer-preview-state {
   color: var(--text-dim);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
+  font: 400 var(--fs-sm) / 1 var(--font-numeric);
 }
-.viewer-preview-close:hover,
-.viewer-preview-close:active {
-  color: var(--danger-text);
+.viewer-preview-grow {
+  flex: 1;
 }
 /* The stage: the screen's proportions, with the iframe drawn at the TV's size from its top left and scaled down. */
 .viewer-preview-body {
   position: relative;
-  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--void);
 }
@@ -87,6 +75,16 @@
   z-index: 1;
   cursor: inherit;
 }
+/* On a phone the picture is a button to the table screen page. */
+.viewer-preview-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
 .viewer-preview-empty {
   position: absolute;
   inset: 0;
@@ -97,14 +95,19 @@
   color: var(--text-muted);
   text-align: center;
 }
-.viewer-preview-resize {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
-  width: 1.2rem;
-  height: 1.2rem;
-  cursor: nwse-resize;
-  touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, var(--line-strong) 50%);
+
+/* A phone: 10px from the corner, the bottom ones above the tabs. */
+@media (max-width: 760px) {
+  .viewer-preview-panel:is(.is-bottom-right, .is-bottom-left) {
+    bottom: calc(var(--bottom-tabs-h, 0px) + 10px);
+  }
+  .viewer-preview-panel:is(.is-top-right, .is-top-left) {
+    top: 10px;
+  }
+  .viewer-preview-panel:is(.is-bottom-right, .is-top-right) {
+    right: 10px;
+  }
+  .viewer-preview-panel:is(.is-bottom-left, .is-top-left) {
+    left: 10px;
+  }
 }

@@ -167,6 +167,7 @@ export {
   IconMusic,
   IconArrow,
   IconDownload,
+  IconPopOut,
   // Map tools and content marks.
   IconSelect,
   IconPing,

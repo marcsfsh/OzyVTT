@@ -72,7 +72,7 @@ export function useTableScreen(gmToken: string, state: GmView) {
         ]
       : []),
     {
-      label: previewOpen ? "Hide the preview" : "Preview the table screen here",
+      label: previewOpen ? "Hide the preview" : "Preview it here",
       disabled: false,
       onSelect: () => setViewerPreviewOpen(!previewOpen)
     },

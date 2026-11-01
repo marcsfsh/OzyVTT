@@ -14,8 +14,7 @@
   text-transform: uppercase;
 }
 /* The idle screens hold no map, so they show the app's ground. */
-.viewer-pairing,
-.viewer-waiting {
+.viewer-pairing {
   position: relative;
   width: 100%;
   height: 100%;
@@ -28,21 +27,6 @@
   text-align: center;
   overflow: hidden;
   background: var(--sky);
-}
-/* The words stay above the page's own layers. */
-.viewer-pairing-card,
-.viewer-waiting > :is(h1, p, .viewer-eyebrow) {
-  position: relative;
-  z-index: 1;
-}
-.viewer-pairing-card {
-  container-type: inline-size;
-  width: min(100%, 44rem);
-  padding: clamp(1.5rem, 4vw, 3rem);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
-  background: var(--surface-1);
-  text-align: center;
 }
 /* The code is read across a room and typed on another device: as large as the card allows, on one line (seven
    display-face glyphs are about 5.5em wide). */
@@ -59,15 +43,13 @@
 .viewer-pairing .viewer-pairing-note {
   font-size: clamp(0.9rem, 1.2vw, 1.15rem);
 }
-.viewer-pairing h1,
-.viewer-waiting h1 {
+.viewer-pairing h1 {
   margin: var(--space-2) 0;
   font: var(--fw-display) clamp(2.5rem, 7vw, 5.5rem)/1 var(--font-display);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.viewer-pairing p,
-.viewer-waiting p {
+.viewer-pairing p {
   color: var(--text-dim);
   line-height: 1.5;
   font-size: clamp(1rem, 1.5vw, 1.45rem);
@@ -284,10 +266,6 @@
   left: 50%;
   transform: translateX(-50%);
   color: var(--magenta-text);
-}
-/* No map yet: the waiting words take the map's cell, beside the ladder. */
-.viewer-shell > .viewer-waiting {
-  grid-area: var(--viewer-map-cell);
 }
 /* Fullscreen and the connection sit over the map's top corners, in its grid cell, clear of the strip and the column. */
 .viewer-fullscreen {
