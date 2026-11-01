@@ -167,7 +167,11 @@ function Spine<R extends StoryRecord>({
               ) : (
                 <span className="story-spinetitle is-plain">Not in a session</span>
               )}
-              {session?.planned && <span className="story-plannedchip">Planned</span>}
+              {session && (
+                <span className={`story-sessiontag${session.planned ? " is-planned" : ""}`}>
+                  {session.planned ? "Planned" : "Played"}
+                </span>
+              )}
               {audience === "gm" && session?.hidden && !session.planned && (
                 <span className="story-hiddenword">
                   <IconEyeOff /> Recap hidden

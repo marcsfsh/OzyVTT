@@ -167,9 +167,34 @@ const S5 = session("s5", 5, { status: "played", recapBody: "The party copied the
 const S6 = session("s6", 6);
 const S7 = session("s7", 7, { realDate: "2026-10-31", prep: [] });
 
+describe("The Sessions tab", () => {
+  it("leads with the next session, then the played ones as cards with their recap's word and who came", async () => {
+    const user = userEvent.setup();
+    const played = session("s5", 5, {
+      status: "played",
+      recapBody: "The party copied the ledger.\n\nThen they ran.",
+      realDate: "2026-10-10",
+      revealedToPlayers: true,
+      attendees: ["Lyra Emberwise", "Borin Stoneguard"]
+    });
+    renderGmStory(GmSessionsSection, "/codex/sessions", { sessions: [played, S7], pages: PAGES });
+    const lead = within(await screen.findByRole("region", { name: "Next: Session 7" }));
+    expect(lead.getByRole("button", { name: "Open the prep" })).toBeInTheDocument();
+    await user.click(lead.getByRole("button", { name: "Start session 7" }));
+    await waitFor(() => expect(api.activate).toHaveBeenCalledWith("gm", "s7"));
+
+    const card = within(screen.getByRole("article", { name: "Session 5" }));
+    expect(card.getByText("Recap shared")).toBeInTheDocument();
+    expect(card.getByText("The party copied the ledger.")).toBeInTheDocument();
+    expect(card.getByText("Lyra Emberwise, Borin Stoneguard")).toBeInTheDocument();
+    await user.click(card.getByRole("button", { name: "Session 5" }));
+    expect(window.location.pathname).toBe("/codex/sessions/s5");
+  });
+});
+
 describe("The session page", () => {
-  it("opens on the active session, with its date, its players and the template it was made from", async () => {
-    renderGmStory(GmSessionsSection, "/codex/sessions", {
+  it("opens a session's page with its date, its players and the template it was made from", async () => {
+    renderGmStory(GmSessionsSection, "/codex/sessions/s6", {
       sessions: [S5, S6, S7],
       activeSessionId: "s6",
       pages: PAGES
@@ -384,8 +409,8 @@ describe("A player's sessions", () => {
     tags: []
   };
 
-  it("opens the newest recap with what was filed under it, the quest named by the player's own list", async () => {
-    renderPlayerStory(PlayerSessionsSection, "/codex/sessions", {
+  it("opens a recap with what was filed under it, the quest named by the player's own list", async () => {
+    renderPlayerStory(PlayerSessionsSection, "/codex/sessions/s5", {
       sessions: [P4, P5],
       records: [
         playerRecord({ id: "r1", sessionId: "s5", text: "The Black Gull never docked." }),

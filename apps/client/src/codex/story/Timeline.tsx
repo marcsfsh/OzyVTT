@@ -247,49 +247,80 @@ function Year({
           </Button>
         )}
       </div>
-      <ol className="story-months" style={{ "--months": months.length } as React.CSSProperties}>
-        {months.map((month) => {
-          const isToday = today?.month === month.month;
-          const clocks = month.records.filter((record) => record.kind === "deadline");
-          const events = month.records.filter((record) => record.kind === "event");
-          return (
-            <li key={month.month}>
-              <button
-                type="button"
-                className={`story-month-cell${isToday ? " is-today" : ""}`}
-                onClick={() => onShow(shownYear, month.month, "month")}
-              >
-                <span className="story-month-name">{month.name}</span>
-                {month.sessions && <span className="story-month-sessions">{month.sessions}</span>}
-                {isToday && today && (
-                  <span className="story-month-today">
-                    {audience === "gm" ? "Players" : "Today"}: {today.day}
-                  </span>
-                )}
-                {yours?.month === month.month && audience === "gm" && (
-                  <span className="story-month-yours">Yours: {yours.day}</span>
-                )}
-                {clocks.map((record) => (
-                  <span
-                    key={record.id}
-                    className={`story-month-clock${record.revealedToPlayers === false ? " is-hidden" : ""}`}
-                  >
-                    {instantToDate(calendar, record.calendarInstant!).day} · {summaryOf(record.title ?? record.text)}
-                  </span>
-                ))}
-                {events.map((record) => (
-                  <span
-                    key={record.id}
-                    className={`story-month-event${record.revealedToPlayers === false ? " is-hidden" : ""}`}
-                  >
-                    {record.title ?? summaryOf(record.text)}
-                  </span>
-                ))}
-              </button>
-            </li>
-          );
-        })}
-      </ol>
+      {!phone && !compact ? (
+        <HorizonLine
+          label={`${formatWorldYear(calendar, shownYear)}, the months`}
+          points={months
+            .filter((month) => month.records.length > 0 || month.sessions || today?.month === month.month)
+            .map((month): LinePoint => {
+              const isToday = today?.month === month.month;
+              const named = month.records.filter((record) => record.kind === "event" || record.kind === "deadline");
+              const text = [month.sessions, ...named.map((record) => record.title ?? summaryOf(record.text))]
+                .filter(Boolean)
+                .join(" · ");
+              const ahead =
+                players !== null &&
+                (shownYear > instantToDate(calendar, players).year || (today !== null && month.month > today.month));
+              return {
+                key: String(month.month),
+                label: month.name,
+                card: {
+                  title: isToday
+                    ? `${month.name} · ${audience === "gm" ? "Players" : "Today"}: ${today!.day}`
+                    : month.name,
+                  text: text || "Nothing dated"
+                },
+                state: isToday ? "today" : ahead ? "future" : "past",
+                hidden: named.length > 0 && named.every((record) => record.revealedToPlayers === false),
+                onOpen: () => onShow(shownYear, month.month, "month")
+              };
+            })}
+        />
+      ) : (
+        <ol className="story-months" style={{ "--months": months.length } as React.CSSProperties}>
+          {months.map((month) => {
+            const isToday = today?.month === month.month;
+            const clocks = month.records.filter((record) => record.kind === "deadline");
+            const events = month.records.filter((record) => record.kind === "event");
+            return (
+              <li key={month.month}>
+                <button
+                  type="button"
+                  className={`story-month-cell${isToday ? " is-today" : ""}`}
+                  onClick={() => onShow(shownYear, month.month, "month")}
+                >
+                  <span className="story-month-name">{month.name}</span>
+                  {month.sessions && <span className="story-month-sessions">{month.sessions}</span>}
+                  {isToday && today && (
+                    <span className="story-month-today">
+                      {audience === "gm" ? "Players" : "Today"}: {today.day}
+                    </span>
+                  )}
+                  {yours?.month === month.month && audience === "gm" && (
+                    <span className="story-month-yours">Yours: {yours.day}</span>
+                  )}
+                  {clocks.map((record) => (
+                    <span
+                      key={record.id}
+                      className={`story-month-clock${record.revealedToPlayers === false ? " is-hidden" : ""}`}
+                    >
+                      {instantToDate(calendar, record.calendarInstant!).day} · {summaryOf(record.title ?? record.text)}
+                    </span>
+                  ))}
+                  {events.map((record) => (
+                    <span
+                      key={record.id}
+                      className={`story-month-event${record.revealedToPlayers === false ? " is-hidden" : ""}`}
+                    >
+                      {record.title ?? summaryOf(record.text)}
+                    </span>
+                  ))}
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
@@ -387,6 +418,58 @@ function Month({
     );
   };
 
+  const recordPoint = (record: StoryRecord, instant: number): LinePoint => {
+    const hidden = audience === "gm" && record.revealedToPlayers === false;
+    const name =
+      record.sessionNumber !== null && laneOf(record.kind) === "party"
+        ? `Session ${record.sessionNumber}`
+        : (record.title ?? kindLine(record));
+    const date = dayWithWeekday(calendar, instantToDate(calendar, instant));
+    return {
+      key: `${record.kind}-${record.id}`,
+      label: summaryOf(name),
+      card: { title: `${name} · ${date}`, text: lineOf(record) },
+      state: players !== null && instant > players ? "future" : "past",
+      hidden,
+      selected: record.id === selectedId,
+      onOpen: () => onSelect(record)
+    };
+  };
+  const points: LinePoint[] = rows.flatMap((row): LinePoint[] =>
+    row.kind === "day"
+      ? row.day.records.map((record) => recordPoint(record, row.instant))
+      : row.kind === "line"
+        ? [{ key: `line-${row.who}`, label: row.label, card: null, state: "today" }]
+        : [
+            {
+              key: "next",
+              label: nextSession!.title,
+              card: { title: `${nextSession!.title} · Planned`, text: nextSession!.line },
+              state: "future"
+            }
+          ]
+  );
+
+  if (!phone)
+    return (
+      <div className="story-ages-wrap">
+        <div className="story-month-main scroll-y">
+          <div className="story-year-head">
+            <Button variant="ghost" size="sm" aria-label="Previous month" onClick={() => step(-1)}>
+              <IconChevron className="story-chevron-left" />
+            </Button>
+            <h3 className="story-eyebrow">{title}</h3>
+            <Button variant="ghost" size="sm" aria-label="Next month" onClick={() => step(1)}>
+              <IconChevron className="story-chevron-right" />
+            </Button>
+          </div>
+          {rows.length === 0 && <p className="story-hint">Nothing is dated in this month.</p>}
+          <HorizonLine points={points} label={title} />
+        </div>
+        {aside}
+      </div>
+    );
+
   return (
     <div className="story-ages-wrap">
       {/* A phone scrolls the whole Story as one column, so the month doesn't scroll on its own there. */}
@@ -452,5 +535,66 @@ function Month({
       </div>
       {aside}
     </div>
+  );
+}
+
+// ----- The line across the top -----
+
+type LinePoint = Readonly<{
+  key: string;
+  /** Over the mark. */
+  label: string;
+  /** The card under it: its date and one line. A point with no card (today) is only its mark. */
+  card: Readonly<{ title: string; text: string }> | null;
+  state: "past" | "today" | "future";
+  hidden?: boolean;
+  selected?: boolean;
+  onOpen?: () => void;
+}>;
+
+/**
+ * A zoom drawn on one horizontal line in the horizon gradient (Codex frame 2.4): a mark for each session, today's date
+ * and each dated event, the ones ahead in amber, and a card under each point with its date and one line, four to a
+ * row, the ones ahead with a dashed edge.
+ */
+function HorizonLine({ points, label }: Readonly<{ points: readonly LinePoint[]; label: string }>) {
+  if (points.length === 0) return null;
+  const cards = points.filter((point) => point.card);
+  return (
+    <section className="story-hline">
+      <ol className="story-hline-marks" style={{ "--points": points.length } as React.CSSProperties} aria-label={label}>
+        {points.map((point) => (
+          <li key={point.key} className={`story-hline-point is-${point.state}${point.hidden ? " is-hidden" : ""}`}>
+            <span className="story-hline-label">{point.label}</span>
+            <span className="story-hline-mark" />
+          </li>
+        ))}
+      </ol>
+      <ul className="story-hline-cards" aria-label={`${label}, what happened`}>
+        {cards.map((point) => {
+          const body = (
+            <>
+              <span className="story-hline-cardtitle">
+                {point.hidden && <IconEyeOff />}
+                {point.card!.title}
+              </span>
+              <span className="story-hline-cardtext">{point.card!.text}</span>
+            </>
+          );
+          const className = `story-hline-card is-${point.state}${point.hidden ? " is-hidden" : ""}${point.selected ? " is-selected" : ""}`;
+          return (
+            <li key={point.key}>
+              {point.onOpen ? (
+                <button type="button" className={className} onClick={point.onOpen}>
+                  {body}
+                </button>
+              ) : (
+                <div className={className}>{body}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

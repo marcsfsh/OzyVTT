@@ -1,12 +1,12 @@
 import { useMemo, type ReactNode } from "react";
-import { Input, FilterChips, FilterFlyout } from "@vtt/ui";
+import { Button, IconEye, IconEyeOff, Input, FilterChips, FilterFlyout, Tabs } from "@vtt/ui";
 import type { CodexCalendar, PlayerCodexChronicleRecord, PlayerCodexSession } from "@vtt/domain";
 import { CHRONICLE_KIND_META } from "../chronicle";
 import { CodexIcon } from "../icons";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { sessionTitle } from "../sessions";
 import { useCodexShell } from "../shell/context";
-import { realDateLabel, recordDay, type StoryRecord } from "./model";
+import { realDateLabel, recordDay, summaryOf, type StoryRecord } from "./model";
 
 /** A session as the list shows it, for both audiences. */
 export type ListedSession = Readonly<{
@@ -282,38 +282,42 @@ export function RecapCards({
   );
 }
 
-/** Story's own bar on a laptop: Chronicle, Timeline and Sessions, then whatever the view adds. */
+export type StoryView = "chronicle" | "timeline" | "sessions" | "downtime";
+
+/**
+ * Story's own bar on a laptop (Codex frame 2.4): its tabs as words with the horizon ink (Chronicle, Timeline,
+ * Sessions, and Downtime for the GM, which is the chronicle's downtime), then whatever the view adds at the right.
+ */
 export function StoryBar({
   view,
   onView,
+  downtime = false,
   children,
   end
 }: Readonly<{
-  view: "chronicle" | "timeline" | "sessions";
-  onView: (view: "chronicle" | "timeline" | "sessions") => void;
+  view: StoryView;
+  onView: (view: StoryView) => void;
+  /** The GM's Downtime tab. */
+  downtime?: boolean;
   children?: ReactNode;
   end?: ReactNode;
 }>) {
-  const views = [
+  const views: ReadonlyArray<Readonly<{ id: StoryView; label: string }>> = [
     { id: "chronicle", label: "Chronicle" },
     { id: "timeline", label: "Timeline" },
-    { id: "sessions", label: "Sessions" }
-  ] as const;
+    { id: "sessions", label: "Sessions" },
+    ...(downtime ? [{ id: "downtime" as const, label: "Downtime" }] : [])
+  ];
   return (
     <div className="story-bar">
-      <nav className="nh-segmented" aria-label="Story views">
-        {views.map((each) => (
-          <button
-            key={each.id}
-            type="button"
-            className="nh-segmented-option tap-target interactive"
-            aria-pressed={each.id === view}
-            aria-current={each.id === view ? "page" : undefined}
-            onClick={() => onView(each.id)}
-          >
-            <span className="nh-segmented-label">{each.label}</span>
-          </button>
-        ))}
+      <nav className="story-tabs-nav" aria-label="Story views">
+        <Tabs
+          className="story-tabs"
+          ariaLabel="Story views"
+          activeId={view}
+          onChange={(id) => onView(id as StoryView)}
+          tabs={views.map((each) => ({ id: each.id, label: each.label }))}
+        />
       </nav>
       {children}
       <span className="story-grow" />
@@ -342,15 +346,118 @@ export function useSessionFilter(): readonly [SessionFilter, (next: SessionFilte
   return [filter, write, any] as const;
 }
 
-/** The session the Sessions view opens on when the address names none: the active one, else the newest. */
-export function defaultSessionId<S extends ListedSession>(
-  sessions: readonly S[],
-  activeId: string | null
-): string | null {
-  if (activeId && sessions.some((session) => session.id === activeId)) return activeId;
-  return filterSessions(sessions, { text: "", statuses: [], from: "", to: "" })[0]?.id ?? null;
-}
-
 export function useSortedSessions<S extends ListedSession>(sessions: readonly S[]): S[] {
   return useMemo(() => filterSessions(sessions, { text: "", statuses: [], from: "", to: "" }), [sessions]);
+}
+
+/** One session as its card shows it. */
+export type SessionCardData = Readonly<{
+  id: string;
+  sessionNumber: number | null;
+  realDate: string | null;
+  recap: string;
+  /** The GM's word for the recap: shared, or hidden; null for a player. */
+  recapShared: boolean | null;
+  /** What was filed under it, each in one line, a hidden one marked for the GM. */
+  entries: ReadonlyArray<Readonly<{ id: string; iconId: string; line: string; hidden: boolean }>>;
+  /** Who came, for the GM. */
+  attendees: readonly string[];
+}>;
+
+/** The session to come, leading the Sessions tab. */
+export type LeadSession = Readonly<{
+  id: string;
+  sessionNumber: number | null;
+  realDate: string | null;
+  prepLine: string;
+}>;
+
+/**
+ * The Sessions tab (Codex frame 2.4): the next session leads as a card with its number, date and prep in one line,
+ * Open the prep and Start session N as the Cup; then the played sessions as cards two to a row, each with its number
+ * and date, whether its recap is shared, the recap's first line, what happened in it and who came.
+ */
+export function SessionCards({
+  lead,
+  sessions,
+  starting = false,
+  onOpen,
+  onStart
+}: Readonly<{
+  lead: LeadSession | null;
+  sessions: readonly SessionCardData[];
+  starting?: boolean;
+  onOpen: (sessionId: string) => void;
+  onStart?: (sessionId: string) => void;
+}>) {
+  return (
+    <div className="story-scards">
+      {lead && (
+        <section className="story-scard-lead" aria-label={`Next: ${sessionTitle(lead)}`}>
+          <div className="story-scard-leadtext">
+            <span className="story-scard-eyebrow">
+              {["Next", realDateLabel(lead.realDate)].filter(Boolean).join(" · ")}
+            </span>
+            <h3 className="story-scard-leadtitle">{sessionTitle(lead)}</h3>
+            {lead.prepLine && <p className="story-scard-line">{lead.prepLine}</p>}
+          </div>
+          <div className="story-scard-actions">
+            <Button size="sm" onClick={() => onOpen(lead.id)}>
+              Open the prep
+            </Button>
+            {onStart && (
+              <Button size="sm" variant="primary" disabled={starting} onClick={() => onStart(lead.id)}>
+                Start {sessionTitle(lead).replace(/^Session/, "session")}
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
+      {sessions.length > 0 && (
+        <ul className="story-scard-grid" aria-label="Played sessions">
+          {sessions.map((session) => (
+            <li key={session.id}>
+              <article className="story-scard" aria-label={sessionTitle(session)}>
+                <div className="story-scard-head">
+                  <button type="button" className="story-scard-title" onClick={() => onOpen(session.id)}>
+                    {sessionTitle(session)}
+                  </button>
+                  {session.realDate && <span className="story-scard-date">{realDateLabel(session.realDate)}</span>}
+                  <span className="story-grow" />
+                  {session.recapShared !== null && (
+                    <span className={`nh-aud ${session.recapShared ? "is-everyone" : "is-hidden"}`}>
+                      {session.recapShared ? (
+                        <IconEye className="nh-aud-icon" />
+                      ) : (
+                        <IconEyeOff className="nh-aud-icon" />
+                      )}
+                      {session.recapShared ? "Recap shared" : "Recap hidden"}
+                    </span>
+                  )}
+                </div>
+                {session.recap.trim() && <p className="story-scard-line">{summaryOf(session.recap)}</p>}
+                {session.entries.length > 0 && (
+                  <ul className="story-scard-entries">
+                    {session.entries.map((entry) => (
+                      <li key={entry.id}>
+                        <CodexIcon iconId={entry.iconId} className="story-item-icon" />
+                        <span>{entry.line}</span>
+                        {entry.hidden && (
+                          <span className="nh-aud is-hidden">
+                            <IconEyeOff className="nh-aud-icon" />
+                            Hidden
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {session.attendees.length > 0 && <p className="story-scard-who">{session.attendees.join(", ")}</p>}
+              </article>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }

@@ -38,13 +38,34 @@
 .story-empty .nh-btn {
   align-self: flex-start;
 }
+/* The story's tabs: words with the horizon ink on the bar's line (theme spec 2.5), its controls at the right. */
 .story-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
+  min-height: 46px;
+  padding: 0 var(--space-4);
   border-bottom: 1px solid var(--line-strong);
+}
+.story-tabs-nav {
+  align-self: stretch;
+  display: flex;
+  margin-bottom: -1px;
+}
+.story-tabs.nh-tabs--horizontal {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.story-tabs .nh-tab,
+.story-tabs .nh-tab:hover,
+.story-tabs .nh-tab--active,
+.story-tabs .nh-tab--active:hover {
+  min-height: 46px;
+  padding: 0 12px;
+  background: none;
+  box-shadow: none;
 }
 .story-grow {
   flex: 1 1 auto;
@@ -103,7 +124,7 @@
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(20rem, 32%, 26rem);
+  grid-template-columns: minmax(0, 1fr) 330px;
 }
 .story-spinecol {
   min-height: 0;
@@ -114,10 +135,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--surface-1);
-  border-left: 1px solid var(--line-strong);
+  padding: var(--space-3) var(--space-4) var(--space-3) 0;
 }
+/* The chronicle's one line: 2px, cyan to violet; sessions mark it with 12px squares, their entries with 6px ones. */
 .story-spine {
   list-style: none;
   margin: 0;
@@ -127,11 +147,11 @@
 .story-spine::before {
   content: "";
   position: absolute;
-  left: 7px;
-  top: var(--space-2);
+  left: 5px;
+  top: var(--space-3);
   bottom: 0;
   width: 2px;
-  background: var(--indigo);
+  background: linear-gradient(to bottom, var(--cyan), var(--violet));
 }
 .story-spinegroup {
   position: relative;
@@ -143,16 +163,30 @@
 .story-spinedot {
   position: absolute;
   left: calc(-1 * var(--space-5));
-  top: 8px;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-pill);
-  border: 2px solid var(--indigo-text);
+  top: 16px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--cyan);
   background: var(--bg);
 }
+/* The next session is amber; played ones are cyan. */
 .story-spinedot.is-planned {
-  border-color: var(--violet);
-  background: var(--violet);
+  border-color: var(--caution);
+}
+.story-sessiontag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font: 400 15px / 1 var(--font-numeric);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.story-sessiontag.is-planned {
+  border-style: dashed;
+  color: var(--text-dim);
 }
 .story-spinehead {
   display: flex;
@@ -166,10 +200,9 @@
   background: none;
   border: 0;
   color: var(--heading-ink);
-  text-shadow: var(--heading-shadow);
-  font: var(--fw-display) var(--fs-h3) / 1.1 var(--font-display);
+  font: 600 16px / 1.1 var(--font-label);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   cursor: pointer;
   text-align: left;
 }
@@ -177,13 +210,6 @@
   cursor: default;
   min-height: 0;
   color: var(--text-dim);
-}
-.story-plannedchip {
-  padding: 2px var(--space-2);
-  border-left: 3px solid var(--violet);
-  background: color-mix(in srgb, var(--violet) 14%, transparent);
-  color: var(--violet-text);
-  font: 700 var(--fs-xs) / 1.4 var(--font-label);
 }
 .story-spinedays {
   color: var(--text-muted);
@@ -196,10 +222,18 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--line);
 }
 .story-spinerow {
-  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.story-spinerow::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-5) + 3px);
+  top: 19px;
+  width: 6px;
+  height: 6px;
+  background: var(--line-raised);
 }
 /* Rows grow their own 44px in the stacked list, where an ::after would overlap the next row. */
 .story-spinerow-open,
@@ -608,14 +642,16 @@
   grid-template-columns: repeat(var(--marks), minmax(7rem, 1fr));
   position: relative;
 }
+/* The ages on the horizon's line: 2px in its gradient with its glow, the marks 14px squares. */
 .story-ages::before {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   top: 50%;
-  height: 3px;
-  background: var(--line-strong);
+  height: 2px;
+  background: var(--grad-horizon);
+  box-shadow: var(--glow-on);
 }
 .story-age {
   position: relative;
@@ -626,11 +662,11 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translate(-50%, -50%) rotate(45deg);
-  background: var(--surface-1);
-  border: 3px solid var(--indigo);
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+  background: var(--bg);
+  border: 2px solid var(--cyan);
   pointer-events: none;
 }
 .story-age.is-campaign .story-age-diamond {
@@ -1387,4 +1423,234 @@
 .prep-read-check.is-done .prep-row-title {
   color: var(--text-dim);
   text-decoration: line-through;
+}
+
+/* ----- The line across the top (Codex frame 2.4) ----- */
+.story-hline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.story-hline-marks {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--points), minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The line: 2px in the horizon gradient with its glow, through the marks. */
+.story-hline-marks::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  height: 2px;
+  background: var(--grad-horizon);
+  box-shadow: var(--glow-on);
+}
+.story-hline-point {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.story-hline-label {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-dim);
+  font: 600 var(--fs-xs) / 1.2 var(--font-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.story-hline-mark {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--cyan);
+  background: var(--bg);
+}
+/* Today is filled; what is ahead is amber. */
+.story-hline-point.is-today .story-hline-mark {
+  background: var(--cyan);
+  box-shadow: var(--glow-on);
+}
+.story-hline-point.is-today .story-hline-label {
+  color: var(--text);
+}
+.story-hline-point.is-future .story-hline-mark {
+  border-color: var(--caution);
+}
+.story-hline-point.is-hidden .story-hline-mark {
+  border-style: dashed;
+  border-color: var(--violet);
+}
+/* The cards under the points, four to a row; the ones ahead have a dashed edge. */
+.story-hline-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-hline-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--material-plate);
+  color: var(--text);
+  text-align: start;
+}
+button.story-hline-card {
+  cursor: pointer;
+}
+button.story-hline-card:hover,
+.story-hline-card.is-selected {
+  border-color: var(--rim-color-hi);
+}
+.story-hline-card.is-future {
+  border-style: dashed;
+  background: none;
+}
+.story-hline-card.is-hidden {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--violet) 75%, transparent);
+}
+.story-hline-cardtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  font: 600 11px / 1.3 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.story-hline-card.is-hidden .story-hline-cardtitle {
+  color: var(--violet-text);
+}
+.story-hline-cardtitle svg {
+  width: 12px;
+  height: 12px;
+}
+.story-hline-cardtext {
+  font: 400 var(--fs-sm) / 1.45 var(--font-body);
+}
+
+/* ----- The Sessions tab: the next session leads, the played ones two to a row ----- */
+.story-scards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.story-scard-lead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--material-lip), var(--material-plate);
+}
+.story-scard-leadtext {
+  display: flex;
+  flex: 1 1 18rem;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.story-scard-eyebrow {
+  color: var(--text-muted);
+  font: 600 11px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.story-scard-leadtitle {
+  margin: 0;
+  color: var(--heading-ink);
+  font: var(--fw-display) 22px / 1.1 var(--font-display);
+  letter-spacing: var(--tracking-display);
+  text-transform: uppercase;
+}
+.story-scard-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.story-scard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-scard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 100%;
+  padding: 14px;
+  border: 1px solid var(--line-strong);
+  background: var(--material-plate);
+}
+.story-scard-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.story-scard-title {
+  min-height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--heading-ink);
+  font: 600 16px / 1.1 var(--font-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.story-scard-date,
+.story-scard-who {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.story-scard-line {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.story-scard-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+.story-scard-entries li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+@media (max-width: 979px) {
+  .story-hline-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .story-scard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.story-timeline > .story-hint {
+  padding: var(--space-4);
 }

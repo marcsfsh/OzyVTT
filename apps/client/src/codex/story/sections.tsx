@@ -13,12 +13,13 @@ import {
   FiltersButton
 } from "@vtt/ui";
 import type { CodexChronicleRecord, CodexSession } from "@vtt/domain";
-import { calendarApi, journalApi } from "../api";
-import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META } from "../chronicle";
+import { calendarApi, journalApi, sessionApi } from "../api";
+import { CHRONICLE_FILTER_KINDS, CHRONICLE_KIND_META, chronicleRowSummary } from "../chronicle";
 import { CodexMarkdown } from "../CodexMarkdown";
 import { usePageLinks } from "../pageLinks";
 import { prepSessionApi } from "../prep/api";
 import { atlasPath, pagePath, pathForSection, sessionPath, templatePath } from "../routes";
+import { withQuery } from "../../router";
 import { sessionTitle } from "../sessions";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex, usePlayerCodex } from "../shell/context";
@@ -35,8 +36,9 @@ import {
   RecapCards,
   SessionRows,
   SessionsFlyout,
+  SessionCards,
   StoryBar,
-  defaultSessionId,
+  type StoryView,
   sessionFilterCount,
   useSortedSessions,
   useSessionFilter,
@@ -52,11 +54,11 @@ import "./story.css";
  * (`/codex/sessions[/:id]`), for the GM and for players. A phone reads Story as the timeline, under Campaign's switch.
  */
 
-type View = "chronicle" | "timeline" | "sessions";
-const VIEW_PATH: Readonly<Record<View, string>> = {
+const VIEW_PATH: Readonly<Record<StoryView, string>> = {
   chronicle: pathForSection("story"),
   timeline: pathForSection("timeline"),
-  sessions: pathForSection("sessions")
+  sessions: pathForSection("sessions"),
+  downtime: withQuery(pathForSection("story"), { kind: "downtime" })
 };
 const FLYOUT_ID = "story-filters";
 
@@ -374,7 +376,8 @@ export function GmStorySection() {
   return (
     <div className="story">
       <StoryBar
-        view="chronicle"
+        view={downtimeFirst ? "downtime" : "chronicle"}
+        downtime
         onView={(view) => shell.go(VIEW_PATH[view])}
         end={
           <FiltersButton
@@ -513,6 +516,7 @@ export function GmTimelineSection() {
     <div className="story">
       <StoryBar
         view="timeline"
+        downtime
         onView={(view) => shell.go(VIEW_PATH[view])}
         end={
           <SegmentedControl
@@ -604,8 +608,57 @@ export function GmSessionsSection() {
     [sessions]
   );
   const sorted = useSortedSessions(listed);
-  const selectedId = shell.recordId ?? (shell.phone ? null : defaultSessionId(listed, feeds.activeSessionId));
+  // The tab itself is the session cards; a session's own address opens its page (Codex frame 2.4).
+  const selectedId = shell.recordId;
   const session = sessions.find((each) => each.id === selectedId) ?? null;
+  const [starting, setStarting] = useState(false);
+  const start = async (id: string) => {
+    setStarting(true);
+    try {
+      await sessionApi.activate(shell.token, id);
+      await feeds.sessionFeed.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Couldn't start that session.");
+    } finally {
+      setStarting(false);
+    }
+  };
+  const nextPlanned = sorted.filter((each) => each.status === "planned").at(-1) ?? null;
+  const cards = (
+    <SessionCards
+      lead={
+        nextPlanned
+          ? {
+              id: nextPlanned.id,
+              sessionNumber: nextPlanned.sessionNumber,
+              realDate: nextPlanned.realDate,
+              prepLine: prepLine(nextPlanned.source.prep)
+            }
+          : null
+      }
+      sessions={sorted
+        .filter((each) => each.status === "played")
+        .map((each) => ({
+          id: each.id,
+          sessionNumber: each.sessionNumber,
+          realDate: each.realDate,
+          recap: each.recap,
+          recapShared: each.shared ?? false,
+          entries: records
+            .filter((record) => record.sessionId === each.id)
+            .map((record) => ({
+              id: record.id,
+              iconId: CHRONICLE_KIND_META[record.kind].iconId,
+              line: record.title ?? (chronicleRowSummary(record) || CHRONICLE_KIND_META[record.kind].label),
+              hidden: record.revealedToPlayers === false
+            })),
+          attendees: each.source.attendees
+        }))}
+      starting={starting}
+      onOpen={(id) => shell.go(sessionPath(id))}
+      onStart={(id) => void start(id)}
+    />
+  );
   const deadlines = useMemo(
     () =>
       records
@@ -693,20 +746,22 @@ export function GmSessionsSection() {
     <div className="story">
       <StoryBar
         view="sessions"
+        downtime
         onView={(view) => shell.go(VIEW_PATH[view])}
         end={
-          <Button variant="secondary" size="sm" onClick={() => void create()}>
-            <IconPlus /> New session
-          </Button>
+          <>
+            <FiltersButton
+              open={filtersOpen}
+              onToggle={() => setFiltersOpen((open) => !open)}
+              controls="story-sessions"
+              count={sessionFilterCount(filter)}
+            />
+            <Button variant="secondary" size="sm" onClick={() => void create()}>
+              <IconPlus /> New session
+            </Button>
+          </>
         }
-      >
-        <FiltersButton
-          open={filtersOpen}
-          onToggle={() => setFiltersOpen((open) => !open)}
-          controls="story-sessions"
-          count={sessionFilterCount(filter)}
-        />
-      </StoryBar>
+      />
       {error && <Alert tone="danger">{error}</Alert>}
       <div className="story-stage">
         <SessionsFlyout
@@ -728,6 +783,8 @@ export function GmSessionsSection() {
             <div className="story-loading">
               <Skeleton variant="text" />
             </div>
+          ) : sessions.length > 0 ? (
+            <div className="story-sessionstage scroll-y">{cards}</div>
           ) : (
             <div className="story-empty">
               <h3>No sessions yet</h3>
@@ -928,7 +985,7 @@ export function PlayerSessionsSection() {
       })),
     [feeds.sessions]
   );
-  const selectedId = shell.recordId ?? (shell.phone ? null : defaultSessionId(listed, null));
+  const selectedId = shell.recordId;
   const session = feeds.sessions.find((each) => each.id === selectedId) ?? null;
   const open = (id: string) => {
     reads.markRead(id);
@@ -972,14 +1029,18 @@ export function PlayerSessionsSection() {
     );
   return (
     <div className="story">
-      <StoryBar view="sessions" onView={(view) => shell.go(VIEW_PATH[view])}>
-        <FiltersButton
-          open={filtersOpen}
-          onToggle={() => setFiltersOpen((now) => !now)}
-          controls="story-sessions"
-          count={sessionFilterCount(filter)}
-        />
-      </StoryBar>
+      <StoryBar
+        view="sessions"
+        onView={(view) => shell.go(VIEW_PATH[view])}
+        end={
+          <FiltersButton
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((now) => !now)}
+            controls="story-sessions"
+            count={sessionFilterCount(filter)}
+          />
+        }
+      />
       <div className="story-stage">
         <SessionsFlyout
           id="story-sessions"
@@ -996,9 +1057,45 @@ export function PlayerSessionsSection() {
           onClose={() => setFiltersOpen(false)}
         />
         <div className="story-sessionstage scroll-y">
-          {page ?? <p className="story-hint">No recaps shared yet. Session recaps your GM shares appear here.</p>}
+          {page ??
+            (feeds.sessions.length > 0 ? (
+              <SessionCards
+                lead={null}
+                sessions={[...feeds.sessions]
+                  .sort((a, b) => (b.sessionNumber ?? 0) - (a.sessionNumber ?? 0))
+                  .map((each) => ({
+                    id: each.id,
+                    sessionNumber: each.sessionNumber,
+                    realDate: each.realDate,
+                    recap: each.recap,
+                    recapShared: null,
+                    entries: feeds.timeline
+                      .filter((record) => record.sessionId === each.id)
+                      .map((record) => ({
+                        id: record.id,
+                        iconId: CHRONICLE_KIND_META[record.kind].iconId,
+                        line: lineOf(record),
+                        hidden: false
+                      })),
+                    attendees: []
+                  }))}
+                onOpen={open}
+              />
+            ) : (
+              <p className="story-hint">No recaps shared yet. Session recaps your GM shares appear here.</p>
+            ))}
         </div>
       </div>
     </div>
   );
+}
+
+/** A planned session's prep in one line: its scenes' titles, or else its first written section's first line. */
+function prepLine(prep: CodexSession["prep"]): string {
+  const scenes = prep.flatMap((section) =>
+    section.type === "scenes" ? section.scenes.map((scene) => scene.title) : []
+  );
+  if (scenes.length > 0) return scenes.slice(0, 4).join(" · ");
+  const text = prep.find((section) => section.type === "text" && section.text.trim());
+  return text && text.type === "text" ? (text.text.trim().split("\n")[0] ?? "") : "";
 }

@@ -147,19 +147,21 @@ describe("The GM's timeline", () => {
     expect(screen.getByRole("region", { name: "1492 DR, by month" })).toBeInTheDocument();
   });
 
-  it("draws both dates across the month, the players' first and yours after, in words", () => {
+  it("draws the month on one line with both dates, the players' first and yours after, and a card a record", () => {
     renderGmStory(GmTimelineSection, "/codex/timeline?zoom=month", {
       records: [ENTRY, LATER, VOTE],
       calendar: CALENDAR
     });
+    // The line's marks name both dates; the cards under it say what happened.
     const month = within(screen.getByRole("list", { name: "Hammer 1492 DR" }));
     const lines = month.getAllByText(/date ·/).map((line) => line.textContent);
     expect(lines).toEqual([
       expect.stringMatching(/^Players' date · .*Hammer 10$/),
       expect.stringMatching(/^Your date · .*Hammer 20$/)
     ]);
-    expect(month.getByText("We crossed the mists.")).toBeInTheDocument();
-    expect(month.getByText("The council votes.")).toBeInTheDocument();
+    const cards = within(screen.getByRole("list", { name: "Hammer 1492 DR, what happened" }));
+    expect(cards.getByText("We crossed the mists.")).toBeInTheDocument();
+    expect(cards.getByText("The council votes.")).toBeInTheDocument();
   });
 
   it("steps month by month and writes the month into the address", async () => {
