@@ -389,7 +389,7 @@ Codex's tools in Settings.
 
 ## G. The Compendium
 
-Job: the rules content, SRD and homebrew, and who sees it. Status: frame Designed (`G-compendium/SPEC.md`,
+Job: the rules content, SRD and homebrew, and who sees it. Status: frame Built (`G-compendium/SPEC.md`,
 `G-compendium/PLAN.md`, ADR-0055): the Titled bar, a home of shelves, browsing and records as three panes (filters,
 results and the record, with the open records as tabs), and the studio with each step's answer in its rail. G4 to G6
 Designed (`G-compendium-pages/SPEC.md`, `G-compendium-pages/PLAN.md`, ADR-0068): the sources and Sharing's kinds at the

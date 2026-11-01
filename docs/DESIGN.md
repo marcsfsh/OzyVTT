@@ -533,6 +533,23 @@ The sheet is the Ledger (ADR-0047; `docs/design/polish/D1-character-sheet/`).
 - Links in body text are cyan and underlined. The words are Hidden, Revealed, Reveal, Hide again, See it as and Who
   sees it.
 
+## The Compendium
+
+- The Titled bar: Compendium, then Home, Browse, Sources and Sharing, with the search, Rules as a Base line control and
+  New homebrew as the Cup (ADR-0055).
+- Home is shelves: Needs you as a strip with an amber edge, the nine kinds as cards three to a row (two on a phone)
+  with their counts, their homebrew and drafts in magenta and a few records with homebrew first, and the sources on one
+  line at the foot.
+- Browse is a filter panel at the left (270px) and the table: each choice counts what it would show, the kind's range
+  is a small chart with a two-handle range, and the active filters are chips over the table. A phone opens the panel
+  as a sheet with Show N at its foot.
+- A record opens as three panes (the filters, the results, the record) with the open records as tabs over the record
+  only; a folded pane is a 44px edge. The record's parts sit at the right of its title line, never a third row of tabs.
+- The studio is one step at a time with each step's answer in the rail, Next as the Cup, and for a copy a preview that
+  names what differs from its original.
+- An SRD record carries a quiet SRD 5.2.1 tag; homebrew carries a magenta Homebrew tag, and homebrew counts are magenta
+  wherever they show.
+
 ## Phones and touch
 
 Phone and laptop have the same features in the same build. A control that only works with a

@@ -922,8 +922,16 @@ names no family is the GM's own ruling on the whole command.
   that is off. The GM's Compendium reads (`homebrew-library.ts`) put the SRD's rows beside the
   homebrew of a kind with the kind's own columns, count by source and kind, and search the homebrew's
   text. Players read the same kinds, without monsters, through `content:compendium`.
-- The GM's tab is the Compendium (`apps/client/src/compendium/`, ADR-0033): one table per kind with the
-  SRD and the homebrew together, and each record at its own address with Card, Edit, Sharing and History.
+- The GM's tab is the Compendium (`apps/client/src/compendium/`, ADR-0033, ADR-0055): one table per kind with the
+  SRD and the homebrew together, and each record at its own address with its parts (Card, Sharing and History for
+  homebrew, Card and Your copies for an SRD record) and the studio at `?tab=edit`. Home (`OverviewView.tsx`) is the
+  shelves: Needs you, the kinds as kit `KindCard`s with a few records each, and the sources. Browse puts
+  `FilterPanel.tsx` beside the table: its counts are worked out in the client from the rows in memory
+  (`facetCounts` in `tableModel.ts`, each facet letting its own selection go), and a range writes the values between
+  its ends so the address keeps its list form. A record opens as three panes (the filters, the results as
+  `CompendiumTable`'s pane list and the record) under the open records' tabs; `openRecords.ts` keeps them in
+  sessionStorage, at most eight, with the last shown and the panes' folds. Closing a tab goes through the context's
+  `closeTab`.
   A record is made and edited in steps (`homebrew/wizard/`, ADR-0026): a wizard is data over the editor's
   own fields in plainer words, and a few composers keep derived values in step, such as a monster's
   Proficiency Bonus, XP and Hit Points or a spell's upcast rows. `wizard/steps.ts` gives every field no
@@ -931,8 +939,9 @@ names no family is the GM's own ruling on the whole command.
   every tab, and the review step places the publish checklist on the step that answers each item. The
   checklist's sentences come from `homebrew-issues.ts` in the content package, the same words the gate
   sends. The monster wizard compares its numbers with the SRD stat blocks of its CR, read from the bundle
-  by `content:monster-benchmarks`. Its sections read Browse (the tables), Homebrew (the overview of what
-  needs you), Sources and Sharing over the same addresses.
+  by `content:monster-benchmarks`. Its sections read Home (the shelves), Browse (the tables), Sources and
+  Sharing over the same addresses. The studio's rail shows each step's answer (`homebrew/wizard/stepAnswers.ts`), and
+  a copy's preview names what differs from its original (`useOriginalBody` in `record/HistoryTab.tsx`).
 - Add to an encounter on a monster's card (`compendium/record/AddToScene.tsx`) is client orchestration over two
   existing commands: `actor:add-from-definition` at the staging default, then `encounter:set-combatants` with
   the encounter's ids merged from a fresh snapshot and `expectedRevision`. It offers only prepared encounters that
