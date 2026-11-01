@@ -222,9 +222,9 @@ audience. There are five:
   page's title for `[[links]]`, and a GM-layer connection never folds away a player-layer mention.
   A hidden record is a 404, never a 403, and ETags are computed after every gate. A GM's ETag
   carries the store revision; a player's hashes the body they receive, so a GM-only write, or a
-  reveal to another character, leaves it as it was. The GM's preview is a signed player session
-  that reads as everyone or as one party character and only reads: game commands and uploads
-  refuse it.
+  reveal to another character, leaves it as it was. The GM's preview (See as players, the writer's
+  Preview and the whole-Codex preview) is a signed player session that reads as everyone or as one
+  party character and only reads: game commands and uploads refuse it.
 - **Homebrew** (`content-library.ts`, `homebrew-store.ts`, `homebrew-player.ts`): every content read is
   built for one audience (`ContentLibrary.forAudience`). A player session is a reader: the party
   characters it has claimed, or the ones a Codex preview names. A reader receives a homebrew record
@@ -1202,8 +1202,9 @@ the loose route (`SheetActionList` in `PlayFight.tsx`). A cast, an item or a spe
 `SheetDetail.tsx`: in place inside the box, or in a drawer over the GM's narrow sheet. The sheet notes the ids of the
 rolls it starts (`sheet-roll-ids.ts`), and its latest-roll line shows only those.
 
-The Codex client (ADR-0031) lives in `codex/`. `CodexShell.tsx` (the GM) and `PlayerCodex.tsx` (a player, and the
-GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the section bar or the phone's strip of views,
+The Codex client (ADR-0031, its frame ADR-0054) lives in `codex/`. `CodexShell.tsx` (the GM) and `PlayerCodex.tsx` (a
+player, and the GM's preview, which runs on a local route) both draw `shell/CodexFrame.tsx`, the Titled section bar
+with its pages (`codexBar` in `routes.ts`), the search field, and the GM's New and More (`shell/GmMenus.tsx`),
 and render the section the address names from `shell/sections.tsx`, each entry a GM view and a player view. Views read
 the shell through context (`shell/context.ts`): the role and token, the address, and for the GM the shared feeds,
 the party and quick create. A player's views read only `playerCodexApi` and the player shapes of `api-records.ts`,
@@ -1211,7 +1212,9 @@ which holds the record reads and writes (pages and quests with their blocks and 
 live in their own folders (`home/`, `search/`, `page/`, `quests/`, `relationships/`) over the pieces in `shared/`. Who
 sees it, the filter flyout, the dropdown and the Sort dialog are shared with the Compendium, Encounters, Maps and Settings,
 so they live in `@vtt/ui` (`packages/ui/src/records/`).
-A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blocks in one document;
+A page's writer (`page/PageWriter.tsx`) has Preview: it flushes autosave, then reads the page through the same player
+preview session See as players uses (`usePreviewToken` in `page/SeeAs.tsx`, drawn by `PlayerPageBody`), so what it
+shows is what the projection sends. A page's editor (`page/DocEditor.tsx`) writes the player text and the hidden blocks in one document;
 `page/document.ts` places blocks by `codexParagraphs` from `@vtt/domain`, the rule the server assembles bodies by.
 The table's Codex tab is `table/CodexTab.tsx`, over the same reads.
 

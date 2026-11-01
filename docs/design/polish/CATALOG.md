@@ -313,7 +313,7 @@ fight beside the map, a line of rounds with Launch at its end, and a player's re
 
 ## F. The Codex
 
-Job: the campaign's memory, written by the GM and read by everyone. Status: frame Designed (`F-codex/SPEC.md`,
+Job: the campaign's memory, written by the GM and read by everyone. Status: frame Built (`F-codex/SPEC.md`,
 `F-codex/PLAN.md`, ADR-0054): the Titled bar, the dashboard home, wiki pages, writing in place with a Preview switch,
 and the story's Chronicle, Timeline and Sessions tabs each with its own design. F1.3 to F1.5, F2.1, F2.5, F2.6 and F2.8
 Designed (`F-finding-pages/SPEC.md`, `F-finding-pages/PLAN.md`, ADR-0064): search as panes, the pages index with the

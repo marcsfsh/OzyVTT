@@ -134,15 +134,6 @@
   vertical-align: -0.16em;
 }
 
-/* The detail column's scroll region; the editor scrolls here while the rail stays put. */
-.codex-main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  gap: var(--space-3);
-  position: relative;
-}
 /* The back link is a `Button`, which carries the tap floor; this only controls when it shows. */
 .codex-back {
   display: none;
@@ -594,13 +585,6 @@
   font-size: var(--fs-xs);
 }
 
-/* Single-pane on a phone: the column is flex so the visible pane (rail or detail) takes the fill. */
-@media (max-width: 760px) {
-  .codex-main {
-    flex: 0 1 auto;
-  }
-}
-
 /* ----- Atlas ----- */
 .codex-root {
   display: flex;
@@ -805,10 +789,6 @@
 }
 
 /* ----- Player Codex ----- */
-/* The player reader is bare prose, so it keeps its last line clear of the phone's home indicator. */
-.codex-player:not(.is-embedded) .codex-main {
-  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
-}
 
 .codex-md-img {
   display: block;

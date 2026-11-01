@@ -503,14 +503,6 @@
   flex-direction: column;
   gap: var(--space-1);
 }
-.cx-writefields-head {
-  display: flex;
-  justify-content: space-between;
-}
-.cx-writefields-who {
-  white-space: nowrap;
-  text-align: right;
-}
 .cx-writefield {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 4.5rem;

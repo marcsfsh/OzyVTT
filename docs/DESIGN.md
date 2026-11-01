@@ -363,9 +363,9 @@ from the mockups.
   dice icon and a send button. Text that parses as a dice formula (2d6+3) rolls; anything else is sent as a message.
   Until table chat exists (ADR-0037, phase 8), the input takes formulas only and its placeholder says "Roll dice, like
   2d6+3".
-- Who sees it: an audience chip with the eye and Everyone (or names), or the violet crossed eye and Hidden. A hidden
-  block is a dashed violet box with Reveal in its corner; a revealed block says who it reached and when, with Hide
-  again.
+- Who sees it: a tag in its 22px box. Hidden reads one way everywhere: violet with a dashed edge and the crossed eye.
+  Everyone is quiet ink with the eye; chosen characters are cyan. A hidden block is a dashed violet box with its tag
+  and Reveal; a revealed block says who it reached and when, with Hide again.
 - Focus: every control shows a 2px `--focus-ring` outline with a 2px offset on keyboard focus (`:focus-visible`). It is never
   removed or hidden.
 - Toast: bottom right on a laptop (420px wide, 16px in), just above the bottom tabs on a phone (8px in from each side),
@@ -529,17 +529,30 @@ The sheet is the Ledger (ADR-0047; `docs/design/polish/D1-character-sheet/`).
 
 ## The Codex
 
-- No left rail. The section bar lists Home, Pages, Atlas, Story and Quests; a phone uses the bottom tabs and the page's
-  own header.
-- A page or quest reads as one document with its hidden blocks in place and its metadata panel beside it. A hidden
-  block is a dashed violet box with the crossed eye, the word Hidden and Reveal in its corner. A revealed one says who
-  it reached and when ("Revealed to Lyra Emberwise", SESSION 4) with Hide again.
+- The Titled bar (ADR-0054): Codex, then Home, Pages, Atlas, Story, Quests and Relationships (a player's strip ends with
+  Compendium), the search field with Ctrl K, New as the Cup with its menu (page, quest, session) and More, which holds
+  Prep templates, Backup, Autosave and history and See the Codex as players. A phone runs the same pages as a strip of
+  words under its header, with Search and New as icons.
+- Home is the dashboard: the date bar as a Cradle (the campaign's date in VT323 cyan, with whether players have it),
+  the five kinds as cards in a row, Recently changed as an open group of rows, and at the right (330px) the next
+  session with Start session N as the Cup, Where the party is and the Reveal check. A phone stacks the date bar, the
+  kinds and the session.
+- A page reads as a wiki: the record's title row (the crumb, the title, then its kind, who can open it and what is
+  hidden as tags), the text at the left in its 680px measure, and open groups at the right (Facts, Relationships, On
+  the Atlas, Mentioned on, Tags, In the journal). A player gets the same page with every hidden part left out and
+  nothing that says so. A phone has Overview, Relations and Mentions as words, with the facts in two columns.
+- Writing is in place: Edit turns the page into its writer, with Preview, Saved and Done as the Cup in the title row,
+  the toolbar over one bordered text field, and the fields as a Cradle with Everyone and Hidden for each. Preview saves
+  first, then shows the page exactly as players get it under a violet line; See as players on a page is the same view.
+  A phone has Write and Preview under its header and Done pinned at the foot.
+- The story's tabs are Chronicle, Timeline, Sessions and Downtime, as words with Filters at the right. The chronicle is
+  one line of sessions (the next amber, played ones cyan) with their entries; the timeline draws its zoom on a line in
+  the horizon gradient with a card under each point; Sessions leads with the next session's card, then the played ones
+  two to a row.
 - Who sees it is Everyone, Hidden or chosen characters. A field has two audiences, Everyone or Hidden, chosen on its
   own row.
-- See it as is a wrapping grid in the side panel: GM, Everyone and each character, using as many rows as needed.
-  The mockup's party size is a fixture. Preserve the server-backed preview for every audience.
-- Links in body text are cyan and underlined. The words are Hidden, Revealed, Reveal, Hide again, See it as and Who
-  sees it.
+- Links in body text are cyan with a thin line under them. The words are Hidden, Revealed, Reveal, Hide again, See as
+  players, Preview and Who sees it.
 
 ## The Compendium
 
