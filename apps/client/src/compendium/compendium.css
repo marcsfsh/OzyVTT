@@ -1572,3 +1572,58 @@
   color: var(--text-muted);
   font-size: var(--fs-sm);
 }
+
+/* ----- Sources (G pages spec 2.1): the sources at the side, the chosen one at the right ----- */
+.cp-sources-split {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.cp-sources-side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--line-strong);
+}
+.cp-sources-side > .nh-btn {
+  justify-self: start;
+}
+.cp-sources-main {
+  min-height: 0;
+  padding: var(--space-4);
+}
+.cp-source {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 760px;
+}
+.cp-source-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cp-source-name {
+  flex: 1 1 auto;
+  margin: 0;
+  font: 600 22px / 1.2 var(--font-display);
+  text-transform: uppercase;
+}
+.cp-source-line {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
+.cp-source-pickers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.cp-source-needs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -9,7 +9,7 @@ import { COMPENDIUM_PATHS, recordPath, tablePath } from "./routes";
 type NeedsYou = HomebrewOverview["needsYou"][number];
 
 /** What a waiting record's line says, and the button that answers it. */
-function needWords(row: NeedsYou): Readonly<{ what: string; action: string; tab: "edit" | "history" }> {
+export function needWords(row: NeedsYou): Readonly<{ what: string; action: string; tab: "edit" | "history" }> {
   const left = row.issueCount > 0 ? ` · ${row.issueCount} ${row.issueCount === 1 ? "thing" : "things"} left` : "";
   switch (row.reason) {
     case "changes-not-live":

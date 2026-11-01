@@ -404,3 +404,22 @@ describe("the open records", () => {
     expect(window.location.pathname).toBe("/compendium/spells/fireball");
   });
 });
+
+describe("Sources at the side", () => {
+  it("chooses This table first, with its line, its switch and its kinds; the SRD reads always in pickers", async () => {
+    const user = mount("/compendium/sources");
+    const side = within(await screen.findByRole("group", { name: "Sources" }));
+    expect(side.getByRole("button", { name: /^This table/ })).toHaveAttribute("aria-current", "true");
+    const source = within(screen.getByRole("region", { name: "This table" }));
+    expect(source.getByText("Made here · 1 record · 1 published · 1 shared")).toBeInTheDocument();
+    expect(source.getByRole("switch")).toBeInTheDocument();
+    expect(await source.findByRole("rowheader", { name: /Spell/ })).toBeInTheDocument();
+
+    await user.click(side.getByRole("button", { name: /^SRD 5\.2\.1/ }));
+    expect(new URLSearchParams(window.location.search).get("source")).toBe("srd");
+    const srd = within(await screen.findByRole("region", { name: "SRD 5.2.1" }));
+    expect(srd.getByText("Read only. Make a homebrew copy of anything.")).toBeInTheDocument();
+    expect(srd.getByText("Always in pickers")).toBeInTheDocument();
+    expect(srd.queryByRole("switch")).not.toBeInTheDocument();
+  });
+});

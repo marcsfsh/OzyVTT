@@ -1,5 +1,21 @@
 import { useMemo, useRef, useState } from "react";
-import { Badge, Button, Field, IconButton, IconDownload, Input, Modal, Select, useToast } from "@vtt/ui";
+import {
+  Badge,
+  Button,
+  Field,
+  IconDownload,
+  IconMore,
+  Input,
+  Menu,
+  MenuItem,
+  Modal,
+  Select,
+  SideListGroup,
+  SideListRow,
+  cx,
+  useToast
+} from "@vtt/ui";
+import { usePrompt } from "../components/feedback";
 import { CodexIcon } from "../codex/icons";
 import {
   homebrewApi,
@@ -10,11 +26,16 @@ import {
   type HomebrewPackInfo
 } from "../homebrew/api";
 import { useCompendium } from "./context";
-import { refreshCompendium, useHomebrewList, usePacks } from "./data";
-import { KindIcon, kindLabel, type Kind } from "./kinds";
+import { refreshCompendium, useHomebrewList, useOverview, usePacks } from "./data";
+import { needWords } from "./OverviewView";
+import { recordPath } from "./routes";
+import { KINDS, KindIcon, kindLabel, type Kind } from "./kinds";
 import { PackSwitch, creditWords, packName } from "./pieces";
 
 type Decision = HomebrewImportDecision["decision"];
+
+/** A kind's word starts a table's row, where the kit's words are written for the middle of a sentence. */
+const upperFirst = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 /** What the import does with one record, in the review's words. */
 export function decisionWord(record: HomebrewImportRecord, decision: Decision, packTitle: string): string {
@@ -67,9 +88,12 @@ type Review = Readonly<{
  * table from the server's dry run, a decision for each record; exporting is a selection under a pack name.
  */
 export function SourcesView() {
-  const { token, phone } = useCompendium();
+  const { token, phone, query, setQuery, go } = useCompendium();
   const { toast } = useToast();
   const packs = usePacks(token);
+  const overview = useOverview(token);
+  const homebrew = useHomebrewList(token);
+  const { prompt, dialog: promptDialog } = usePrompt();
   const fileRef = useRef<HTMLInputElement>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [busy, setBusy] = useState(false);
@@ -127,12 +151,8 @@ export function SourcesView() {
   };
 
   const list = packs.data;
-  const importButton = phone ? (
-    <IconButton label="Import a pack" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
-      <IconDownload className="cp-upload" />
-    </IconButton>
-  ) : (
-    <Button size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>
+  const importButton = (
+    <Button size="sm" variant="ghost" onClick={() => fileRef.current?.click()} disabled={busy}>
       <IconDownload className="cp-upload" /> Import a pack
     </Button>
   );
@@ -155,8 +175,181 @@ export function SourcesView() {
     />
   );
 
+  // The chosen source is the address (G pages spec 2.1): the SRD, a pack's id, or This table by default.
+  const tablePack = list?.packs.find((pack) => pack.kind === "table") ?? null;
+  const sourceKey = query.get("source") ?? tablePack?.id ?? "srd";
+  const chosenPack = sourceKey === "srd" ? null : (list?.packs.find((pack) => pack.id === sourceKey) ?? tablePack);
+  const choose = (key: string) => setQuery((params) => params.set("source", key));
+  const theirs = (homebrew.data ?? []).filter((row) => chosenPack && row.packId === chosenPack.id && !row.deletedAt);
+  const byKind = chosenPack
+    ? KINDS.map((kind) => {
+        const rows = theirs.filter((row) => row.type === kind);
+        return {
+          kind,
+          records: rows.length,
+          drafts: rows.filter((row) => row.state === "draft").length,
+          shared: rows.filter((row) => row.audience !== "hidden").length
+        };
+      }).filter((row) => row.records > 0)
+    : (overview.data?.byKind ?? [])
+        .filter((row) => row.srd > 0)
+        .map((row) => ({ kind: row.kind as Kind, records: row.srd, drafts: 0, shared: row.srd }));
+  const needs = chosenPack ? (overview.data?.needsYou ?? []).filter((row) => row.packId === chosenPack.id) : [];
+  const sourceName = chosenPack ? packName(chosenPack) : "SRD 5.2.1";
+  const sourceLine = chosenPack
+    ? [
+        creditWords(chosenPack),
+        `${chosenPack.counts.records} ${chosenPack.counts.records === 1 ? "record" : "records"}`,
+        `${chosenPack.counts.published} published`,
+        `${chosenPack.counts.shared} shared`
+      ].join(" · ")
+    : "Read only. Make a homebrew copy of anything.";
+
+  const rename = async () => {
+    if (!chosenPack) return;
+    const name = await prompt({
+      title: "Rename the source",
+      defaultValue: packName(chosenPack),
+      confirmLabel: "Rename"
+    });
+    if (!name) return;
+    try {
+      await homebrewApi.updatePack(token, chosenPack.id, { name });
+      refreshCompendium();
+    } catch (failure) {
+      toast(failure instanceof Error ? failure.message : "Couldn't rename the source.", { tone: "error" });
+    }
+  };
+  const recredit = async () => {
+    if (!chosenPack) return;
+    const credit = await prompt({
+      title: "Credit",
+      defaultValue: chosenPack.credit ?? "",
+      confirmLabel: "Save credit"
+    });
+    if (credit === null) return;
+    try {
+      await homebrewApi.updatePack(token, chosenPack.id, { credit: credit || null });
+      refreshCompendium();
+    } catch (failure) {
+      toast(failure instanceof Error ? failure.message : "Couldn't save the credit.", { tone: "error" });
+    }
+  };
+
+  const sourceRows = list && (
+    <>
+      {[
+        { key: "srd", name: "SRD 5.2.1", icon: "book", count: list.srd.records },
+        ...list.packs.map((pack) => ({
+          key: pack.id,
+          name: packName(pack),
+          icon: pack.kind === "table" ? "home" : "archive",
+          count: pack.counts.records
+        }))
+      ].map((row) =>
+        phone ? (
+          <button
+            key={row.key}
+            type="button"
+            className={cx("nh-filterchip", "interactive", sourceKey === row.key && "is-on")}
+            aria-pressed={sourceKey === row.key}
+            onClick={() => choose(row.key)}
+          >
+            {row.name} <span className="cx-tag-n">{row.count.toLocaleString("en")}</span>
+          </button>
+        ) : (
+          <SideListRow
+            key={row.key}
+            label={row.name}
+            leading={<CodexIcon iconId={row.icon} />}
+            count={row.count.toLocaleString("en")}
+            current={sourceKey === row.key || (row.key === chosenPack?.id && sourceKey !== "srd")}
+            onSelect={() => choose(row.key)}
+          />
+        )
+      )}
+    </>
+  );
+
+  const detail = list && (
+    <section className="cp-source" aria-label={sourceName}>
+      <div className="cp-source-head">
+        <h3 className="cp-source-name">{sourceName}</h3>
+        {!phone && exportButton}
+        {chosenPack && (
+          <Menu icon align="end" label={`More for ${sourceName}`} trigger={<IconMore />}>
+            <MenuItem onClick={() => void rename()}>Rename…</MenuItem>
+            <MenuItem onClick={() => void recredit()}>Credit…</MenuItem>
+          </Menu>
+        )}
+      </div>
+      <p className="cp-source-line">{sourceLine}</p>
+      <div className="cp-source-pickers">
+        {chosenPack ? <PackSwitch pack={chosenPack} /> : <b className="cp-source-always">Always in pickers</b>}
+        {chosenPack && (
+          <span className="cp-hint">In pickers: homebrew fields and the encounter builder offer these records.</span>
+        )}
+      </div>
+      {byKind.length > 0 && (
+        <>
+          <p className="nh-sidelist-eyebrow">By kind</p>
+          <table className="cp-table cp-source-kinds">
+            <thead>
+              <tr>
+                <th scope="col">Kind</th>
+                <th scope="col" className="is-num">
+                  Records
+                </th>
+                <th scope="col" className="is-num">
+                  Drafts
+                </th>
+                <th scope="col" className="is-num">
+                  Shared
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {byKind.map((row) => (
+                <tr key={row.kind}>
+                  <th scope="row">
+                    <KindIcon kind={row.kind} /> {upperFirst(kindLabel(row.kind))}
+                  </th>
+                  <td className="is-num tabular">{row.records.toLocaleString("en")}</td>
+                  <td className="is-num tabular">{row.drafts}</td>
+                  <td className="is-num tabular">{row.shared.toLocaleString("en")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      {needs.length > 0 && (
+        <>
+          <p className="nh-sidelist-eyebrow">Needs you</p>
+          <ul className="cp-source-needs" aria-label="Needs you">
+            {needs.map((row) => {
+              const words = needWords(row);
+              return (
+                <li key={`${row.id}-${row.reason}`} className="cp-home-need">
+                  <KindIcon kind={row.kind as Kind} />
+                  <span className="cp-home-need-main">
+                    <b>{row.name}</b>
+                    <small>{words.what}</small>
+                  </span>
+                  <Button size="sm" onClick={() => go(`${recordPath(row.kind as Kind, row.id)}?tab=${words.tab}`)}>
+                    Open
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+
   return (
-    <div className="cp-sources scroll-y">
+    <div className={cx("cp-sources", phone ? "scroll-y" : "cp-sources-split")}>
       <input
         ref={fileRef}
         type="file"
@@ -168,87 +361,34 @@ export function SourcesView() {
           event.target.value = "";
         }}
       />
-      {/* The section bar's strip names the page on a phone too (compendium rule 3.1), so one head serves both. */}
-      <div className="cp-section-head">
-        <h3 className="cp-h cp-grow">Sources</h3>
-        {importButton}
-        {/* A phone's list ends with its own Export. */}
-        {!phone && exportButton}
-      </div>
-      <div className={phone ? "cp-phone-body" : "cp-pad"}>
-        {!list ? (
-          <p className="cp-hint">{packs.error ?? "Reading the sources."}</p>
-        ) : phone ? (
-          <>
-            <div className="cp-card-row">
-              <CodexIcon iconId="book" className="cp-kind-icon" />
-              <span className="cp-row-main">
-                <b>SRD 5.2.1</b>
-                <small>{list.srd.records.toLocaleString("en")} records · All shared</small>
-                <small>Read only. Make a homebrew copy of anything.</small>
-              </span>
-            </div>
-            {list.packs.map((pack) => (
-              <div key={pack.id} className="cp-card-row">
-                <CodexIcon iconId={pack.kind === "table" ? "home" : "archive"} className="cp-kind-icon" />
-                <span className="cp-row-main">
-                  <b>{packName(pack)}</b>
-                  <small>
-                    {pack.counts.records} {pack.counts.records === 1 ? "record" : "records"} · {pack.counts.shared}{" "}
-                    shared
-                  </small>
-                  <small>{creditWords(pack)}</small>
-                </span>
-                <PackSwitch pack={pack} />
-              </div>
-            ))}
-            <div className="cp-actions-row">{exportButton}</div>
-          </>
-        ) : (
-          <table className="cp-table cp-sources-table">
-            <thead>
-              <tr>
-                <th scope="col">Source</th>
-                <th scope="col" className="is-num">
-                  Records
-                </th>
-                <th scope="col" className="is-num">
-                  Published
-                </th>
-                <th scope="col" className="is-num">
-                  Shared
-                </th>
-                <th scope="col">Credit</th>
-                <th scope="col">In pickers</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th scope="row">SRD 5.2.1</th>
-                <td className="is-num tabular">{list.srd.records.toLocaleString("en")}</td>
-                <td className="is-num">All</td>
-                <td className="is-num">All</td>
-                <td>Read only. Make a homebrew copy of anything.</td>
-                <td>Always on</td>
-              </tr>
-              {list.packs.map((pack) => (
-                <tr key={pack.id}>
-                  <th scope="row">{packName(pack)}</th>
-                  <td className="is-num tabular">{pack.counts.records}</td>
-                  <td className="is-num tabular">{pack.counts.published}</td>
-                  <td className="is-num tabular">{pack.counts.shared}</td>
-                  <td>{creditWords(pack)}</td>
-                  <td>
-                    <PackSwitch pack={pack} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {reviewPart}
-      </div>
+      {!list ? (
+        <p className="cp-hint cp-pad">{packs.error ?? "Reading the sources."}</p>
+      ) : phone ? (
+        <div className="cp-phone-body">
+          <div className="nh-filterchips" role="group" aria-label="Sources">
+            {sourceRows}
+          </div>
+          {detail}
+          <div className="cp-actions-row">
+            {exportButton}
+            {importButton}
+          </div>
+          {reviewPart}
+        </div>
+      ) : (
+        <>
+          <nav className="cp-sources-side scroll-y" aria-label="Sources">
+            <SideListGroup eyebrow="Sources">{sourceRows}</SideListGroup>
+            {importButton}
+          </nav>
+          <div className="cp-sources-main scroll-y">
+            {detail}
+            {reviewPart}
+          </div>
+        </>
+      )}
       {exporting && <ExportDialog packs={list?.packs ?? []} onClose={() => setExporting(false)} />}
+      {promptDialog}
     </div>
   );
 }
