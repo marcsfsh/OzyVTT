@@ -25,6 +25,7 @@ vi.mock("../scene/gridPreview", async (original) => ({
   })
 }));
 
+import { command } from "../lib/command";
 import { goTo } from "../../test/route";
 import { IDS, gmView, mapAsset, serveScenes } from "../../test/scenes-fakes";
 import { setViewport } from "../../test/viewport";
@@ -135,8 +136,12 @@ describe("a map's page", () => {
     renderTab(`/encounters/maps/${IDS.crypt}`);
     await user.click(await screen.findByRole("button", { name: "New encounter on this map" }));
     expect(here()).toBe(`/encounters/new?map=${IDS.crypt}`);
+    // The Draft page makes the encounter on the map it was given at once.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Sunken crypt/ })).toHaveAttribute("aria-pressed", "true")
+      expect(vi.mocked(command)).toHaveBeenCalledWith(
+        "encounter:create",
+        expect.objectContaining({ mapAssetId: IDS.crypt })
+      )
     );
   });
 });

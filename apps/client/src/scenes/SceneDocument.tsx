@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { rosterActors } from "@vtt/domain";
 import {
   Button,
@@ -23,7 +23,7 @@ import { DockToolsTarget } from "../table/dockTools";
 import { TablePanel, useRememberedTab } from "../table/TablePanel";
 import { pathForGmTab } from "../router";
 import { useScenes } from "./context";
-import { pathForMap, pathForScene, SCENES_PATHS, type SceneStep } from "./routes";
+import { arrivingScenes, pathForMap, pathForScene, SCENES_PATHS, type SceneStep } from "./routes";
 import { useSceneActions } from "./sceneActions";
 import { factsOf, modifiedAt, readinessOf, tokensLine, whenLabel, type SceneFacts } from "./sceneFacts";
 import { StateChip } from "./pieces";
@@ -40,6 +40,8 @@ export function tabForStep(step: SceneStep | null | undefined): EncounterTab {
 }
 export type EncounterTab = "who" | "rules" | "light";
 const TAB_IDS: readonly EncounterTab[] = ["who", "rules", "light"];
+/** A phone's Switch adds the map as its first view. */
+const PHONE_TAB_IDS: readonly string[] = ["map", ...TAB_IDS];
 const TAB_KEY = "vtt.scene-tab";
 /** Before this page had its three tabs, the remembered tab was Combat, Setup or Tokens. */
 const OLD_TAB: Readonly<Record<string, EncounterTab>> = { encounter: "rules", scene: "light", tokens: "who" };
@@ -75,9 +77,16 @@ export function SceneDocument({
     }
     return null;
   });
-  const [tab, setTab] = useRememberedTab(TAB_KEY, TAB_IDS, initialTab ?? "who", encounterId);
+  const [tab, setTab] = useRememberedTab(TAB_KEY, narrow ? PHONE_TAB_IDS : TAB_IDS, initialTab ?? "who", encounterId);
+  useEffect(() => {
+    if (scene) arrivingScenes.delete(scene.id);
+  }, [scene]);
   if (!scene)
-    return (
+    return arrivingScenes.has(encounterId) ? (
+      <p className="sc-missing" role="status">
+        Opening the encounter…
+      </p>
+    ) : (
       <div className="sc-missing">
         <p role="status">That encounter no longer exists. It may have been deleted.</p>
         <Button onClick={() => go(SCENES_PATHS.list)}>All encounters</Button>
@@ -213,7 +222,7 @@ export function SceneDocument({
         onPlace={(actorId) => {
           // A preview shows no workbench map, so it goes back to the GM's own view first.
           setSeeAs("gm");
-          if (phone) setTab("map");
+          if (narrow) setTab("map");
           window.setTimeout(() => armPlacement(actorId), 0);
         }}
       />
@@ -241,7 +250,7 @@ export function SceneDocument({
           facts={facts}
           onOpenTools={(group) => {
             setSeeAs("gm");
-            if (phone) setTab("map");
+            if (narrow) setTab("map");
             openMapToolGroup(group);
           }}
         />
@@ -308,7 +317,7 @@ export function SceneDocument({
             <TablePanel
               label={`About ${scene.name}`}
               tabs={tabs}
-              active={narrow && tab === "map" ? "map" : tab}
+              active={tab}
               onActive={setTab}
               footer={footer}
               phone={narrow}

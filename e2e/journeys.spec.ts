@@ -42,15 +42,15 @@ async function onPreview(page: Page, point: { x: number; y: number }) {
   }, point);
 }
 
-/** From a scene's step, Next through the steps named, then Make live and the table. */
-async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
-  for (const step of steps) await press(gm.getByRole("button", { name: `Next: ${step}` }));
-  await expect(gm.getByRole("heading", { name: "Review and make live" })).toBeVisible();
+/** From an encounter's page, Make live in the panel's foot, then the table. */
+async function makeLiveFromPage(gm: Page) {
+  await expect(gm.getByRole("button", { name: "Make live", exact: true })).toBeVisible();
   await expectPageFits(gm);
-  await press(gm.getByRole("button", { name: "Make live" }));
+  await press(gm.getByRole("button", { name: "Make live", exact: true }));
   // With a fight running, making another scene live parks it, which the GM confirms.
   const confirm = gm.getByRole("dialog", { name: /^Make ".*" live\?$/ });
-  const table = gm.getByRole("button", { name: "Go to the table", exact: true });
+  // Once live, Who is in it says so with its own Go to the table; the foot's Cup is the last.
+  const table = gm.getByRole("button", { name: "Go to the table", exact: true }).last();
   await expect(confirm.or(table)).toBeVisible();
   if (await confirm.isVisible()) await press(confirm.getByRole("button", { name: "Make live" }));
   await press(table);
@@ -59,20 +59,19 @@ async function makeLiveFromSteps(gm: Page, steps: readonly string[]) {
   await showView(gm, "Map");
 }
 
-/** A new scene on a freshly uploaded map, made from the Scenes tab's steps and made live; the GM ends at the table. */
+/** A new encounter on a freshly uploaded map, made from its Draft page and made live; the GM ends at the table. */
 async function liveSceneOnNewMap(gm: Page, file: string, buffer: Buffer) {
   await openGmSection(gm, "Encounters");
-  // The bar's New scene on a laptop, the tab bar's New on a phone.
+  // The bar's New encounter on a laptop, the header's plus on a phone.
   await press(gm.getByRole("button", { name: /^New( encounter)?$/ }).first());
-  await expect(gm.getByRole("heading", { name: "New encounter" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Untitled encounter" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: file, mimeType: "image/png", buffer });
   await expect(gm.getByText("Map uploaded.")).toBeVisible();
   await expectPageFits(gm);
-  await press(gm.getByRole("button", { name: "Continue" }));
-  await expect(gm.getByRole("heading", { name: "Tokens and monsters" })).toBeVisible();
-  await makeLiveFromSteps(gm, ["Light", "Sound", "Review"]);
+  await press(gm.getByRole("button", { name: "Use this map" }));
+  await makeLiveFromPage(gm);
 }
 
 test("the first evening: the GM password, the join address, a player, the table screen and a live encounter", async ({
@@ -165,17 +164,16 @@ test("the first evening: the GM password, the join address, a player, the table 
   // picker says, and the scene's Map step leads to it.
   await press(gmSection(gm, "Play"));
   await press(gm.getByRole("button", { name: "Prepare an encounter" }));
-  await expect(gm.getByRole("heading", { name: "New encounter" })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: "Untitled encounter" })).toBeVisible();
   const chooser = gm.waitForEvent("filechooser");
   await press(gm.getByRole("button", { name: /Upload a map/ }));
   await (await chooser).setFiles({ name: `${MAP_NAME}.png`, mimeType: "image/png", buffer: battleMap() });
   await expect(gm.getByText("Map uploaded.")).toBeVisible();
   await expect(gm.getByText(/has no grid yet/).first()).toBeVisible();
   await expectPageFits(gm);
-  await press(gm.getByRole("button", { name: "Continue" }));
-  await expect(gm.getByRole("heading", { name: "Tokens and monsters" })).toBeVisible();
-  await press(gm.getByRole("button", { name: "Back", exact: true }));
-  await expect(gm.getByRole("heading", { name: "Map", exact: true })).toBeVisible();
+  // The encounter is made with Use this map; its foot names the missing grid, and Go to it opens Light and sound.
+  await press(gm.getByRole("button", { name: "Use this map" }));
+  await press(gm.getByRole("button", { name: "Go to it" }).first());
   await expectPageFits(gm);
   await press(gm.getByRole("button", { name: "Set the grid" }));
 
@@ -192,11 +190,11 @@ test("the first evening: the GM password, the join address, a player, the table 
   await expect(gm.getByText(`The grid for ${MAP_NAME} is set. Tokens on it snap to its squares.`)).toBeVisible();
   await expectPageFits(gm);
 
-  // Back to the scene, now with a grid, through its steps to live: the table screen shows it.
+  // Back to the encounter, now with a grid, and live from its page: the table screen shows it.
   await press(gm.getByRole("button", { name: "Back to the encounter" }));
-  await expect(gm.getByRole("heading", { name: "Map", exact: true })).toBeVisible();
+  await expect(gm.getByRole("heading", { name: MAP_NAME })).toBeVisible();
   await expect(gm.getByRole("button", { name: "Set the grid" })).toBeHidden();
-  await makeLiveFromSteps(gm, ["Tokens", "Light", "Sound", "Review"]);
+  await makeLiveFromPage(gm);
   await expect(gm.getByLabel(`Encounters · ${MAP_NAME} is live`)).toBeVisible();
   await expect(screen.getByRole("img", { name: MAP_NAME })).toBeVisible();
   await expectPageFits(gm);
@@ -586,11 +584,9 @@ test("the GM paints water on a gridded map, sets a hidden trap and turns the wea
   await press(gm.getByRole("button", { name: "Measure this area" }));
   await press(gm.getByRole("button", { name: "Looks right" }));
   await press(gm.getByRole("button", { name: "Confirm grid" }));
+  // Back from the grid with the map named, the encounter is made on it at once.
   await press(gm.getByRole("button", { name: "Back to the encounter" }));
-  const continueStep = gm.getByRole("button", { name: "Continue" });
-  if (await continueStep.isDisabled()) await press(gm.getByRole("button", { name: /^Smoke grotto/ }));
-  await press(continueStep);
-  await makeLiveFromSteps(gm, ["Light", "Sound", "Review"]);
+  await makeLiveFromPage(gm);
 
   const rail = gm.getByRole("toolbar", { name: "Map tools" });
   const map = gm.getByRole("group", { name: /Interactive tokens are layered above this map/ });

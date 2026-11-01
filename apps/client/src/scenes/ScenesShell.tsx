@@ -9,8 +9,8 @@ import { PrepBarSlot } from "../shell/AppBar";
 import { ScenesContext, useSceneLinks, type ScenesContextValue } from "./context";
 import { SCENES_PATHS, pathForMap, pathForScene, scenesViewOf, sectionOf } from "./routes";
 import { SceneList } from "./SceneList";
-import { SceneDocument } from "./SceneDocument";
-import { SceneEditor } from "./SceneEditor";
+import { SceneDocument, tabForStep } from "./SceneDocument";
+import { DraftEncounter } from "./DraftEncounter";
 import { MapList } from "../maps/MapList";
 import { MapDocument } from "../maps/MapDocument";
 import { MapEditor } from "../maps/MapEditor";
@@ -119,10 +119,15 @@ export function ScenesShell({
       case "scenes":
         return <SceneList />;
       case "scene":
-        return view.step === null && view.encounterId ? (
-          <SceneDocument key={view.encounterId} encounterId={view.encounterId} />
+        // An old step's address opens the page on the tab that holds that step (Prep frame 2.3).
+        return view.encounterId ? (
+          <SceneDocument
+            key={view.encounterId}
+            encounterId={view.encounterId}
+            {...(view.step ? { initialTab: tabForStep(view.step) } : {})}
+          />
         ) : (
-          <SceneEditor key={view.encounterId ?? "new"} encounterId={view.encounterId} step={view.step ?? "map"} />
+          <DraftEncounter />
         );
       case "maps":
         return <MapList />;

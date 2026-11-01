@@ -642,3 +642,60 @@
     font-size: 20px;
   }
 }
+
+/* ----- A new encounter, the Draft page (Prep frame 2.3) ----- */
+/* The checklist (420px) where the map would be, beside Pick a map with the maps four to a row. */
+.sc-draft {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 420px minmax(0, 1fr);
+  align-items: start;
+  align-content: start;
+  min-height: 0;
+}
+.sc-draft-check {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-right: 1px solid var(--line-strong);
+  align-self: stretch;
+}
+.sc-draft-eyebrow {
+  margin: 0;
+  color: var(--text-muted);
+  font: 600 11px / 1.2 var(--font-label);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.sc-draft-check .nh-steps-vertical li,
+.sc-draft-check .nh-step {
+  min-height: 52px;
+}
+.sc-draft-maps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+}
+.sc-draft-use {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 979px) {
+  .sc-draft {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sc-draft-check {
+    align-self: start;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-strong);
+  }
+}
+@media (max-width: 760px) {
+  .sc-draft-check,
+  .sc-draft-maps {
+    padding: var(--space-3);
+  }
+}
