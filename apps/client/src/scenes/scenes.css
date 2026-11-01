@@ -26,35 +26,6 @@
   flex: 1 1 auto;
 }
 
-/* ----- Laptop: the section bar ----- */
-.sc-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: none;
-  padding: var(--space-1) var(--pane-gutter);
-  border-bottom: 1px solid var(--line-strong);
-  background: var(--material-lip), var(--surface-1);
-}
-.sc-bar-title {
-  margin: 0;
-  color: var(--heading-ink);
-  font: var(--fw-display) var(--fs-h3) / 1.2 var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-display);
-  text-shadow: var(--heading-shadow);
-}
-.sc-bar-sections {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.sc-bar-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding-inline: var(--space-3);
-  font-size: var(--fs-sm);
-}
 .sc-find {
   position: relative;
   width: min(18rem, 28vw);
@@ -70,45 +41,6 @@
   display: none;
 }
 
-/* ----- Phone: the tab bar under the thumb ----- */
-.sc-tabbar {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  flex: none;
-  padding-bottom: env(safe-area-inset-bottom);
-  border-top: 1px solid var(--line-strong);
-  background: var(--material-lip), var(--surface-1);
-}
-.sc-tabbar-tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-height: calc(var(--tap-min) + var(--space-3));
-  padding: var(--space-1) 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-dim);
-  font: 600 var(--fs-2xs) / 1.1 var(--font-label);
-  cursor: pointer;
-}
-.sc-tabbar-tab svg {
-  width: 1.35rem;
-  height: 1.35rem;
-}
-.sc-tabbar-tab:hover {
-  color: var(--text);
-}
-/* The tab that is on is raised, with the cyan selection edge along its top. */
-.sc-tabbar-tab.is-on {
-  color: var(--text);
-  background: var(--tab-on);
-  box-shadow:
-    var(--tab-on-sheen),
-    inset 0 2px 0 var(--cyan);
-}
 .sc-phone-head {
   display: flex;
   align-items: center;
@@ -233,19 +165,6 @@
   height: 1em;
 }
 
-/* ----- The front page: New map and New scene side by side, then the Maps and Scenes views ----- */
-.sc-front-head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  flex: none;
-  padding: var(--space-3) var(--pane-gutter) 0;
-}
-
-.sc-front-tabs {
-  align-self: flex-start;
-}
-
 /* ----- Lists: a table on a laptop, rows with two facts on a phone ----- */
 .sc-list {
   display: flex;
@@ -310,11 +229,7 @@
 .sc-rows li.is-dragging {
   opacity: 0.6;
 }
-.sc-name-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
+
 .sc-rowlink {
   display: inline-flex;
   align-items: center;
@@ -415,7 +330,6 @@
   font-size: var(--fs-xs);
 }
 @media (max-width: 760px) {
-  .sc-front-head,
   .sc-list-body,
   .sc-sub {
     padding-inline: var(--space-3);

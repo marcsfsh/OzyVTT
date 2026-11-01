@@ -266,9 +266,14 @@ describe("an encounter's page", () => {
     expect(screen.getByText("What Lyra Emberwise's player sees once this encounter is live.")).toBeInTheDocument();
   });
 
-  it("names the Codex session that stages it on its title row's line", async () => {
+  it("names the Codex session that stages it on its title row's line, and lists it under In the Codex", async () => {
+    const user = userEvent.setup();
     renderTab(`/encounters/${IDS.ambush}`);
     expect(await screen.findByText(/In the Codex: Session 6/)).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Crypt ambush actions"));
+    await user.click(screen.getByRole("menuitem", { name: "In the Codex" }));
+    const drawer = within(await screen.findByRole("complementary", { name: "In the Codex" }));
+    expect(drawer.getByText("Session 6")).toBeInTheDocument();
   });
 
   it("says so when the encounter is gone, with the way back to the list", async () => {

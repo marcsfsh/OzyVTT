@@ -194,9 +194,10 @@ The shells:
   and Log. Table is the Switch: Map, Turn (Me before an encounter), Log and Party, the turn order's cards under it and End turn in
   reach in every view; choosing a target turns to Map, and an owed prompt or the player's turn turns to Turn.
 
-Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar. On its
-front page New encounter is the bar's primary with New map before it as a Base line button; the Maps and Encounters
-tabs follow, each a sortable table.
+Prep holds Encounters, Party (the roster), Maps, Tokens, Sound and Replays, in that order in its section bar (ADR-0053).
+New encounter is the bar's Cup on Prep's lists and steps down to a Base line control on a record. Encounters is a shelf:
+its toolbar has Filters, the state chips, the count, Your order and New map, then a card an encounter with its map as
+the picture, its one state tag (Live, Encounter parked, Replay, Ended, Prepared or Draft) and whether it is ready.
 
 A page header is for records only (ADR-0048). A list, a settings section or an overview starts with its content and at
 most one description line (14px, `--text-dim`, the GM only tag in front of it on a page players can also open). A
@@ -476,14 +477,17 @@ its pages from these patterns.
   row at the end of the document.
 - A preview is the real thing, drawn by the component the real page uses. See it as switches the page in place to what
   Everyone or one chosen character receives, through the server's read for that audience.
-- Lists are tables. Filters open from a Filters button and leave removable chips; sort names its order on its button.
-  On a phone a table becomes rows with the two facts that matter most.
+- Lists are tables, or a shelf where the picture leads. Filters open from a Filters button and leave removable chips;
+  sort names its order on its button. On a phone a table becomes rows with the two facts that matter most, and a shelf
+  two cards to a row.
 - Making something is a set of steps: steps down the left, each marked done (cyan check), current (cyan outline) or
   needing a choice (amber !); questions in the middle; a live preview on the right. On a phone the steps are a strip of
   chips and the preview is a bar above Next.
-- Prep is a list, a preview and a setup column: encounters on the left with their status (a Live lamp, Ready, Needs a map,
-  Draft, defined in IMPLEMENTATION.md using `factsOf` and `needsOf`), the whole staged map in the middle (fitted, never cropped), and on the right the encounter (monsters, XP and a difficulty meter against the
-  party's budget), its Encounter settings (ADR-0039) and a Ready to go checklist, with Make live at the bottom.
+- An encounter's page is the table's workbench: the record's title row, the tools as the dock, the map with its Tray chip
+  and controls, and a panel with Who is in it, Rules (its Encounter settings, ADR-0039) and Light and sound, its foot
+  naming what is missing (from `factsOf` and `needsOf`, see `docs/design/IMPLEMENTATION.md`) over Make live. A new
+  encounter is a Draft page with its checklist beside Pick a map, made when the map is picked. A map's grid keeps its
+  steps.
 - Decisions owed wait in one place: a pending card on the GM's Encounter tab, a prompt at the top of a player's Table tab.
 - Time is a timeline. History is a list of versions with Compare and Restore.
 - A map is present without taking over. Anything placed on a map has two ways in: a button and then a click on the map,

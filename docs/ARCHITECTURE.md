@@ -1162,21 +1162,23 @@ fields, and saved data keys say encounter, and the stores' numbered migrations m
 (`encounter-rename.ts`). Files, types and variables inside still say scene, and the running fight inside is still
 "encounter" in places; issue #167 tracks renaming them.
 
-Encounters and maps are prepared on Prep's Encounters and Maps pages (ADR-0035), in `scenes/` and `maps/`. `scenes/ScenesShell.tsx`
-fills the end of Prep's section bar and renders the view the address names (`scenes/routes.ts`): the front page
-(New map and New encounter side by side over the Maps and Encounters tabs, each its table with filters and a sort that
-includes Needs attention, from `needsOf`, and for encounters Progress: in progress while its combat runs or is parked,
-completed once one ended there, which the server stamps as the encounter's `endedAt`), an encounter or a map as one
-document, or the steps that make or edit one
-(`scenes/EditorFrame.tsx`). An encounter's page and steps are built from the table's parts (`EncounterMap`, `MapRail`,
-`TablePanel`, the tray) and edit the parked encounter with its `encounterId`, so the table itself always shows the live
-encounter. Placing on any map is a button and then a press on it (`armPlacement` in `scene/tableGeometry.ts`), or the
-spot menu a right-click or long press opens (`scene/MapSpotMenu.tsx`). The grid's calibration keeps its logic in
-`maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the map's steps to place. On a
-laptop an encounter's page lists the encounters down its left (`scenes/SceneListColumn.tsx`) with whether each is ready to go
-(`readinessOf` in `scenes/sceneFacts.ts`, worked out from the facts, never stored), and its panel leads with Encounter
-(`scenes/SceneEncounterTab.tsx`): the monsters and the difficulty meter (`encounter/EncounterMeter.tsx`, the SRD budget
-for the staged party, with no reading when the catalog gives a monster no XP), Encounter settings and Ready to go. Encounter
+Encounters and maps are prepared on Prep's Encounters and Maps pages (ADR-0035, its frame ADR-0053), in `scenes/` and
+`maps/`. `scenes/ScenesShell.tsx` fills the end of Prep's section bar and renders the view the address names
+(`scenes/routes.ts`). Encounters is a shelf (`scenes/SceneList.tsx`, the cards in `scenes/SceneShelf.tsx`): filters,
+state chips and a sort that includes Needs attention, from `needsOf`, and Progress (in progress while its combat runs or
+is parked, completed once one ended there, which the server stamps as the encounter's `endedAt`). A card's state tag
+and its ready line come from `scenes/stateTag.ts` (`stateTagOf` and `readyLineOf` over `readinessOf` in
+`scenes/sceneFacts.ts`), worked out from the facts, never stored. An encounter's page (`scenes/SceneDocument.tsx`) is
+the table's workbench: the title row, the tools in a dock (`DockToolsTarget`), `EncounterMap` editing the parked
+encounter with its `encounterId` (so the table itself always shows the live encounter), and `TablePanel` with Who is in
+it, Rules and Light and sound, whose foot (`ReadyLines` in `scenes/SceneEncounterTab.tsx`) names what is missing over
+Make live. A new encounter is `scenes/DraftEncounter.tsx`, which sends `encounter:create` when a map is picked; an old
+`?step=` address opens the page on the tab that holds that step. Placing on any map is a button and then a press on it
+(`armPlacement` in `scene/tableGeometry.ts`), or the spot menu a right-click or long press opens
+(`scene/MapSpotMenu.tsx`). A map's steps run in `scenes/EditorFrame.tsx`; the grid's calibration keeps its logic in
+`maps/useCalibration.tsx`, which returns its parts (note, body, actions, canvas) for the steps to place. Who they face
+(`encounter/EncounterMeter.tsx`, the SRD budget for the staged party, with no reading when the catalog gives a monster
+no XP) sits under Who is in it. Encounter
 settings are the encounter's `initiativeDefaults` (ADR-0039), set with `encounter:set-initiative-defaults`: `encounter:start`
 takes the live encounter's value for a choice its request leaves out, a duplicate copies them and a replay has none. The
 table's Start the encounter seeds its two switches from them and sends what the switches show.

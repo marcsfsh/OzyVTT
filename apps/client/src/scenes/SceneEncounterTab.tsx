@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { DiceMode, ScenePlayerDice } from "@vtt/domain";
-import { Button, IconCheck, IconWarning, Select, Switch, useToast } from "@vtt/ui";
+import { Button, Select, Switch, useToast } from "@vtt/ui";
 import { DICE_MODE_OPTIONS } from "../settings/table-words";
 import { EncounterMeter } from "../encounter/EncounterMeter";
 import { command } from "../lib/command";
@@ -132,43 +132,6 @@ function EncounterDice({ facts }: Readonly<{ facts: SceneFacts }>) {
       {choice("d20", "Players' d20 rolls")}
       {choice("damage", "Players' damage")}
     </>
-  );
-}
-
-/** The scene panel's Fight tab: the monsters and the difficulty meter, the fight's settings, then Ready to go. */
-export function SceneEncounterTab({ facts }: Readonly<{ facts: SceneFacts }>) {
-  const { state, token, maps, go } = useScenes();
-  const checks = readyChecks(facts, maps);
-  return (
-    <div className="sc-encounter">
-      <section className="sc-encounter-section" aria-labelledby="sc-encounter-title">
-        <h3 id="sc-encounter-title" className="sc-encounter-label">
-          Who they face
-        </h3>
-        <EncounterMeter state={state} token={token} staged={facts.combat.initiative.map((entry) => entry.actorId)} />
-      </section>
-      {!facts.scene.replayOf && <FightSettings facts={facts} />}
-      <section className="sc-encounter-section" aria-labelledby="sc-ready-title">
-        <h3 id="sc-ready-title" className="sc-encounter-label">
-          Ready to go
-        </h3>
-        <ul className="sc-ready">
-          {checks.map((check) => (
-            <li key={check.id} className={check.ok ? "is-ok" : "is-warn"}>
-              <span className="sc-ready-mark" aria-hidden="true">
-                {check.ok ? <IconCheck /> : <IconWarning />}
-              </span>
-              <span className="sc-ready-text">{check.text}</span>
-              {!check.ok && check.step && (
-                <Button size="sm" variant="secondary" onClick={() => go(pathForScene(facts.scene.id, check.step))}>
-                  Go to it
-                </Button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
   );
 }
 

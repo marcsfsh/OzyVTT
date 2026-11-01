@@ -266,7 +266,7 @@ party member as a band.
 
 ## E. Prep
 
-Job: get a session ready before anyone arrives. Status: frame Designed (`E-prep/SPEC.md`, `E-prep/PLAN.md`, ADR-0053): a
+Job: get a session ready before anyone arrives. Status: frame Built (`E-prep/SPEC.md`, `E-prep/PLAN.md`, ADR-0053): a
 shelf of encounter cards, an encounter's page on the table's workbench, a new encounter's page with its checklist, and
 the map's grid steps. Maps and tokens Designed (`E2-maps-tokens/SPEC.md`, `E2-maps-tokens/PLAN.md`, ADR-0063): folders
 at the side, a map beside its folder's list, filing by a map's menu and Choose, the Tokens page in Party, Monsters and

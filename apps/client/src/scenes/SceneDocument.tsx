@@ -30,7 +30,7 @@ import { StateChip } from "./pieces";
 import { stateTagOf } from "./stateTag";
 import { FightSettings, ReadyLines, WhoTheyFace } from "./SceneEncounterTab";
 import { ScenePreview, type SeeAs } from "./ScenePreview";
-import { SceneTokens, SceneHistory, SceneLight, SceneMapFacts, SceneSound } from "./SceneQuestions";
+import { SceneCodex, SceneTokens, SceneHistory, SceneLight, SceneMapFacts, SceneSound } from "./SceneQuestions";
 import "./scene-page.css";
 import "../table/table-header.css";
 
@@ -60,6 +60,7 @@ export function SceneDocument({
   const scene = state.combat.encounters.find((candidate) => candidate.id === encounterId) ?? null;
   const [seeAs, setSeeAs] = useState<SeeAs>("gm");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [codexOpen, setCodexOpen] = useState(false);
   const [dockTools, setDockTools] = useState<HTMLElement | null>(null);
   const actions = useSceneActions(state.combat.encounters, {
     combatActive: state.combat.active,
@@ -162,6 +163,7 @@ export function SceneDocument({
               See as {actor.name}
             </MenuItem>
           ))}
+          <MenuItem onClick={() => setCodexOpen(true)}>In the Codex</MenuItem>
           <MenuItem onClick={() => setHistoryOpen(true)}>History</MenuItem>
           {!facts.live && (
             <MenuItem icon={<IconTrash />} tone="danger" onClick={() => void actions.remove(scene)}>
@@ -327,6 +329,10 @@ export function SceneDocument({
       </div>
       <Drawer open={historyOpen} onClose={() => setHistoryOpen(false)} title="History">
         <SceneHistory facts={facts} />
+      </Drawer>
+      {/* The sessions and pins that stage it, with staging it for a session; its title row's line names them. */}
+      <Drawer open={codexOpen} onClose={() => setCodexOpen(false)} title="In the Codex">
+        <SceneCodex facts={facts} />
       </Drawer>
       {actions.dialogs}
     </div>

@@ -33,28 +33,7 @@
   min-height: 44px;
   border-bottom: 1px solid var(--line);
 }
-.sc-ready-mark {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-}
-.sc-ready-mark svg {
-  width: 16px;
-  height: 16px;
-}
-.sc-ready .is-ok .sc-ready-mark {
-  color: var(--cyan-hi);
-}
-.sc-ready .is-warn .sc-ready-mark {
-  color: var(--caution-text);
-}
-.sc-ready-text {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: var(--fs-sm);
-}
+
 /* An encounter's own dice modes: the label over the select, full width at 390px. */
 .sc-encounter-dice {
   display: flex;
