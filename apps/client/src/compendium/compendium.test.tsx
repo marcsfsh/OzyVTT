@@ -247,10 +247,25 @@ describe("New homebrew", () => {
 });
 
 describe("Sharing", () => {
-  it("sets who sees a record from its row of the grid, and several at once", async () => {
+  it("narrows the records by kind and by who sees them, and sets who sees one from its row", async () => {
     const user = mount("/compendium/sharing");
-    const grid = await screen.findByRole("table");
-    await user.click(within(grid).getByRole("checkbox", { name: "Brine Burst: Everyone" }));
+    const rows = within(await screen.findByRole("list", { name: "Who sees what" }));
+    expect(rows.getByText("Spell · Lyra Emberwise")).toBeInTheDocument();
+    const kinds = within(screen.getByRole("group", { name: "Kinds" }));
+    expect(kinds.getByRole("button", { name: /^All homebrew/ })).toHaveTextContent("1");
+    await user.click(
+      within(screen.getByRole("group", { name: "Who sees it" })).getByRole("button", { name: /^Hidden/ })
+    );
+    expect(new URLSearchParams(window.location.search).get("who")).toBe("hidden");
+    expect(
+      await screen.findByText("Nothing is published yet. A record is shared once it is published.")
+    ).toBeInTheDocument();
+    await user.click(
+      within(screen.getByRole("group", { name: "Who sees it" })).getByRole("button", { name: /^Hidden/ })
+    );
+    const menu = await screen.findByLabelText(/^Who sees Brine Burst/);
+    await user.click(menu);
+    await user.click(within(menu.closest(".nh-menu") as HTMLElement).getByRole("menuitemradio", { name: "Everyone" }));
     await waitFor(() =>
       expect(api.calls).toContainEqual([
         "setAudience",
@@ -259,7 +274,12 @@ describe("Sharing", () => {
         4
       ])
     );
-    await user.click(within(grid).getByRole("checkbox", { name: "Tick Brine Burst" }));
+  });
+
+  it("sets several at once after Choose", async () => {
+    const user = mount("/compendium/sharing");
+    await user.click(await screen.findByRole("button", { name: "Choose" }));
+    await user.click(screen.getByRole("checkbox", { name: "Tick Brine Burst" }));
     await user.click(screen.getByRole("button", { name: "Set for 1 selected" }));
     await user.click(
       within(screen.getByRole("group", { name: "Who sees the ticked record" })).getByRole("button", { name: "Hidden" })

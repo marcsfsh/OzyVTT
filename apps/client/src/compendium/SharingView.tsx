@@ -1,26 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Button,
-  IconCheck,
-  IconChevronRight,
-  IconEyeOff,
+  SideListGroup,
+  SideListRow,
+  WhoSeesItMenu,
   cx,
   useToast,
   Dropdown,
-  AudienceChip,
   WhoSeesItSwitch,
   HIDDEN,
-  toggleCharacter,
   type Audience
 } from "@vtt/ui";
-import { homebrewApi, type HomebrewRecordDocument, type HomebrewRecordSummary } from "../homebrew/api";
-import { TickDropdown } from "../scenes/listTools";
+import { homebrewApi, type HomebrewRecordSummary } from "../homebrew/api";
 import { useCompendium } from "./context";
 import { refreshCompendium, useHomebrewList } from "./data";
-import { KINDS, KindIcon, kindPlural, type Kind } from "./kinds";
-import { NameCell } from "./pieces";
+import { KINDS, KindIcon, kindLabel, kindPlural, type Kind } from "./kinds";
+
+/** A kind's word starts a row, where the kit's words are written for the middle of a sentence. */
+const upperFirst = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 import { recordPath } from "./routes";
-import { SharingTab } from "./record/SharingTab";
 
 const audienceOf = (row: HomebrewRecordSummary): Audience => ({
   audience: row.audience,
@@ -33,7 +31,7 @@ const audienceOf = (row: HomebrewRecordSummary): Audience => ({
  * picked in the grid shows its own row beside it, with where each audience meets it and since when.
  */
 export function SharingView() {
-  const { token, party, phone, wide, go } = useCompendium();
+  const { token, party, phone, go, query, setQuery } = useCompendium();
   const { toast } = useToast();
   const list = useHomebrewList(token);
   const published = useMemo(
@@ -46,13 +44,21 @@ export function SharingView() {
     [list.data]
   );
   const kindsHere = KINDS.filter((kind) => published.some((row) => row.type === kind));
-  const [kinds, setKinds] = useState<readonly Kind[] | null>(null);
-  const shownKinds = kinds ?? kindsHere;
-  const rows = published.filter((row) => shownKinds.includes(row.type));
+  // The kinds and who sees it narrow the rows, one choice each in the address (G pages spec 2.2).
+  const kind = (query.get("kind") as Kind | null) ?? null;
+  const who = query.get("who");
+  const inKind = (row: HomebrewRecordSummary) => kind === null || row.type === kind;
+  const inWho = (row: HomebrewRecordSummary, value: string | null) =>
+    value === null || (value === "hidden" ? row.audience === "hidden" : row.audience !== "hidden");
+  const rows = published.filter((row) => inKind(row) && inWho(row, who));
+  const [choosing, setChoosing] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [focus, setFocus] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const focused = rows.find((row) => row.id === focus) ?? rows[0] ?? null;
+  const setFilter = (key: string, value: string | null) =>
+    setQuery((params) => {
+      if (value === null) params.delete(key);
+      else params.set(key, value);
+    });
 
   const set = async (row: HomebrewRecordSummary, audience: Audience) => {
     setBusy(row.id);
@@ -88,189 +94,167 @@ export function SharingView() {
 
   if (!list.data) return <p className="cp-hint cp-pad">{list.error ?? "Reading who sees what."}</p>;
 
+  // The row's line: its kind, then who it reached when that is characters by name.
+  const lineOf = (row: HomebrewRecordSummary) => {
+    const value = audienceOf(row);
+    const names =
+      value.audience === "characters"
+        ? party.filter((character) => value.characterIds.includes(character.id)).map((character) => character.name)
+        : [];
+    return [upperFirst(kindLabel(row.type)), ...names].join(" · ");
+  };
+
+  const kindRows = [
+    { value: null as Kind | null, label: "All homebrew" },
+    ...kindsHere.map((value) => ({ value, label: upperFirst(kindPlural(value)) }))
+  ];
+  const side = phone ? (
+    <div className="nh-filterchips" role="group" aria-label="Kinds">
+      {kindRows.map((entry) => (
+        <button
+          key={entry.label}
+          type="button"
+          className={cx("nh-filterchip", "interactive", kind === entry.value && "is-on")}
+          aria-pressed={kind === entry.value}
+          onClick={() => setFilter("kind", entry.value)}
+        >
+          {entry.label}
+        </button>
+      ))}
+    </div>
+  ) : (
+    <>
+      <SideListGroup eyebrow="Kinds">
+        {kindRows.map((entry) => (
+          <SideListRow
+            key={entry.label}
+            label={entry.label}
+            leading={entry.value ? <KindIcon kind={entry.value} /> : undefined}
+            count={published.filter((row) => entry.value === null || row.type === entry.value).length}
+            current={kind === entry.value}
+            onSelect={() => setFilter("kind", entry.value)}
+          />
+        ))}
+      </SideListGroup>
+      <SideListGroup eyebrow="Who sees it">
+        {(
+          [
+            ["shared", "Shared"],
+            ["hidden", "Hidden"]
+          ] as const
+        ).map(([value, label]) => (
+          <SideListRow
+            key={value}
+            label={label}
+            count={published.filter((row) => inKind(row) && inWho(row, value)).length}
+            current={who === value}
+            onSelect={() => setFilter("who", who === value ? null : value)}
+          />
+        ))}
+      </SideListGroup>
+    </>
+  );
+
+  const allTicked = rows.length > 0 && rows.every((row) => selected.has(row.id));
+  const toolbar = (
+    <div className="cp-sharing-toolbar">
+      <span className="cp-sharing-count" role="status">
+        {`${rows.length} ${rows.length === 1 ? "record" : "records"}`}
+      </span>
+      {choosing && (
+        <BulkWhoSeesIt count={selected.size} disabled={busy !== null} onSet={(audience) => void setMany(audience)} />
+      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-pressed={choosing}
+        onClick={() => {
+          setChoosing((on) => !on);
+          setSelected(new Set());
+        }}
+      >
+        {choosing ? "Done choosing" : "Choose"}
+      </Button>
+    </div>
+  );
+  const list_ =
+    rows.length === 0 ? (
+      <p className="cp-hint">Nothing is published yet. A record is shared once it is published.</p>
+    ) : (
+      <ul className="cp-share-rows" aria-label="Who sees what">
+        {choosing && (
+          <li className="cp-share-row is-all">
+            <input
+              type="checkbox"
+              className="cp-pick"
+              aria-label="Tick every record"
+              checked={allTicked}
+              onChange={() => setSelected(allTicked ? new Set() : new Set(rows.map((row) => row.id)))}
+            />
+            <span className="cp-hint">Every record shown</span>
+          </li>
+        )}
+        {rows.map((row) => {
+          const value = audienceOf(row);
+          return (
+            <li key={row.id} className={cx("cp-share-row", phone && "is-phone")}>
+              {choosing && (
+                <input
+                  type="checkbox"
+                  className="cp-pick"
+                  aria-label={`Tick ${row.name}`}
+                  checked={selected.has(row.id)}
+                  onChange={() => {
+                    const next = new Set(selected);
+                    if (next.has(row.id)) next.delete(row.id);
+                    else next.add(row.id);
+                    setSelected(next);
+                  }}
+                />
+              )}
+              <KindIcon kind={row.type} />
+              <button
+                type="button"
+                className="cp-share-name"
+                onClick={() => go(`${recordPath(row.type, row.id)}?tab=sharing`)}
+              >
+                <b className={cx(value.audience === "hidden" && "is-hidden")}>{row.name}</b>
+                <small>{lineOf(row)}</small>
+              </button>
+              <WhoSeesItMenu
+                value={value}
+                party={party}
+                what={row.name}
+                disabled={busy !== null}
+                onChange={(next) => void set(row, next)}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    );
+
   if (phone)
     return (
       <div className="cp-sharing scroll-y">
         <div className="cp-phone-body">
-          {rows.length === 0 ? (
-            <p className="cp-hint">Nothing is published yet. A record is shared once it is published.</p>
-          ) : (
-            <ul className="cp-list" aria-label="Who sees what">
-              {rows.map((row) => (
-                <li key={row.id}>
-                  <button
-                    type="button"
-                    className="cp-row"
-                    onClick={() => go(`${recordPath(row.type, row.id)}?tab=sharing`)}
-                  >
-                    <KindIcon kind={row.type} />
-                    <span className="cp-row-main">
-                      <b>{row.name}</b>
-                      <AudienceChip value={audienceOf(row)} party={party} />
-                    </span>
-                    <IconChevronRight />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          {side}
+          {toolbar}
+          {list_}
         </div>
       </div>
     );
 
-  const allTicked = rows.length > 0 && rows.every((row) => selected.has(row.id));
   return (
-    // Narrower than 980 the record's row stacks under the grid, and the view scrolls as one.
-    <div className={cx("cp-sharing cp-sharing--laptop", !wide && "scroll-y")}>
-      <section className="cp-sharing-grid" aria-label="Who sees what">
-        <div className="cp-section-head">
-          <h3 className="cp-h cp-grow">Who sees what</h3>
-          {kindsHere.length > 1 && (
-            <TickDropdown
-              name="Published"
-              options={kindsHere.map((kind) => ({ value: kind, label: kindPlural(kind) }))}
-              selected={shownKinds}
-              onChange={(next) => setKinds(next)}
-            />
-          )}
-          <BulkWhoSeesIt count={selected.size} disabled={busy !== null} onSet={(audience) => void setMany(audience)} />
-        </div>
-        {rows.length === 0 ? (
-          <p className="cp-hint">Nothing is published yet. A record is shared once it is published.</p>
-        ) : (
-          <div className="scroll-both cp-grid-wrap">
-            <table className="cp-table cp-share-table">
-              <thead>
-                <tr>
-                  <th scope="col" className="cp-pick-cell">
-                    <input
-                      type="checkbox"
-                      className="cp-pick"
-                      aria-label="Tick every record"
-                      checked={allTicked}
-                      onChange={() => setSelected(allTicked ? new Set() : new Set(rows.map((row) => row.id)))}
-                    />
-                  </th>
-                  <th scope="col">Record</th>
-                  <th scope="col" className="is-c">
-                    Hidden
-                  </th>
-                  <th scope="col" className="is-c">
-                    Everyone
-                  </th>
-                  {party.map((character) => (
-                    <th key={character.id} scope="col" className="is-c">
-                      {character.name.split(" ")[0]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => {
-                  const value = audienceOf(row);
-                  const locked = busy !== null;
-                  return (
-                    <tr key={row.id} className={cx(focused?.id === row.id && "is-selected")}>
-                      <td className="cp-pick-cell">
-                        <input
-                          type="checkbox"
-                          className="cp-pick"
-                          aria-label={`Tick ${row.name}`}
-                          checked={selected.has(row.id)}
-                          onChange={() => {
-                            const next = new Set(selected);
-                            if (next.has(row.id)) next.delete(row.id);
-                            else next.add(row.id);
-                            setSelected(next);
-                          }}
-                        />
-                      </td>
-                      <th scope="row">
-                        <button
-                          type="button"
-                          className="cp-rowlink"
-                          aria-current={focused?.id === row.id ? "true" : undefined}
-                          onClick={() => setFocus(row.id)}
-                        >
-                          <NameCell kind={row.type} name={row.name} />
-                        </button>
-                      </th>
-                      <td className="is-c">
-                        <GridBox
-                          on={value.audience === "hidden"}
-                          hidden
-                          label={`${row.name}: Hidden`}
-                          disabled={locked}
-                          onToggle={() => value.audience !== "hidden" && void set(row, HIDDEN)}
-                        />
-                      </td>
-                      <td className="is-c">
-                        <GridBox
-                          on={value.audience === "everyone"}
-                          label={`${row.name}: Everyone`}
-                          disabled={locked}
-                          onToggle={() =>
-                            void set(
-                              row,
-                              value.audience === "everyone" ? HIDDEN : { audience: "everyone", characterIds: [] }
-                            )
-                          }
-                        />
-                      </td>
-                      {party.map((character) => (
-                        <td key={character.id} className="is-c">
-                          <GridBox
-                            on={value.audience === "everyone" || value.characterIds.includes(character.id)}
-                            covered={value.audience === "everyone"}
-                            label={`${row.name}: ${character.name}`}
-                            disabled={locked || value.audience === "everyone"}
-                            onToggle={() => void set(row, toggleCharacter(value, character.id))}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      <aside className="cp-sharing-side scroll-y" aria-label={focused ? focused.name : "A record"}>
-        {focused ? <FocusedRecord row={focused} /> : <p className="cp-hint">Pick a record to see its row.</p>}
-      </aside>
+    <div className="cp-sharing cp-sharing-split">
+      <nav className="cp-sharing-sideList scroll-y" aria-label="Narrow who sees what">
+        {side}
+      </nav>
+      <div className="cp-sharing-main scroll-y">
+        {toolbar}
+        {list_}
+      </div>
     </div>
-  );
-}
-
-/** One square of the grid: ticked, Hidden's crossed eye, or ticked but covered by Everyone. */
-function GridBox({
-  on,
-  hidden = false,
-  covered = false,
-  label,
-  disabled,
-  onToggle
-}: Readonly<{
-  on: boolean;
-  hidden?: boolean;
-  covered?: boolean;
-  label: string;
-  disabled: boolean;
-  onToggle: () => void;
-}>) {
-  return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={on}
-      aria-label={label}
-      disabled={disabled}
-      className={cx("cp-gridbox", "interactive", on && "is-on", hidden && "is-hidden", covered && "is-covered")}
-      onClick={onToggle}
-    >
-      {on && (hidden ? <IconEyeOff /> : <IconCheck />)}
-    </button>
   );
 }
 
@@ -312,54 +296,5 @@ function BulkWhoSeesIt({
         </div>
       )}
     </Dropdown>
-  );
-}
-
-/** The picked record's own row: the full record, read for its reveal dates. */
-function FocusedRecord({ row }: Readonly<{ row: HomebrewRecordSummary }>) {
-  const { token, party } = useCompendium();
-  const { toast } = useToast();
-  const [doc, setDoc] = useState<HomebrewRecordDocument | null>(null);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let live = true;
-    homebrewApi.get(token, row.id).then(
-      (answer) => {
-        if (live) setDoc(answer);
-      },
-      () => {
-        if (live) setDoc(null);
-      }
-    );
-    return () => {
-      live = false;
-    };
-  }, [token, row.id, row.rev]);
-  if (!doc || doc.id !== row.id) return <p className="cp-hint">Reading {row.name}.</p>;
-  return (
-    <>
-      <h3 className="cp-h">{row.name}</h3>
-      <SharingTab
-        doc={doc}
-        kind={doc.type}
-        name={row.name}
-        party={party}
-        busy={busy}
-        onAudience={(audience) => {
-          setBusy(true);
-          homebrewApi
-            .setAudience(token, doc.id, audience, doc.rev)
-            .then(
-              (next) => {
-                setDoc(next);
-                refreshCompendium();
-              },
-              (failure: unknown) =>
-                toast(failure instanceof Error ? failure.message : "Couldn't change who sees that.", { tone: "error" })
-            )
-            .finally(() => setBusy(false));
-        }}
-      />
-    </>
   );
 }
