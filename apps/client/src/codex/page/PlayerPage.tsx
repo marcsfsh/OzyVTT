@@ -29,6 +29,7 @@ import {
   usePagePins
 } from "./pageParts";
 import { PlayerRevealTimeline } from "./RevealTimeline";
+import { PlayerTagColumn, SideHead, useEscapeToFacts } from "./SideColumn";
 import "./page.css";
 
 const READ_KEY = "codex-page-read";
@@ -68,12 +69,19 @@ export function PlayerPageBody({
   newSince = null,
   onOpenConnection,
   onOpenPin,
-  onLoaded
+  onLoaded,
+  sideTag = null,
+  onTag,
+  onCloseSide
 }: Readonly<{
   /** Null while the GM's preview token is on its way. */
   token: string | null;
   tokenError?: string | null;
   pageId: string;
+  /** The tag open in the side column (the player's own page only); the GM's preview leaves it out. */
+  sideTag?: string | null;
+  onTag?: (tag: string) => void;
+  onCloseSide?: () => void;
   /** In the GM's preview, whose player this is; null reads as Everyone. */
   viewerName?: string | null;
   phone: boolean;
@@ -163,6 +171,7 @@ export function PlayerPageBody({
     </article>
   );
   const fields = metaFields(page.entityType, page.fields);
+  const pickTag = (name: string) => (onTag ? onTag(name) : go(tagPath(name)));
   const meta = (
     <>
       {fields.length > 0 && (
@@ -175,9 +184,16 @@ export function PlayerPageBody({
       </MetaSection>
       <OnTheAtlas token={token} pins={pins} onOpenPin={onOpenPin} />
       <MentionedOn connections={connections} onOpen={onOpenConnection} />
-      <TagChips tags={page.tags} onPick={(tag) => go(tagPath(tag))} />
+      <TagChips tags={page.tags} onPick={pickTag} />
     </>
   );
+  const tagColumn =
+    sideTag && onCloseSide ? (
+      <>
+        <SideHead onBack={onCloseSide} />
+        <PlayerTagColumn tag={sideTag} />
+      </>
+    ) : null;
   if (phone)
     return (
       <>
@@ -193,12 +209,16 @@ export function PlayerPageBody({
               <FieldList fields={fields} />
             </MetaSection>
           )}
-          {doc}
-          <MetaSection label="Relationships">
-            <RelationshipList connections={connections} pageTitle={page.title} onOpen={onOpenConnection} />
-          </MetaSection>
-          <MentionedOn connections={connections} onOpen={onOpenConnection} />
-          <TagChips tags={page.tags} onPick={(tag) => go(tagPath(tag))} />
+          {tagColumn ?? (
+            <>
+              {doc}
+              <MetaSection label="Relationships">
+                <RelationshipList connections={connections} pageTitle={page.title} onOpen={onOpenConnection} />
+              </MetaSection>
+              <MentionedOn connections={connections} onOpen={onOpenConnection} />
+              <TagChips tags={page.tags} onPick={pickTag} />
+            </>
+          )}
         </div>
       </>
     );
@@ -206,7 +226,7 @@ export function PlayerPageBody({
     <div className="cx-page-cols is-player">
       <div className="cx-page-docscroll scroll-y">{doc}</div>
       <aside className="cx-page-meta scroll-y" aria-label="About this page">
-        {meta}
+        {tagColumn ?? meta}
       </aside>
     </div>
   );
@@ -237,7 +257,7 @@ function usePlayerCodexPages(token: string | null) {
 
 /** The player's page: crumbs, title and kind over the body, with what is new since this device last read it. */
 export function PlayerPage({ id }: Readonly<{ id: string }>) {
-  const { token, phone, go, embedded } = useCodexShell();
+  const { token, phone, go, embedded, query, setQuery } = useCodexShell();
   const { feeds } = usePlayerCodex();
   const summary = feeds.pages.find((candidate) => candidate.id === id) ?? null;
   const [since] = useState(() => readTimes()[id] ?? null);
@@ -264,6 +284,11 @@ export function PlayerPage({ id }: Readonly<{ id: string }>) {
             : journalEntryPath(otherId)
     );
   const openPin = (markerId: string, mapId: string) => go(atlasPath(mapId, markerId));
+  // A tag opens in the side column and sits in the address, so the browser's Back closes it.
+  const sideTag = query.get("tag");
+  const openTag = (name: string) => go(`${pagePath(id)}?tag=${encodeURIComponent(name)}`);
+  const closeSide = useCallback(() => setQuery((params) => params.delete("tag")), [setQuery]);
+  useEscapeToFacts(sideTag !== null, closeSide);
   const banner = newTitles.length > 0 && (
     <p className="cx-newbanner" role="status">
       <IconSparkle /> New on this page since you last read it: {newTitles.join(", ")}
@@ -274,6 +299,9 @@ export function PlayerPage({ id }: Readonly<{ id: string }>) {
       token={token}
       pageId={id}
       phone={phone}
+      sideTag={sideTag}
+      onTag={openTag}
+      onCloseSide={closeSide}
       newSince={since}
       onOpenConnection={open}
       onOpenPin={openPin}

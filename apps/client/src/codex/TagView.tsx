@@ -88,7 +88,10 @@ export function TagView({
 
   return (
     <div className="codex-tagview">
-      <h3 className="codex-campaign-h codex-tagview-h">#{slug}</h3>
+      {/* The column's own head carries Back; this line names the tag and how many pages carry it. */}
+      <h2 className="cx-side-title codex-tagview-h">
+        #{slug} · {taggedPages.length} {taggedPages.length === 1 ? "page" : "pages"}
+      </h2>
       {total === 0 && pinSearch.status !== "loading" && (
         <p className="codex-list-empty">Nothing carries this tag yet.</p>
       )}

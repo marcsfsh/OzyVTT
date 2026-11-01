@@ -92,7 +92,7 @@ describe("Everything that carries the tag, across types", () => {
   it("lists one section per kind, exact-matched on the slug", async () => {
     renderTags();
 
-    expect(screen.getByRole("heading", { name: "#coast" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^#coast · \d+ pages?$/ })).toBeInTheDocument();
     expect(within(screen.getByRole("navigation", { name: "Pages with this tag" })).getAllByRole("button")).toHaveLength(
       1
     );
@@ -156,7 +156,7 @@ describe("Everything that carries the tag, across types", () => {
   it("normalizes the tag from the address before matching", () => {
     // `#Coast` and `coast ` find the same records as `coast`.
     renderTags({ tag: "  COAST " });
-    expect(screen.getByRole("heading", { name: "#coast" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^#coast · \d+ pages?$/ })).toBeInTheDocument();
     expect(screen.getByText("Vallaki")).toBeInTheDocument();
   });
 });

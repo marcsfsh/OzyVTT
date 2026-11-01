@@ -74,7 +74,9 @@ export function useGmFeeds(gmToken: string, section: CodexSection | null) {
     section === "story" ||
     section === "timeline" ||
     section === "tags" ||
-    section === "relationships";
+    section === "relationships" ||
+    // A page's side column reads it: a tag lists the maps and journal entries that carry it.
+    section === "pages";
   const loadCampaignFeed = useCallback(async () => {
     const [records, maps, calendar, standing, party] = await Promise.all([
       journalApi.chronicle(gmToken),

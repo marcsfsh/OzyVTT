@@ -32,8 +32,7 @@ import {
   pathForSection,
   questPath,
   relationshipsPath,
-  sessionPath,
-  tagPath
+  sessionPath
 } from "../routes";
 import { CodexPhoneBar } from "../shell/PhoneBar";
 import { useCodexShell, useGmCodex } from "../shell/context";
@@ -66,6 +65,7 @@ import { GmRevealTimeline } from "./RevealTimeline";
 import { PlayerPageBody } from "./PlayerPage";
 import { SeeAsControl, usePreviewToken, type SeeAsViewer } from "./SeeAs";
 import { PageWriter } from "./PageWriter";
+import { GmTagColumn, SideHead, useEscapeToFacts } from "./SideColumn";
 import "./page.css";
 
 const PHONE_TABS = [
@@ -112,6 +112,11 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
   const [error, setError] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [phoneTab, setPhoneTab] = useState("overview");
+  // The side column's one open part. A tag is in the address, so the browser's Back closes it.
+  const tag = query.get("tag");
+  const openTag = (name: string) => go(`${pagePath(id)}?tag=${encodeURIComponent(name)}`);
+  const closeSide = useCallback(() => setQuery((params) => params.delete("tag")), [setQuery]);
+  useEscapeToFacts(tag !== null, closeSide);
   const pins = usePagePins("gm", token, id);
   const followLink = usePageLinks(feeds.pages, gm.quickCreate);
   const knownTitles = useMemo(() => new Set(feeds.pages.map((summary) => pageLinkKey(summary.title))), [feeds.pages]);
@@ -422,7 +427,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           </MetaSection>
           <OnTheAtlas token={token} pins={pins} onOpenPin={openPin} />
           <MentionedOn connections={connections} onOpen={openConnection} />
-          <TagChips tags={page.tags} onPick={(tag) => go(tagPath(tag))} />
+          <TagChips tags={page.tags} onPick={openTag} />
           <PageTimeline
             gmToken={token}
             pageId={id}
@@ -455,15 +460,24 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
               <PhoneRecordHeader title={page.title}>{visibility}</PhoneRecordHeader>
               <Tabs
                 ariaLabel="Page sections"
-                tabs={PHONE_TABS}
-                activeId={phoneTab}
-                onChange={setPhoneTab}
+                tabs={tag ? [...PHONE_TABS, { id: "tag", label: `#${tag}` }] : PHONE_TABS}
+                activeId={tag ? "tag" : phoneTab}
+                onChange={(next) => {
+                  if (next === "tag") return;
+                  if (tag) closeSide();
+                  setPhoneTab(next);
+                }}
                 className="cx-phonetabs"
               />
             </>
           )}
           {error && <Alert tone="danger">{error}</Alert>}
-          {seeAs.on || phoneTab === "overview" ? (
+          {tag && !seeAs.on ? (
+            <>
+              <SideHead onBack={closeSide} />
+              <GmTagColumn tag={tag} />
+            </>
+          ) : seeAs.on || phoneTab === "overview" ? (
             <>
               {!seeAs.on && fields.length > 0 && (
                 <MetaSection label="Facts">
@@ -485,7 +499,7 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
           ) : (
             <>
               <MentionedOn connections={connections} onOpen={openConnection} />
-              <TagChips tags={page.tags} onPick={(tag) => go(tagPath(tag))} />
+              <TagChips tags={page.tags} onPick={openTag} />
               <PageTimeline
                 gmToken={token}
                 pageId={id}
@@ -534,7 +548,14 @@ export function GmPage({ id }: Readonly<{ id: string }>) {
         </div>
         {!seeAs.on && (
           <aside className="cx-page-meta scroll-y" aria-label="About this page">
-            {metaPanel}
+            {tag ? (
+              <>
+                <SideHead onBack={closeSide} />
+                <GmTagColumn tag={tag} />
+              </>
+            ) : (
+              metaPanel
+            )}
           </aside>
         )}
       </div>

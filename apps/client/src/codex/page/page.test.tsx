@@ -469,3 +469,71 @@ describe("A page on a phone", () => {
     );
   });
 });
+
+describe("A tag in the side column", () => {
+  const TAGGED: CodexPage = { ...YSOLDE, tags: ["thornwick"] };
+  beforeEach(() => {
+    api.codexApi.listPages.mockResolvedValue([
+      summary({ id: "p1", title: "Ysolde Varn", tags: ["thornwick"] }),
+      summary({ id: "p2", title: "Ashen Chapel", entityType: "location", tags: ["thornwick"] }),
+      summary({ id: "p3", title: "Wren", revealedToPlayers: false, tags: ["thornwick"] })
+    ]);
+    records.pageRecordApi.get.mockResolvedValue({ page: TAGGED, connections: CONNECTIONS });
+  });
+
+  it("turns the side column into the tag while the text stays, and Back returns to the facts", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/pages/p1");
+    const side = within(await screen.findByRole("complementary", { name: "About this page" }));
+    await user.click(await side.findByRole("button", { name: "#thornwick" }));
+    expect(new URLSearchParams(window.location.search).get("tag")).toBe("thornwick");
+    expect(await side.findByRole("heading", { name: "#thornwick · 3 pages" })).toBeInTheDocument();
+    expect(side.getByRole("button", { name: /Ashen Chapel/ })).toBeInTheDocument();
+    expect(doc()).toHaveTextContent("She keeps the tide clock.");
+    expect(side.queryByText("Relationships")).not.toBeInTheDocument();
+    await user.click(side.getByRole("button", { name: "Back" }));
+    expect(new URLSearchParams(window.location.search).get("tag")).toBeNull();
+    expect(await side.findByText("Relationships")).toBeInTheDocument();
+  });
+
+  it("closes the tag with Escape", async () => {
+    const user = userEvent.setup();
+    renderGmCodex("/codex/pages/p1?tag=thornwick");
+    const side = within(await screen.findByRole("complementary", { name: "About this page" }));
+    expect(await side.findByRole("heading", { name: "#thornwick · 3 pages" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("tag")).toBeNull());
+  });
+
+  it("lists for a player only the pages their own feed carries", async () => {
+    const user = userEvent.setup();
+    api.playerCodexApi.listPages.mockResolvedValue([
+      {
+        id: "p1",
+        title: "Ysolde Varn",
+        entityType: "character",
+        tags: ["thornwick"],
+        bannerAssetId: null,
+        playerUpdatedAt: AT
+      },
+      {
+        id: "p2",
+        title: "Ashen Chapel",
+        entityType: "location",
+        tags: ["thornwick"],
+        bannerAssetId: null,
+        playerUpdatedAt: AT
+      }
+    ]);
+    records.pageRecordApi.getForPlayer.mockResolvedValue({
+      page: playerPage({ body: "The harbourmaster of Saltmere.", tags: ["thornwick"] }),
+      connections: []
+    });
+    renderPlayerCodex("/codex/pages/p1");
+    const side = within(await screen.findByRole("complementary", { name: "About this page" }));
+    await user.click(await side.findByRole("button", { name: "#thornwick" }));
+    expect(await side.findByRole("heading", { name: "#thornwick · 2 pages" })).toBeInTheDocument();
+    expect(side.queryByText("Wren")).not.toBeInTheDocument();
+    expect(api.codexApi.listPages).not.toHaveBeenCalled();
+  });
+});
