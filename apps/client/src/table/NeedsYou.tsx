@@ -15,6 +15,7 @@ import { aidGiverOf, type AidGiver, StabilizeControl } from "../encounter/Stabil
 import { useMapCalibration } from "../scene/gridPreview";
 import { damageWords, needsItems, needsTitle, type NeedsItem } from "./needs";
 import { creatureDistanceFeet } from "./targetHints";
+import { ActorAvatar } from "../actors/ActorAvatar";
 import "./needs-you.css";
 
 /** Who in the fight could give a dying creature aid, nearest first: conscious characters and NPCs. */
@@ -65,6 +66,34 @@ async function aimFor(
   onFeedback(`Choose ${ask.actorName}'s target on the map.`);
 }
 
+/** The creature an item is about, for its card's face: who must answer, who was hit or who asks. */
+function faceOf(item: NeedsItem, state: GmView): GmActor | null {
+  const byId = (id: string | undefined) => (id ? (state.actors.find((actor) => actor.id === id) ?? null) : null);
+  switch (item.kind) {
+    case "order":
+    case "reaction":
+    case "save":
+    case "dying":
+    case "rest":
+      return item.actor;
+    case "ask":
+      return item.actor ?? null;
+    case "target":
+      return byId(item.ask.actorId);
+    case "damage":
+      return byId(item.proposal.targetActorId);
+    case "damage-roll":
+      return byId(item.roll.sourceActorId);
+    case "initiative":
+      return item.actors[0] ?? null;
+  }
+}
+
+/** Items a player answers on their own device come after what the GM owes; within each, today's order holds. */
+export function waitsOnPlayer(item: NeedsItem): boolean {
+  return (item.kind === "order" || item.kind === "reaction" || item.kind === "save") && item.waiting;
+}
+
 /** A prompt a player answers on their own device, which the GM can open to answer instead. */
 function AnswerFor({ name, children }: Readonly<{ name: string; children: ReactNode }>) {
   const [open, setOpen] = useState(false);
@@ -98,12 +127,10 @@ function NeedsCard({
       onFeedback(result.ok ? done : (result.message ?? "That did not go through."));
     });
   };
-  let tone = "info";
   let detail: string | null = null;
   let body: ReactNode = null;
   switch (item.kind) {
     case "order": {
-      tone = item.waiting ? "caution" : "info";
       detail = `${item.steps.steps.map(stepLabel).join(", ")} happen at the same moment.`;
       const prompt = <TurnOrder key={item.steps.id} waiting={item.steps} onFeedback={onFeedback} />;
       body = item.waiting ? <AnswerFor name={item.actor.name}>{prompt}</AnswerFor> : prompt;
@@ -117,7 +144,6 @@ function NeedsCard({
         parked?.attackTotal !== null && parked?.attackTotal !== undefined && target?.armorClass !== undefined
           ? ` (${parked.attackTotal} against AC ${target.armorClass})`
           : "";
-      tone = item.waiting ? "caution" : "info";
       detail =
         reaction.kind === "attack-would-hit"
           ? `${reaction.sourceName}'s hit${roll} waits until ${item.actor.name} answers.`
@@ -149,7 +175,6 @@ function NeedsCard({
     }
     case "save": {
       const { save } = item;
-      tone = item.waiting ? "caution" : "info";
       const from = `${save.sourceName ? `${save.sourceName}'s ` : ""}${save.actionName}`;
       detail =
         save.proposedDamage > 0
@@ -178,7 +203,6 @@ function NeedsCard({
     }
     case "damage": {
       const { proposal, roll } = item;
-      tone = "caution";
       if (roll) {
         // The player rolls it; the GM may type it instead, or settle the hit as it stands.
         detail = `${proposal.targetName} was hit. ${roll.sourceName}'s player rolls ${roll.formula}.`;
@@ -196,18 +220,21 @@ function NeedsCard({
     }
     case "damage-roll": {
       const { roll } = item;
-      tone = "caution";
       detail = `The saves wait for it. ${roll.sourceName}'s player rolls ${roll.formula}.`;
       body = <DamageRollPrompt roll={roll} onFeedback={onFeedback} />;
       break;
     }
     case "target": {
       const { ask } = item;
-      tone = "caution";
       detail = `${ask.slotLevel !== undefined ? `Cast at level ${ask.slotLevel}. ` : ""}Pick the target on the map, then roll it as you would your own.`;
       body = (
         <div className="needs-card-buttons">
-          <Button size="sm" disabled={busy} onClick={() => void aimFor(state, ask, onFeedback, setBusy)}>
+          <Button
+            size="sm"
+            className="needs-main"
+            disabled={busy}
+            onClick={() => void aimFor(state, ask, onFeedback, setBusy)}
+          >
             Choose the target
           </Button>
           <Button
@@ -229,7 +256,6 @@ function NeedsCard({
     }
     case "dying": {
       const helpers = helpersFor(state, item.actor, distance);
-      tone = "danger";
       detail = dyingDetail(item.actor, helpers);
       const aid: AidGiver[] = helpers.map(({ candidate }) =>
         aidGiverOf(candidate, state.definitions?.find((entry) => entry.id === candidate.definitionId)?.definition)
@@ -260,13 +286,13 @@ function NeedsCard({
     }
     case "ask": {
       const { ask } = item;
-      tone = "gm";
       detail = ask.message;
       const name = item.actor?.name ?? "the player";
       body = (
         <div className="needs-card-buttons">
           <Button
             size="sm"
+            className="needs-main"
             disabled={busy}
             onClick={() =>
               send(() => command("rules:answer", { askId: ask.id, allow: true }), `Allowed ${name}'s request.`)
@@ -298,6 +324,7 @@ function NeedsCard({
         <div className="needs-card-buttons">
           <Button
             size="sm"
+            className="needs-main"
             disabled={busy}
             onClick={() =>
               send(() => command("initiative:roll-remaining", {}), "Rolled initiative for the rest of the table.")
@@ -317,6 +344,7 @@ function NeedsCard({
         <div className="needs-card-buttons">
           <Button
             size="sm"
+            className="needs-main"
             disabled={busy}
             onClick={() =>
               send(
@@ -329,7 +357,6 @@ function NeedsCard({
           </Button>
           <Button
             size="sm"
-            variant="ghost"
             disabled={busy}
             onClick={() =>
               send(
@@ -345,9 +372,14 @@ function NeedsCard({
       break;
     }
   }
+  const face = faceOf(item, state);
+  // Every item the GM owes carries the amber rim; one that waits on a player is grey and quieter (C3 spec 2.2).
   return (
-    <li className={`needs-card needs-card--${tone}`} data-needs={item.kind}>
-      <p className="needs-card-title">{needsTitle(item, state)}</p>
+    <li className={`needs-card${waitsOnPlayer(item) ? " is-waiting" : ""}`} data-needs={item.kind}>
+      <div className="needs-card-head">
+        {face && <ActorAvatar actor={face} name={face.name} size="sm" className="needs-card-face" />}
+        <p className="needs-card-title">{needsTitle(item, state)}</p>
+      </div>
       {detail && <p className="needs-card-detail">{detail}</p>}
       <div className="needs-card-body">{body}</div>
     </li>
@@ -364,7 +396,8 @@ export function NeedsYou({
   token,
   alone = false
 }: Readonly<{ state: GmView; token: string | null; alone?: boolean }>) {
-  const items = needsItems(state);
+  const all = needsItems(state);
+  const items = [...all.filter((item) => !waitsOnPlayer(item)), ...all.filter(waitsOnPlayer)];
   const place = useWaitingList();
   const { rollMode } = useRollPreference();
   const { toast } = useToast();

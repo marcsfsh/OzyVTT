@@ -51,37 +51,60 @@
 }
 .needs-you-list {
   display: grid;
-  gap: var(--space-2);
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* A card (C3 spec 2.2 and 4): a 3px amber rim for what the GM owes, grey for what waits on a player; the face, the
+   title, the line, then the buttons on Base lines with the main one lit. */
 .needs-card {
   display: grid;
-  gap: var(--space-1);
-  padding: var(--space-3);
+  gap: 6px;
+  padding: 10px 12px 10px 14px;
   border: 1px solid var(--line-strong);
-  border-left: 3px solid var(--info);
+  border-left: 3px solid var(--caution);
   background: var(--material-lip), var(--material-plate);
 }
-.needs-card--caution {
-  border-left-color: var(--caution);
+.needs-card.is-waiting {
+  border-left-color: var(--line-raised);
 }
-.needs-card--danger {
-  border-left-color: var(--danger);
+.needs-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
-.needs-card--gm {
-  border-left-color: var(--rim-gm);
+.needs-card-face.nh-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  font-size: 10px;
 }
 .needs-card-title {
   margin: 0;
+  min-width: 0;
   color: var(--text);
-  font: 700 var(--fs-sm) / 1.3 var(--font-body);
+  font: 600 14px / 1.3 var(--font-body);
 }
 .needs-card-detail {
   margin: 0;
   color: var(--text-dim);
-  font: 400 var(--fs-xs) / 1.4 var(--font-body);
+  font: 400 12.5px / 1.4 var(--font-body);
+}
+.needs-card.is-waiting .needs-card-title {
+  color: var(--text-dim);
+}
+/* The main button: a 2px cyan line and a 10% cyan wash, its number in VT323. */
+.needs-card .needs-main {
+  --nh-sheen: var(--base-line-on);
+  background: color-mix(in srgb, var(--cyan) 10%, transparent);
+  color: var(--text);
+}
+.needs-main-n {
+  margin-left: 2px;
+  color: var(--cyan-hi);
+  font: 400 18px / 1 var(--font-numeric);
 }
 .needs-card-body {
   display: grid;

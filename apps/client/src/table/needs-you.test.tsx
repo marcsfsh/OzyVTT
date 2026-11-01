@@ -173,6 +173,11 @@ describe("Needs you", () => {
     );
     expect(screen.getByText("Waiting on Lyra · Shield")).toBeTruthy();
     expect(screen.getByText("Goblin 1's hit (19 against AC 15) waits until Lyra answers.")).toBeTruthy();
+    // What waits on a player is quieter and comes after everything the GM owes, today's order kept within each.
+    const cards = [...document.querySelectorAll<HTMLElement>(".needs-card")];
+    expect(cards.map((card) => card.dataset.needs)).toEqual(["damage", "dying", "ask", "rest", "reaction"]);
+    expect(cards.at(-1)?.classList.contains("is-waiting")).toBe(true);
+    expect(cards.slice(0, -1).some((card) => card.classList.contains("is-waiting"))).toBe(false);
     expect(screen.queryByRole("button", { name: "Use Shield" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Answer for Lyra" }));
     expect(screen.getByRole("button", { name: "Use Shield" })).toBeTruthy();

@@ -43,13 +43,14 @@ export function PendingDamagePrompt({
           onChange={(event) => setAmount(event.target.value.replace(/[^0-9]/g, ""))}
         />
       )}
+      {/* The card's main button: lit on its cyan line, the number in VT323 (C3 spec 2.2). */}
       <Button
         size="sm"
-        variant="primary"
+        className="needs-main"
         disabled={busy || (editing && amount.trim() === "")}
         onClick={() => emit(true)}
       >
-        Apply {total}
+        Apply <b className="needs-main-n">{total}</b>
       </Button>
       {!editing && (
         <Button size="sm" variant="secondary" disabled={busy} onClick={() => setEditing(true)}>
