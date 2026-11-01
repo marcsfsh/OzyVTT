@@ -124,3 +124,11 @@
     height: 90px;
   }
 }
+/* A map page's File and history, folded: its head is the summary. */
+.sc-meta-fold > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.sc-meta-fold > summary::-webkit-details-marker {
+  display: none;
+}

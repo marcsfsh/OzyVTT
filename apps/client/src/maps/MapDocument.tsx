@@ -264,10 +264,11 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
                   </ul>
                 )}
               </section>
-              <section className="sc-meta-section" aria-label="File and history">
-                <header className="sc-meta-head">
+              {/* File and history folds away (E2 spec 2.2): it is looked up, rarely read. */}
+              <details className="sc-meta-section sc-meta-fold" aria-label="File and history">
+                <summary className="sc-meta-head">
                   <h3>File and history</h3>
-                </header>
+                </summary>
                 <dl className="sc-dl">
                   <div>
                     <dt>Size</dt>
@@ -288,7 +289,7 @@ export function MapDocument({ mapId }: Readonly<{ mapId: string }>) {
                     <dd>{whenLabel(map.updatedAt)}</dd>
                   </div>
                 </dl>
-              </section>
+              </details>
             </div>
             <div className="table-panel-foot">
               <div className="table-panel-foot-main">{footer}</div>
