@@ -5,7 +5,7 @@ import { downloadJson } from "../lib/download";
 
 /**
  * Replays: every finished fight is kept. The GM gets the list (with a per-replay reveal control,
- * hidden by default), the viewer, and "Launch from here". A player gets only the replays the GM
+ * hidden by default), the viewer, and "Launch from turn {n}". A player gets only the replays the GM
  * shared, rendered from the server's player replay projection (`apps/server/src/replay-projection.ts`):
  * the client never receives the GM archive, so hidden combatants and GM-only narration are absent,
  * not filtered here. One URL serves both; the server decides which document you get.

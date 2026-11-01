@@ -96,7 +96,7 @@ describe("The writing rules, on every string a person reads", () => {
 
   it("tells a confirm dialog's own question from any other", () => {
     const confirm = strings.find(
-      (entry) => entry.file === "apps/client/src/replay/ReplayList.tsx" && entry.text === "Delete this replay?"
+      (entry) => entry.file === "apps/client/src/replay/ReplayActions.tsx" && entry.text === "Delete this replay?"
     );
     expect(confirm?.confirm, "a confirm({ title }) is confirm text").toBe(true);
     const label = strings.find(

@@ -153,7 +153,7 @@ describe("The play glossary", () => {
   it("sees the copy shapes a naive scanner is blind to", () => {
     // Named strings, so a narrowed scanner fails by name: an object-literal confirm title, an
     // object-literal confirm body, and a template literal.
-    expect(at("apps/client/src/replay/ReplayList.tsx", "Delete this replay?"), "object-literal confirm title").toBe(
+    expect(at("apps/client/src/replay/ReplayActions.tsx", "Delete this replay?"), "object-literal confirm title").toBe(
       true
     );
     expect(

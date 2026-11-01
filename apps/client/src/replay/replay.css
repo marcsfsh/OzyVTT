@@ -22,7 +22,7 @@
 /* The header wraps (and its actions wrap inside it) so long buttons cannot overflow a phone. */
 .replay-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
 }
@@ -44,6 +44,18 @@
 }
 .replay-header h2 {
   margin: 0;
+}
+/* A laptop reads when it was fought to the name's right; a phone puts it under the name. */
+@media (min-width: 761px) {
+  .replay-header-text {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--space-3);
+  }
+}
+.replay-transport-end {
+  margin-left: auto;
 }
 .replay-meta {
   margin: 0.15rem 0 0;
@@ -76,6 +88,10 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+.replay-menu-unchecked {
+  display: inline-block;
+  width: 1em;
 }
 .replay-transport-buttons {
   display: inline-flex;
@@ -530,8 +546,11 @@
   font-size: 12px;
 }
 
-/* A phone wraps the transport: the buttons, then the line at full width, then the count. */
+/* A phone sets the title at 20 px and wraps the transport: the buttons and the count, then the line at full width. */
 @media (max-width: 760px) {
+  .replay-header h2 {
+    font-size: 20px;
+  }
   .replay-line {
     order: 3;
     flex-basis: 100%;

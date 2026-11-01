@@ -173,6 +173,7 @@ export function Transport({
   count,
   playing,
   line,
+  end,
   onMove,
   onPlay,
   onSeek
@@ -182,6 +183,8 @@ export function Transport({
   playing: boolean;
   /** Each turn's round and health, for the line's sections and marks. */
   line: readonly LineTurn[];
+  /** What closes the row: the GM's Launch from this turn. */
+  end?: ReactNode;
   onMove: (delta: number) => void;
   onPlay: () => void;
   onSeek: (index: number) => void;
@@ -276,6 +279,7 @@ export function Transport({
       <span className="replay-position tabular">
         <Roll value={turnCount(index, count)} />
       </span>
+      {end && <span className="replay-transport-end">{end}</span>}
     </div>
   );
 }

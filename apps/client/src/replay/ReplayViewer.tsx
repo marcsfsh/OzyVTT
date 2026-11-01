@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import type { PlayerHp } from "@vtt/domain";
-import { Alert, Button, GmOnlyTag, IconChevronLeft, IconDownload, useToast } from "@vtt/ui";
+import { Alert, Button, GmOnlyTag, IconChevronLeft, useToast } from "@vtt/ui";
 import { navigate } from "../router";
 import { conditionBadgeLabel, healthBandFor } from "../encounter/conditions";
 import { useConfirm } from "../components/feedback";
 import { command } from "../lib/command";
+import { useReplayActions } from "./ReplayActions";
 import {
-  exportDocument,
+  durationOf,
   replayTitle,
   stepsOf,
   useReplays,
@@ -45,7 +46,10 @@ function GmViewer({
   onLaunched
 }: Readonly<{ gmToken: string; archiveId: number; onBack: () => void; onLaunched: () => void }>) {
   const { document, error } = useArchiveDocument<ArchiveDocument>(archiveId, gmToken);
-  const name = useReplayName(archiveId, gmToken);
+  const { archives, refresh } = useReplays(gmToken);
+  const summary = archives?.find((archive) => archive.id === archiveId) ?? null;
+  const name = summary ? replayTitle(summary) : "Replay";
+  const { more, dialogs } = useReplayActions(gmToken, refresh, onBack);
   const [launching, setLaunching] = useState(false);
   /** A refusal with somewhere to go stays on screen (an Alert, since a toast fades): it is a state with a next step. */
   const [refused, setRefused] = useState<{ code: RoutedRefusal; message: string } | null>(null);
@@ -112,6 +116,7 @@ function GmViewer({
 
   return (
     <ReplayFrame loaded={document} onMove={playback.move}>
+      {/* The head row: the name with when it was fought to its right, More at the end (E3 replays spec 2.2). */}
       <div className="replay-header">
         <Button onClick={onBack}>
           <IconChevronLeft /> Replays
@@ -119,21 +124,21 @@ function GmViewer({
         <div className="replay-header-text">
           <h2>{name}</h2>
           <p className="replay-meta">
-            {when(document.startedAt)} to {when(document.endedAt)} · {countOf(document.turns.length, "turn")}
+            {[
+              when(document.startedAt ?? document.endedAt),
+              countOf(document.turns.length, "turn"),
+              durationOf(document.startedAt, document.endedAt)
+            ]
+              .filter(Boolean)
+              .map((part, at) => (
+                <span key={at}>
+                  {at > 0 && " · "}
+                  {part}
+                </span>
+              ))}
           </p>
         </div>
-        <div className="replay-header-actions">
-          <Button variant="primary" onClick={launch} disabled={launching}>
-            {launching ? "Launching…" : "Launch from here"}
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => exportDocument(archiveId, document.endedAt, document)}
-            title="Download the full machine-readable record: per-turn states, command journal, combat log, dice rolls, and stat blocks."
-          >
-            <IconDownload /> Download JSON
-          </Button>
-        </div>
+        {summary && <div className="replay-header-actions">{more(summary, { share: true })}</div>}
       </div>
       {/* The refusal and its way out. A full scene list links to the scene gallery, the only place a
         prepared scene can be removed; a history review says where to go (the rewind banner on the
@@ -166,6 +171,11 @@ function GmViewer({
         onMove={playback.move}
         onPlay={playback.toggle}
         onSeek={playback.seek}
+        end={
+          <Button variant="primary" onClick={launch} disabled={launching}>
+            {launching ? "Launching…" : `Launch from turn ${index + 1}`}
+          </Button>
+        }
       />
       <p className="replay-step-label">
         <strong>{step.label}</strong> · {when(step.at)}
@@ -237,6 +247,7 @@ function GmViewer({
         />
       </div>
       {dialog}
+      {dialogs}
     </ReplayFrame>
   );
 }

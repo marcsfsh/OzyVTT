@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { GameStateSchema } from "@vtt/domain";
 
 const apiRequest = vi.fn();
 vi.mock("../lib/api", () => ({ apiRequest: (...args: unknown[]) => apiRequest(...args) }));
 vi.mock("../socket", () => ({ socket: { on: vi.fn(), off: vi.fn(), emit: vi.fn() } }));
+const command = vi.fn();
+vi.mock("../lib/command", () => ({ command: (...args: unknown[]) => command(...args) }));
 
 import { ToastProvider } from "@vtt/ui";
 import { ReplayViewer } from "./ReplayViewer";
@@ -120,5 +122,43 @@ describe("the replay viewer's header", () => {
     });
     fireEvent.pointerDown(line, { clientX: 190, pointerId: 1 });
     expect(line).toHaveAttribute("aria-valuetext", "Turn 03 of 3");
+  });
+
+  it("launches from the turn on screen, named on the button, after its confirm", async () => {
+    command.mockResolvedValue({ ok: true });
+    const onLaunched = vi.fn();
+    serve([summary()], gmDocument);
+    render(<ReplayViewer role="gm" token="gm" archiveId={7} onBack={() => {}} onLaunched={onLaunched} />, {
+      wrapper: ToastProvider
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Launch from turn 1" }));
+    expect(await screen.findByText("Launch from this moment?")).toBeTruthy();
+    expect(command).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Launch" }));
+    await waitFor(() => expect(command).toHaveBeenCalledWith("replay:launch", { archiveId: 7, turnIndex: 0 }));
+    await waitFor(() => expect(onLaunched).toHaveBeenCalled());
+  });
+
+  it("keeps who sees it, the name and the deletion in the head row's More, deleting only after its confirm", async () => {
+    serve([summary({ playerVisible: false })], gmDocument);
+    render(<ReplayViewer role="gm" token="gm" archiveId={7} onBack={() => {}} />, { wrapper: ToastProvider });
+    fireEvent.click(await screen.findByLabelText("More actions for this replay"));
+    const share = screen.getByRole("menuitemcheckbox", { name: "Players see it" });
+    expect(share).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(share);
+    await waitFor(() =>
+      expect(apiRequest).toHaveBeenCalledWith(
+        "/api/v1/replays/7/visibility",
+        expect.objectContaining({ body: { playerVisible: true } })
+      )
+    );
+    fireEvent.click(screen.getByLabelText("More actions for this replay"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename…" }));
+    expect(await screen.findByRole("dialog", { name: "Rename the replay" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByLabelText("More actions for this replay"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete replay" }));
+    expect(await screen.findByText("Delete this replay?")).toBeTruthy();
+    expect(apiRequest).not.toHaveBeenCalledWith("/api/v1/replays/7", expect.objectContaining({ method: "DELETE" }));
   });
 });
