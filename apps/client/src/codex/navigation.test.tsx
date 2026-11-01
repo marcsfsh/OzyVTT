@@ -51,12 +51,12 @@ describe("Codex shell: getting from Home to the pages", () => {
     expect(list().queryByText("Barovia")).not.toBeInTheDocument();
   });
 
-  it("clearing the group lists every page again", async () => {
+  it("All pages lists every page again", async () => {
     const user = userEvent.setup();
     renderGmCodex("/codex/pages?group=people");
     // A list has no title row (theme spec 2.2): the chosen group's row says which group is listed.
     expect(await screen.findByRole("button", { name: /^People/ })).toHaveAttribute("aria-current", "true");
-    await user.click(screen.getByRole("button", { name: /^People/ }));
+    await user.click(screen.getByRole("button", { name: /^All pages/ }));
     expect(window.location.search).toBe("");
     expect(await list().findByText("Barovia")).toBeInTheDocument();
   });

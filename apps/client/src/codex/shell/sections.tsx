@@ -1,15 +1,14 @@
-import type { ComponentType } from "react";
+import { useEffect, type ComponentType } from "react";
 import { BackupView } from "../BackupView";
 import { CodexSettingsView } from "../CodexSettings";
-import { TagView } from "../TagView";
-import type { CodexSection } from "../routes";
+import { tagPath, type CodexSection } from "../routes";
 import { GmPagesSection, PlayerPagesSection } from "../page/PageSection";
 import { GmHome, PlayerHome } from "../home/HomeView";
 import { SearchView } from "../search/SearchView";
 import { GmQuests, PlayerQuests } from "../quests/QuestsView";
 import { RelationshipsView } from "../relationships/RelationshipsView";
 import { GmCompendiumSection, PlayerCompendiumSection } from "../../compendium/player/CodexCompendium";
-import { useCodexShell, useGmCodex, usePlayerCodex } from "./context";
+import { useCodexShell, useGmCodex } from "./context";
 import { GmAtlasSection, PlayerAtlasSection } from "../atlas/sections";
 import { GmTemplatesSection } from "../templates/sections";
 import {
@@ -33,44 +32,12 @@ export type CodexSectionEntry = Readonly<{
   player: ComponentType | null;
 }>;
 
-function GmTags() {
-  const { token, segments, go } = useCodexShell();
-  const { feeds } = useGmCodex();
-  return (
-    <div className="scroll-y cx-legacy">
-      <TagView
-        gmToken={token}
-        tag={decodeURIComponent(segments[2] ?? "")}
-        pages={feeds.pages}
-        maps={feeds.campaign.maps}
-        records={feeds.campaign.records}
-        sessions={feeds.sessions}
-        quests={feeds.quests}
-        onNavigate={go}
-      />
-    </div>
-  );
-}
-
-/** Player rows carry no reveal state, so `TagView` cannot badge one. */
-function PlayerTags() {
-  const { token, segments, go } = useCodexShell();
-  const { feeds } = usePlayerCodex();
-  return (
-    <div className="scroll-y cx-legacy">
-      <TagView
-        gmToken={token}
-        player
-        tag={decodeURIComponent(segments[2] ?? "")}
-        pages={feeds.pages}
-        maps={feeds.maps}
-        records={feeds.timeline}
-        sessions={feeds.sessions}
-        quests={feeds.quests}
-        onNavigate={go}
-      />
-    </div>
-  );
+/** The old tag address lands on the pages index filtered to the tag, for either reader. */
+function TagRedirect() {
+  const { segments, go } = useCodexShell();
+  const tag = decodeURIComponent(segments[2] ?? "");
+  useEffect(() => go(tagPath(tag), { replace: true }), [go, tag]);
+  return null;
 }
 
 function GmBackup() {
@@ -110,7 +77,7 @@ export const CODEX_SECTIONS: Readonly<Record<CodexSection, CodexSectionEntry>> =
   relationships: { gm: RelationshipsView, player: RelationshipsView },
   // The SRD and the homebrew each reader receives, read only; the GM edits it in the Compendium tab.
   compendium: { gm: GmCompendiumSection, player: PlayerCompendiumSection },
-  tags: { gm: GmTags, player: PlayerTags },
+  tags: { gm: TagRedirect, player: TagRedirect },
   backup: { gm: GmBackup, player: null },
   settings: { gm: GmSettings, player: null },
 

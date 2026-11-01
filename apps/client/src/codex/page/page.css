@@ -595,31 +595,140 @@
   gap: var(--space-2);
 }
 
-/* ----- Pages: the kind groups, the tags and the list ----- */
+/* ----- Pages (F finding spec 2.2): the kinds, folders and tags at the side, the chosen group's rows ----- */
 .cx-index {
   min-height: 0;
   overscroll-behavior: contain;
+}
+.cx-index-split {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  flex: 1 1 auto;
+}
+.cx-index-side {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--line-strong);
+}
+.cx-index-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.cx-index-rows {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
 }
 .cx-index-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  max-width: 48rem;
-  margin: 0 auto;
-  padding: var(--space-3) var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+  padding: var(--space-3) var(--space-3) calc(var(--space-8) + env(safe-area-inset-bottom));
 }
-.cx-index-listhead {
+.cx-index-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.cx-index-body .cx-index-toolbar {
+  padding: 0;
+  border-bottom: 0;
+}
+.cx-index-toolbar .nh-findfield {
+  flex: 1 1 14rem;
+}
+.cx-index-count {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.cx-index-tags {
+  display: grid;
+  gap: var(--space-1);
+}
+.cx-index-tagchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cx-tag-count {
+  min-height: 36px;
+}
+.cx-tag-count.is-on {
+  border-color: var(--cyan);
+  color: var(--cyan-hi);
+}
+.cx-tag-n {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font: 400 16px / 1 var(--font-numeric);
+}
+.cx-pagerow {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 54px;
+  padding: var(--space-2) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
 }
+.cx-pagerow:hover {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.cx-pagerow-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.cx-pagerow-title {
+  font: 700 var(--fs-body) / 1.2 var(--font-body);
+}
+.cx-pagerow-title.is-hidden {
+  color: var(--violet-text);
+}
+.cx-pagerow-sub {
+  color: var(--text-dim);
+  font: 500 var(--fs-xs) / 1.2 var(--font-body);
+}
+.cx-pagerow-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.cx-pagerow-tag {
+  color: var(--text-muted);
+  font: 600 12px / 1 var(--font-label);
+}
+.cx-pagelist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Home's kind rows. */
 .cx-index-groups {
   display: flex;
   flex-direction: column;
 }
-.cx-grouprow,
-.cx-pagerow {
+.cx-grouprow {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -634,8 +743,7 @@
   text-align: start;
   cursor: pointer;
 }
-.cx-grouprow:hover,
-.cx-pagerow:hover {
+.cx-grouprow:hover {
   background: color-mix(in srgb, var(--surface-2) 70%, transparent);
 }
 .cx-grouprow.is-on {
@@ -648,21 +756,15 @@
   flex: none;
   color: var(--text-dim);
 }
-.cx-grouprow-text,
-.cx-pagerow-text {
+.cx-grouprow-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
 }
-.cx-grouprow-title,
-.cx-pagerow-title {
+.cx-grouprow-title {
   font: 700 var(--fs-body) / 1.2 var(--font-body);
-}
-.cx-pagerow-sub {
-  color: var(--text-dim);
-  font: 500 var(--fs-xs) / 1.2 var(--font-body);
 }
 .cx-grouprow-count {
   color: var(--text-dim);
@@ -670,11 +772,6 @@
 }
 .cx-grouprow-chev {
   color: var(--text-muted);
-}
-.cx-pagelist {
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 .cx-count {
   color: var(--text-dim);
@@ -711,7 +808,9 @@ button.cx-count-hidden::after {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  margin-top: var(--space-3);
+}
+.cx-index-folders > .nh-btn {
+  align-self: flex-start;
 }
 /* A folder's rename and new-folder forms, in place of its side list row. */
 form.cx-folderrow {

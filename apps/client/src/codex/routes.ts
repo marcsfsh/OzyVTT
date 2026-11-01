@@ -216,7 +216,8 @@ export const templatePath = (id?: string | null) =>
 export type RelationshipsView = "web" | "grid" | "time";
 export const relationshipsPath = (focusPageId?: string | null, view?: RelationshipsView | null) =>
   withQuery(pathForSection("relationships"), { focus: focusPageId ?? null, view: view === "web" ? null : view });
-export const tagPath = (tag: string) => `${CODEX_ROOT}/tags/${encodeURIComponent(tag)}`;
+/** A tag opens the pages index filtered to it (F finding spec 2.3); the old `/codex/tags/:tag` address redirects here. */
+export const tagPath = (tag: string) => withQuery(pathForSection("pages"), { tag });
 
 /** Search's filters are its address, so a filtered search is linkable and survives a refresh. */
 export type SearchAddress = Readonly<{

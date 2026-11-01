@@ -48,10 +48,13 @@ beforeEach(() => {
 });
 
 describe("The GM's Pages", () => {
-  it("counts each group in words, marks a Hidden page, and lists every page by name", async () => {
+  it("counts each kind at the side, marks a Hidden page, and lists every page", async () => {
     renderGmCodex("/codex/pages");
     await waitFor(() => expect(titles()).toEqual(["Saltmere", "The Tidebound", "Ysolde Varn"]));
-    expect(screen.getByRole("button", { name: /^Factions/ })).toHaveTextContent("0 revealed · 1 hidden");
+    const kinds = within(screen.getByRole("group", { name: "Kinds" }));
+    expect(kinds.getByRole("button", { name: /^All pages/ })).toHaveTextContent("3");
+    expect(kinds.getByRole("button", { name: /^Factions/ })).toHaveTextContent("1");
+    expect(screen.getByRole("status")).toHaveTextContent("3 pages");
     expect(list().getByRole("button", { name: /The Tidebound/ })).toHaveTextContent("Hidden");
     expect(list().getByRole("button", { name: /Saltmere/ })).not.toHaveTextContent("Hidden");
   });
@@ -82,11 +85,33 @@ describe("The GM's Pages", () => {
     view.unmount();
 
     renderGmCodex("/codex/pages");
-    const tags = within(await screen.findByRole("list", { name: "Tags" }));
-    // The tag most pages carry comes first.
-    expect(tags.getAllByRole("listitem").map((tag) => tag.textContent)).toEqual(["#saltmere", "#coast"]);
-    await user.click(tags.getByText("#coast"));
-    expect(window.location.pathname).toBe("/codex/tags/coast");
+    const tags = within(await screen.findByRole("group", { name: "Tags" }));
+    // The tag most pages carry comes first, with its count.
+    expect(tags.getAllByRole("listitem").map((tag) => tag.textContent)).toEqual(["#saltmere 2", "#coast 1"]);
+    await user.click(tags.getByRole("button", { name: /#coast/ }));
+    expect(new URLSearchParams(window.location.search).get("tag")).toBe("coast");
+    await waitFor(() => expect(titles()).toEqual(["Saltmere"]));
+  });
+
+  it("orders by when a page changed, or by name, and says the count in the kind's words", async () => {
+    const user = userEvent.setup();
+    api.codexApi.listPages.mockResolvedValue([
+      summary({ id: "p1", title: "Ysolde Varn", updatedAt: "2026-10-03T00:00:00.000Z" }),
+      summary({ id: "p4", title: "Brannoc", updatedAt: "2026-10-01T00:00:00.000Z" })
+    ]);
+    renderGmCodex("/codex/pages?group=people");
+    await waitFor(() => expect(titles()).toEqual(["Ysolde Varn", "Brannoc"]));
+    expect(screen.getByRole("status")).toHaveTextContent("2 people");
+    await user.click(screen.getByRole("button", { name: /Order by name/ }));
+    expect(new URLSearchParams(window.location.search).get("sort")).toBe("name");
+    await waitFor(() => expect(titles()).toEqual(["Brannoc", "Ysolde Varn"]));
+  });
+
+  it("lands on the index filtered to a tag from the tag's old address", async () => {
+    renderGmCodex("/codex/tags/coast");
+    await waitFor(() => expect(window.location.pathname).toBe("/codex/pages"));
+    expect(new URLSearchParams(window.location.search).get("tag")).toBe("coast");
+    await waitFor(() => expect(titles()).toEqual(["Saltmere"]));
   });
 
   it("makes a new page of the group on screen", async () => {
@@ -189,6 +214,9 @@ describe("A player's Pages (viewer safety)", () => {
   it("lists the player's own pages with plain counts, and no folder, Hidden mark or New", async () => {
     renderPlayerCodex("/codex/pages");
     await waitFor(() => expect(titles()).toEqual(["Saltmere", "Ysolde Varn"]));
+    expect(
+      within(screen.getByRole("group", { name: "Kinds" })).getByRole("button", { name: /^Places/ })
+    ).toHaveTextContent("1");
     expect(api.codexApi.listPages).not.toHaveBeenCalled();
     expect(api.codexApi.listFolders).not.toHaveBeenCalled();
     expect(screen.queryByRole("region", { name: "Folders" })).not.toBeInTheDocument();
